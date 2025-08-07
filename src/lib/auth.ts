@@ -157,7 +157,7 @@ export class AuthService {
       } else {
         // Email confirmation is required
         return {
-          success: false,
+          success: true,
           error: 'Account created successfully! Please check your email to confirm your account before signing in.',
         };
       }

@@ -13,6 +13,7 @@ export default function SignUpForm() {
   const [isChecked, setIsChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     fname: '',
     lname: '',
@@ -46,6 +47,7 @@ export default function SignUpForm() {
 
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       const fullName = `${formData.fname} ${formData.lname}`;
@@ -61,7 +63,7 @@ export default function SignUpForm() {
       } else {
         // Check if this is an email confirmation message
         if (result.error && result.error.includes('email')) {
-          setError('Account created successfully! Please check your email to confirm your account before signing in.');
+          setSuccess('Account created successfully! Please check your email to confirm your account before signing in.');
         } else {
           setError(result.error || 'Failed to create account. Please try again.');
         }
@@ -102,6 +104,16 @@ export default function SignUpForm() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                   <span className="text-red-800 dark:text-red-200">{error}</span>
+                </div>
+              </div>
+            )}
+            {success && (
+              <div className="mb-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-green-800 dark:text-green-200">{success}</span>
                 </div>
               </div>
             )}
