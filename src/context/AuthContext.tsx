@@ -1,0 +1,286 @@
+"use client";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, UserRole, Customer } from '../types/carwash';
+import { AuthService } from '../lib/auth';
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  isAuthenticated: boolean;
+  hasRole: (role: UserRole) => boolean;
+  hasAnyRole: (roles: UserRole[]) => boolean;
+  signUpSuperAdmin: (name: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  createAdmin: (name: string, email: string, phone: string) => Promise<{ success: boolean; error?: string }>;
+  createCarWasher: (name: string, email: string, phone: string, hourlyRate?: number) => Promise<{ success: boolean; error?: string }>;
+  createCustomer: (customerData: {
+    name: string;
+    email?: string;
+    phone: string;
+    licensePlate: string;
+    vehicleType: string;
+    vehicleModel?: string;
+    vehicleColor: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  fetchCustomers: (params?: {
+    search?: string;
+    filter?: 'all' | 'registered' | 'unregistered';
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => Promise<{ success: boolean; customers?: Customer[]; error?: string }>;
+  searchCustomersByEmail: (email: string) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const currentUser = await AuthService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await AuthService.login({ email, password });
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await AuthService.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const signUpSuperAdmin = async (name: string, email: string, phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    setIsLoading(true);
+    try {
+      const response = await AuthService.signUpSuperAdmin({
+        name,
+        email,
+        phone,
+        password,
+      });
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+        return { success: true };
+      }
+      
+      return { success: false, error: response.error };
+    } catch (error) {
+      console.error('Sign up error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createAdmin = async (name: string, email: string, phone: string): Promise<{ success: boolean; error?: string }> => {
+    if (!user || user.role !== 'super_admin') {
+      console.error('Only Super Admins can create admin users');
+      return { success: false, error: 'Only Super Admins can create admin users' };
+    }
+
+    try {
+      const response = await fetch('/api/admin/create-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          createdBy: user.id,
+        }),
+      });
+
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (error) {
+      console.error('Create admin error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const createCarWasher = async (name: string, email: string, phone: string, hourlyRate?: number): Promise<{ success: boolean; error?: string }> => {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      console.error('Only Super Admins and Admins can create car washer users');
+      return { success: false, error: 'Only Super Admins and Admins can create car washer users' };
+    }
+
+    try {
+      const response = await fetch('/api/admin/create-carwasher', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          hourlyRate,
+          createdBy: user.id,
+        }),
+      });
+
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (error) {
+      console.error('Create car washer error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const createCustomer = async (customerData: {
+    name: string;
+    email?: string;
+    phone: string;
+    licensePlate: string;
+    vehicleType: string;
+    vehicleModel?: string;
+    vehicleColor: string;
+  }) => {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      console.error('Only Super Admins and Admins can create customers');
+      return { success: false, error: 'Only Super Admins and Admins can create customers' };
+    }
+
+    try {
+      const response = await fetch('/api/admin/create-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...customerData,
+          createdBy: user.id,
+        }),
+      });
+
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (error) {
+      console.error('Create customer error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const fetchCustomers = async (params?: {
+    search?: string;
+    filter?: 'all' | 'registered' | 'unregistered';
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      console.error('Only Super Admins and Admins can fetch customers');
+      return { success: false, error: 'Only Super Admins and Admins can fetch customers' };
+    }
+
+    try {
+      const searchParams = new URLSearchParams();
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.filter) searchParams.append('filter', params.filter);
+      if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+
+      const response = await fetch(`/api/admin/customers?${searchParams.toString()}`);
+      const result = await response.json();
+      return { success: result.success, customers: result.customers, error: result.error };
+    } catch (error) {
+      console.error('Fetch customers error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const searchCustomersByEmail = async (email: string): Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }> => {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      console.error('Only Super Admins and Admins can search customers by email');
+      return { success: false, error: 'Only Super Admins and Admins can search customers by email' };
+    }
+
+    try {
+      const response = await fetch(`/api/admin/customers/search?email=${encodeURIComponent(email)}`);
+      const result = await response.json();
+      return { success: result.success, customers: result.customers, found: result.found, error: result.error };
+    } catch (error) {
+      console.error('Search customers by email error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
+  const hasRole = (role: UserRole): boolean => {
+    return user?.role === role;
+  };
+
+  const hasAnyRole = (roles: UserRole[]): boolean => {
+    return user ? roles.includes(user.role) : false;
+  };
+
+  const value: AuthContextType = {
+    user,
+    isLoading,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    hasRole,
+    hasAnyRole,
+    signUpSuperAdmin,
+    createAdmin,
+    createCarWasher,
+    createCustomer,
+    fetchCustomers,
+    searchCustomersByEmail,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}; 
