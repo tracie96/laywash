@@ -1,20 +1,20 @@
 "use client";
-import React from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../../context/SidebarContext";
 import { useAuth } from "../../context/AuthContext";
 import {
+  ChevronDownIcon,
   GridIcon,
   UserCircleIcon,
-  ChevronDownIcon,
-  HorizontaLDots,
   DollarIcon,
   CarIcon,
   ToolIcon,
-  StockIcon,
   ReportIcon,
+  CheckLineIcon,
+  StockIcon,
+  HorizontaLDots,
 } from "../../icons/index";
 
 type NavItem = {
@@ -25,47 +25,51 @@ type NavItem = {
   roles: string[];
 };
 
+// Super Admin Navigation Items
 const superAdminItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
     path: "/dashboard",
-    roles: ['super_admin'],
+    roles: ["super_admin"]
   },
   {
     icon: <UserCircleIcon />,
     name: "User Management",
     subItems: [
       { name: "Manage Admins", path: "/users/admins", pro: false },
-      { name: "Manage Washers", path: "/users/washers", pro: false },
+      { name: "Manage Washers", path: "/users/washers", pro: false }
     ],
-    roles: ['super_admin'],
+    roles: ["super_admin"]
   },
   {
     icon: <DollarIcon />,
     name: "Financial",
     subItems: [
       { name: "Payment History", path: "/financial/payments", pro: false },
-      { name: "Reports", path: "/financial/reports", pro: false },
-      { name: "Bonuses", path: "/financial/bonuses", pro: false },
+      { name: "Financial Reports", path: "/financial/reports", pro: false },
+      { name: "Bonuses", path: "/financial/bonuses", pro: false }
     ],
-    roles: ['super_admin'],
+    roles: ["super_admin"]
   },
   {
     icon: <CarIcon />,
     name: "Operations",
     subItems: [
-      { name: "All Check-ins", path: "/operations/checkins", pro: false },
       { name: "Customer Database", path: "/operations/customers", pro: false },
       { name: "Services", path: "/operations/services", pro: false },
+      { name: "Check-ins", path: "/operations/checkins", pro: false }
     ],
-    roles: ['super_admin'],
+    roles: ["super_admin"]
   },
   {
     icon: <StockIcon />,
     name: "Stock Management",
-    path: "/stock",
-    roles: ['super_admin'],
+    subItems: [
+      { name: "Inventory", path: "/stock/inventory", pro: false },
+      { name: "Update Stock", path: "/stock/update", pro: false }
+    ],
+    roles: ["super_admin"]
   },
   {
     icon: <ToolIcon />,
@@ -73,111 +77,98 @@ const superAdminItems: NavItem[] = [
     subItems: [
       { name: "Tool Management", path: "/tools/management", pro: false },
       { name: "Tool Assignments", path: "/tools/assignments", pro: false },
-      { name: "Lost Tool Charges", path: "/tools/charges", pro: false },
+      { name: "Lost Tool Charges", path: "/tools/charges", pro: false }
     ],
-    roles: ['super_admin'],
+    roles: ["super_admin"]
   },
   {
     icon: <ReportIcon />,
     name: "Reports & Analytics",
     subItems: [
-      { name: "Sales Reports", path: "/reports/sales", pro: false },
       { name: "Performance Reports", path: "/reports/performance", pro: false },
-      { name: "Stock Reports", path: "/reports/stock", pro: false },
+      { name: "Sales Reports", path: "/reports/sales", pro: false },
+      { name: "Stock Reports", path: "/reports/stock", pro: false }
     ],
-    roles: ['super_admin'],
-  },
+    roles: ["super_admin"]
+  }
 ];
 
+// Admin Navigation Items
 const adminItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
     path: "/dashboard",
-    roles: ['admin'],
+    roles: ["admin"]
+  },
+  {
+    icon: <CheckLineIcon />,
+    name: "Check-ins",
+    subItems: [
+      { name: "Active Check-ins", path: "/checkins/active", pro: false },
+      { name: "New Check-in", path: "/checkins/new", pro: false },
+      { name: "Check-in History", path: "/checkins/history", pro: false }
+    ],
+    roles: ["admin"]
   },
   {
     icon: <CarIcon />,
-    name: "Car Check-ins",
+    name: "Operations",
     subItems: [
-      { name: "New Check-in", path: "/checkins/new", pro: false },
-      { name: "Active Check-ins", path: "/checkins/active", pro: false },
-      { name: "Check-in History", path: "/checkins/history", pro: false },
+      { name: "Customer Database", path: "/operations/customers", pro: false },
+      { name: "Services", path: "/operations/services", pro: false }
     ],
-    roles: ['admin'],
+    roles: ["admin"]
   },
   {
     icon: <UserCircleIcon />,
-    name: "Customer Management",
+    name: "Workers",
     subItems: [
-      { name: "Register Customer", path: "/customers/new", pro: false },
-      { name: "Customer Database", path: "/customers/list", pro: false },
+      { name: "Worker List", path: "/workers/list", pro: false },
+      { name: "Add Worker", path: "/add-worker", pro: false }
     ],
-    roles: ['admin'],
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "Worker Management",
-    subItems: [
-      { name: "View Workers", path: "/workers/list", pro: false },
-      { name: "Edit Workers", path: "/workers/edit", pro: false },
-    ],
-    roles: ['admin'],
-  },
-  {
-    icon: <StockIcon />,
-    name: "Stock Management",
-    subItems: [
-      { name: "Update Stock", path: "/stock/update", pro: false },
-      { name: "Stock Inventory", path: "/stock/inventory", pro: false },
-    ],
-    roles: ['admin'],
+    roles: ["admin"]
   },
   {
     icon: <DollarIcon />,
-    name: "Payments",
+    name: "Financial",
     subItems: [
       { name: "Payment History", path: "/payments/history", pro: false },
-      { name: "Daily Reports", path: "/payments/reports", pro: false },
+      { name: "Payment Reports", path: "/payments/reports", pro: false }
     ],
-    roles: ['admin'],
+    roles: ["admin"]
   },
+  {
+    icon: <StockIcon />,
+    name: "Stock",
+    subItems: [
+      { name: "Inventory", path: "/stock/inventory", pro: false },
+      { name: "Update Stock", path: "/stock/update", pro: false }
+    ],
+    roles: ["admin"]
+  }
 ];
 
+// Car Washer Navigation Items
 const washerItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
     path: "/dashboard",
-    roles: ['car_washer'],
+    roles: ["car_washer"]
   },
   {
-    icon: <CarIcon />,
-    name: "My Assignments",
-    subItems: [
-      { name: "Current Assignments", path: "/assignments/current", pro: false },
-      { name: "Completed Cars", path: "/assignments/completed", pro: false },
-    ],
-    roles: ['car_washer'],
+    icon: <CheckLineIcon />,
+    name: "My Check-ins",
+    path: "/checkins/my-checkins",
+    roles: ["car_washer"]
   },
   {
-    icon: <DollarIcon />,
-    name: "Income",
-    subItems: [
-      { name: "Daily Income", path: "/income/daily", pro: false },
-      { name: "Income History", path: "/income/history", pro: false },
-    ],
-    roles: ['car_washer'],
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "Profile",
-    subItems: [
-      { name: "My Profile", path: "/profile", pro: false },
-      { name: "Performance History", path: "/profile/performance", pro: false },
-    ],
-    roles: ['car_washer'],
-  },
+    icon: <ReportIcon />,
+    name: "My Performance",
+    path: "/reports/my-performance",
+    roles: ["car_washer"]
+  }
 ];
 
 const CarWashSidebar: React.FC = () => {
@@ -199,48 +190,35 @@ const CarWashSidebar: React.FC = () => {
 
   const navItems = getNavItems();
 
-  // State for submenu functionality
-  const [openSubmenu, setOpenSubmenu] = React.useState<number | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = React.useState<Record<number, number>>({});
-  const subMenuRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
-  const manuallyOpenedRef = React.useRef<boolean>(false);
+  const [openSubmenu, setOpenSubmenu] = useState<{
+    type: "main";
+    index: number;
+  } | null>(null);
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
+  const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const isActive = (path: string) => path === pathname;
+  const isActive = useCallback((path: string) => path === pathname, [pathname]);
 
-  const handleSubmenuToggle = (index: number) => {
-    console.log('Submenu toggle clicked for index:', index);
-    manuallyOpenedRef.current = true;
-    setOpenSubmenu((prevOpenSubmenu) => {
-      const newValue = prevOpenSubmenu === index ? null : index;
-      console.log('Setting openSubmenu from', prevOpenSubmenu, 'to', newValue);
-      return newValue;
-    });
-    
-    // Reset the manually opened flag after a short delay
-    setTimeout(() => {
-      manuallyOpenedRef.current = false;
-    }, 100);
-  };
-
-  const renderMenuItems = (navItems: NavItem[]) => (
+  const renderMenuItems = (navItems: NavItem[], menuType: "main") => (
     <ul className="flex flex-col gap-4">
       {navItems.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
-              onClick={() => handleSubmenuToggle(index)}
+              onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group ${
-                openSubmenu === index ? "menu-item-active" : "menu-item-inactive"
+                openSubmenu?.type === menuType && openSubmenu?.index === index
+                  ? "menu-item-active"
+                  : "menu-item-inactive"
               } cursor-pointer ${
                 !isExpanded && !isHovered
                   ? "lg:justify-center"
                   : "lg:justify-start"
               }`}
             >
-
               <span
                 className={`${
-                  openSubmenu === index
+                  openSubmenu?.type === menuType && openSubmenu?.index === index
                     ? "menu-item-icon-active"
                     : "menu-item-icon-inactive"
                 }`}
@@ -253,7 +231,7 @@ const CarWashSidebar: React.FC = () => {
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${
-                    openSubmenu === index
+                    openSubmenu?.type === menuType && openSubmenu?.index === index
                       ? "rotate-180 text-green-light-600 dark:text-green-light-300"
                       : "text-gray-400 dark:text-gray-500"
                   }`}
@@ -283,16 +261,16 @@ const CarWashSidebar: React.FC = () => {
               </Link>
             )
           )}
-          {nav.subItems && (
+          {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
             <div
               ref={(el) => {
-                subMenuRefs.current[index] = el;
+                subMenuRefs.current[`${menuType}-${index}`] = el;
               }}
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
-                  openSubmenu === index
-                    ? `${subMenuHeight[index] || 200}px`
+                  openSubmenu?.type === menuType && openSubmenu?.index === index
+                    ? `${subMenuHeight[`${menuType}-${index}`]}px`
                     : "0px",
               }}
             >
@@ -343,100 +321,91 @@ const CarWashSidebar: React.FC = () => {
     </ul>
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Check if the current path matches any submenu item
     let submenuMatched = false;
     navItems.forEach((nav, index) => {
       if (nav.subItems) {
         nav.subItems.forEach((subItem) => {
           if (isActive(subItem.path)) {
-            setOpenSubmenu(index);
+            setOpenSubmenu({
+              type: "main",
+              index,
+            });
             submenuMatched = true;
-            manuallyOpenedRef.current = false; // Reset the flag when navigating to a submenu page
           }
         });
       }
     });
 
-    // Only close the submenu if we're navigating to a page that's not in any submenu
-    // AND the user hasn't manually opened it
-    if (!submenuMatched && !manuallyOpenedRef.current) {
+    // If no submenu item matches, close the open submenu
+    if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [pathname, navItems, isActive]);
+  }, [pathname, isActive, navItems]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
-    console.log('openSubmenu changed to:', openSubmenu);
     if (openSubmenu !== null) {
-      // Use setTimeout to ensure the DOM has updated
-      setTimeout(() => {
-        if (subMenuRefs.current[openSubmenu]) {
-          const height = subMenuRefs.current[openSubmenu]?.scrollHeight || 0;
-          console.log('Calculated height for submenu', openSubmenu, ':', height);
-          setSubMenuHeight((prevHeights) => ({
-            ...prevHeights,
-            [openSubmenu]: height,
-          }));
-        } else {
-          console.log('Submenu ref not found for index:', openSubmenu);
-        }
-      }, 0);
+      const key = `${openSubmenu.type}-${openSubmenu.index}`;
+      if (subMenuRefs.current[key]) {
+        setSubMenuHeight((prevHeights) => ({
+          ...prevHeights,
+          [key]: subMenuRefs.current[key]?.scrollHeight || 0,
+        }));
+      }
     }
   }, [openSubmenu]);
 
-  // Debug effect to log state changes
-  React.useEffect(() => {
-    console.log('Current state - openSubmenu:', openSubmenu, 'subMenuHeight:', subMenuHeight);
-  }, [openSubmenu, subMenuHeight]);
+  const handleSubmenuToggle = (index: number, menuType: "main") => {
+    setOpenSubmenu((prevOpenSubmenu) => {
+      if (
+        prevOpenSubmenu &&
+        prevOpenSubmenu.type === menuType &&
+        prevOpenSubmenu.index === index
+      ) {
+        return null;
+      }
+      return { type: menuType, index };
+    });
+  };
 
   if (!user) return null;
 
   return (
     <aside
-    className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
-      ${
-        isExpanded || isMobileOpen
-          ? "w-[290px]"
-          : isHovered
-          ? "w-[290px]"
-          : "w-[90px]"
-      }
-      ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-      lg:translate-x-0`}
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+        ${
+          isExpanded || isMobileOpen
+            ? "w-[290px]"
+            : isHovered
+            ? "w-[290px]"
+            : "w-[90px]"
+        }
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+        lg:translate-x-0`}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex dark:border-green-light-800/30 ${
+        className={`py-8 flex ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/dashboard">
+        <Link href="/">
           {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.png"
-                alt="Car Wash Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.png"
-                alt="Car Wash Logo"
-                width={150}
-                height={40}
-              />
-            </>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-green-light-600 rounded-lg flex items-center justify-center">
+                <CarIcon />
+              </div>
+              <span className="text-xl font-bold text-gray-900 dark:text-white">
+                LAYWASH
+              </span>
+            </div>
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Car Wash Logo"
-              width={32}
-              height={32}
-            />
+            <div className="w-8 h-8 bg-green-light-600 rounded-lg flex items-center justify-center">
+              <CarIcon />
+            </div>
           )}
         </Link>
       </div>
@@ -445,7 +414,7 @@ const CarWashSidebar: React.FC = () => {
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-500 dark:text-gray-400 font-semibold tracking-wider ${
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
@@ -457,7 +426,7 @@ const CarWashSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems)}
+              {renderMenuItems(navItems, "main")}
             </div>
           </div>
         </nav>
