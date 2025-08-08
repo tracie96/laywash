@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { Modal } from "@/components/ui/modal";
+import { useModal } from "@/hooks/useModal";
 
 interface ToolAssignment {
   id: string;
@@ -12,45 +14,171 @@ interface ToolAssignment {
   notes: string;
 }
 
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  isReturnable: boolean;
+  replacementCost: number;
+  totalQuantity: number;
+  availableQuantity: number;
+  isActive: boolean;
+}
+
+interface Worker {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: string;
+  isAvailable: boolean;
+}
+
+interface AssignmentForm {
+  toolId: string;
+  workerId: string;
+  assignedDate: string;
+  expectedReturnDate: string;
+  notes: string;
+}
+
 const ToolsAssignmentsPage: React.FC = () => {
   const [assignments, setAssignments] = useState<ToolAssignment[]>([]);
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { isOpen, openModal, closeModal } = useModal();
+  
+  const [assignmentForm, setAssignmentForm] = useState<AssignmentForm>({
+    toolId: '',
+    workerId: '',
+    assignedDate: new Date().toISOString().split('T')[0],
+    expectedReturnDate: '',
+    notes: ''
+  });
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockAssignments: ToolAssignment[] = [
-      {
-        id: "1",
-        toolName: "Pressure Washer",
-        workerName: "John Smith",
-        assignedDate: "2024-01-15",
-        status: "assigned",
-        notes: "Assigned for morning shift"
-      },
-      {
-        id: "2",
-        toolName: "Vacuum Cleaner",
-        workerName: "Sarah Johnson",
-        assignedDate: "2024-01-14",
-        returnDate: "2024-01-15",
-        status: "returned",
-        notes: "Returned in good condition"
-      },
-      {
-        id: "3",
-        toolName: "Scrub Brushes",
-        workerName: "Mike Davis",
-        assignedDate: "2024-01-10",
-        status: "overdue",
-        notes: "Should have been returned yesterday"
-      }
-    ];
-
-    setTimeout(() => {
-      setAssignments(mockAssignments);
-      setLoading(false);
-    }, 1000);
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch assignments (mock data for now)
+      const mockAssignments: ToolAssignment[] = [
+        {
+          id: "1",
+          toolName: "Pressure Washer",
+          workerName: "John Smith",
+          assignedDate: "2024-01-15",
+          status: "assigned",
+          notes: "Assigned for morning shift"
+        },
+        {
+          id: "2",
+          toolName: "Vacuum Cleaner",
+          workerName: "Sarah Johnson",
+          assignedDate: "2024-01-14",
+          returnDate: "2024-01-15",
+          status: "returned",
+          notes: "Returned in good condition"
+        },
+        {
+          id: "3",
+          toolName: "Scrub Brushes",
+          workerName: "Mike Davis",
+          assignedDate: "2024-01-10",
+          status: "overdue",
+          notes: "Should have been returned yesterday"
+        }
+      ];
+
+      // Fetch tools
+      const toolsResponse = await fetch('/api/admin/tools');
+      const toolsData = await toolsResponse.json();
+      
+      // Fetch workers
+      const workersResponse = await fetch('/api/admin/washers');
+      const workersData = await workersResponse.json();
+
+      setTimeout(() => {
+        setAssignments(mockAssignments);
+        setTools(toolsData.success ? toolsData.tools : []);
+        setWorkers(workersData.success ? workersData.washers : []);
+        setLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Failed to load data');
+      setLoading(false);
+    }
+  };
+
+  const handleAssignTool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!assignmentForm.toolId || !assignmentForm.workerId || !assignmentForm.assignedDate) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // Get tool and worker details
+      const selectedTool = tools.find(t => t.id === assignmentForm.toolId);
+      const selectedWorker = workers.find(w => w.id === assignmentForm.workerId);
+
+      if (!selectedTool || !selectedWorker) {
+        setError('Invalid tool or worker selection');
+        return;
+      }
+
+      // Check if tool is available
+      if (selectedTool.availableQuantity <= 0) {
+        setError('This tool is not available for assignment');
+        return;
+      }
+
+      // Create new assignment (mock for now - would integrate with API)
+      const newAssignment: ToolAssignment = {
+        id: Date.now().toString(),
+        toolName: selectedTool.name,
+        workerName: selectedWorker.name,
+        assignedDate: assignmentForm.assignedDate,
+        status: "assigned",
+        notes: assignmentForm.notes
+      };
+
+      // Add to assignments list
+      setAssignments(prev => [newAssignment, ...prev]);
+
+      // Reset form and close modal
+      setAssignmentForm({
+        toolId: '',
+        workerId: '',
+        assignedDate: new Date().toISOString().split('T')[0],
+        expectedReturnDate: '',
+        notes: ''
+      });
+      closeModal();
+
+      // Show success message (you could add a toast notification here)
+      console.log('Tool assigned successfully!');
+      
+    } catch (error) {
+      console.error('Error assigning tool:', error);
+      setError('Failed to assign tool');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -131,7 +259,10 @@ const ToolsAssignmentsPage: React.FC = () => {
 
       {/* Action Button */}
       <div className="flex justify-end">
-        <button className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+        <button 
+          onClick={openModal}
+          className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+        >
           Assign New Tool
         </button>
       </div>
@@ -193,6 +324,122 @@ const ToolsAssignmentsPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Assignment Modal */}
+      <Modal isOpen={isOpen} onClose={closeModal} className="max-w-md">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assign New Tool</h3>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-error-100 border border-error-300 text-error-700 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleAssignTool} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tool *
+              </label>
+              <select
+                value={assignmentForm.toolId}
+                onChange={(e) => setAssignmentForm({...assignmentForm, toolId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select a tool</option>
+                {tools
+                  .filter(tool => tool.isActive && tool.availableQuantity > 0)
+                  .map(tool => (
+                    <option key={tool.id} value={tool.id}>
+                      {tool.name} ({tool.availableQuantity} available)
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Worker *
+              </label>
+              <select
+                value={assignmentForm.workerId}
+                onChange={(e) => setAssignmentForm({...assignmentForm, workerId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select a worker</option>
+                {workers
+                  .filter(worker => worker.status === 'active' && worker.isAvailable)
+                  .map(worker => (
+                    <option key={worker.id} value={worker.id}>
+                      {worker.name} ({worker.email})
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Assignment Date *
+              </label>
+              <input
+                type="date"
+                value={assignmentForm.assignedDate}
+                onChange={(e) => setAssignmentForm({...assignmentForm, assignedDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Expected Return Date
+              </label>
+              <input
+                type="date"
+                value={assignmentForm.expectedReturnDate}
+                onChange={(e) => setAssignmentForm({...assignmentForm, expectedReturnDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Notes
+              </label>
+              <textarea
+                value={assignmentForm.notes}
+                onChange={(e) => setAssignmentForm({...assignmentForm, notes: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Any additional notes about this assignment..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 bg-green-light-600 hover:bg-green-light-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Assigning...' : 'Assign Tool'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 };

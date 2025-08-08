@@ -15,56 +15,50 @@ interface PerformanceReport {
   date: string;
 }
 
+interface PerformanceSummary {
+  totalWorkers: number;
+  totalCarsWashed: number;
+  totalEarnings: number;
+  averageEfficiency: number;
+}
+
 const PerformanceReportsPage: React.FC = () => {
   const [reports, setReports] = useState<PerformanceReport[]>([]);
+  const [summary, setSummary] = useState<PerformanceSummary>({
+    totalWorkers: 0,
+    totalCarsWashed: 0,
+    totalEarnings: 0,
+    averageEfficiency: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState('1'); // Default to last 1 month
+
+  const fetchPerformanceReports = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/admin/performance-reports?period=${period}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReports(data.reports);
+        setSummary(data.summary);
+      } else {
+        setError(data.error || 'Failed to fetch performance reports');
+      }
+    } catch (err) {
+      console.error('Error fetching performance reports:', err);
+      setError('An unexpected error occurred while fetching data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockReports: PerformanceReport[] = [
-      {
-        id: "1",
-        workerName: "John Smith",
-        period: "January 2024",
-        carsWashed: 45,
-        averageRating: 4.8,
-        totalHours: 160,
-        hourlyRate: 15.00,
-        totalEarnings: 2400.00,
-        efficiency: 95,
-        date: "2024-01-31"
-      },
-      {
-        id: "2",
-        workerName: "Sarah Johnson",
-        period: "January 2024",
-        carsWashed: 42,
-        averageRating: 4.9,
-        totalHours: 155,
-        hourlyRate: 16.00,
-        totalEarnings: 2480.00,
-        efficiency: 98,
-        date: "2024-01-31"
-      },
-      {
-        id: "3",
-        workerName: "Mike Davis",
-        period: "January 2024",
-        carsWashed: 38,
-        averageRating: 4.6,
-        totalHours: 150,
-        hourlyRate: 14.50,
-        totalEarnings: 2175.00,
-        efficiency: 88,
-        date: "2024-01-31"
-      }
-    ];
-
-    setTimeout(() => {
-      setReports(mockReports);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    fetchPerformanceReports();
+  }, [period]);
 
   const getEfficiencyColor = (efficiency: number) => {
     if (efficiency >= 95) return "text-green-600 dark:text-green-400";
@@ -78,10 +72,6 @@ const PerformanceReportsPage: React.FC = () => {
     return "text-error-600 dark:text-error-400";
   };
 
-  const totalCarsWashed = reports.reduce((sum, report) => sum + report.carsWashed, 0);
-  const totalEarnings = reports.reduce((sum, report) => sum + report.totalEarnings, 0);
-  const averageEfficiency = reports.length > 0 ? reports.reduce((sum, report) => sum + report.efficiency, 0) / reports.length : 0;
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -93,17 +83,65 @@ const PerformanceReportsPage: React.FC = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 dark:text-red-400 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <button 
+            onClick={fetchPerformanceReports}
+            className="px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Performance Reports" />
 
+      {/* Period Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter by Period</h3>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+          >
+            <option value="1">Last Month</option>
+            <option value="3">Last 3 Months</option>
+            <option value="6">Last 6 Months</option>
+            <option value="12">Last Year</option>
+          </select>
+        </div>
+      </div>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Workers</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{summary.totalWorkers}</p>
+            </div>
+            <div className="p-3 bg-blue-light-100 dark:bg-blue-light-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-blue-light-600 dark:text-blue-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Cars Washed</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCarsWashed}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{summary.totalCarsWashed}</p>
             </div>
             <div className="p-3 bg-blue-light-100 dark:bg-blue-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-blue-light-600 dark:text-blue-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +155,7 @@ const PerformanceReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Earnings</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalEarnings.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">${summary.totalEarnings.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +169,7 @@ const PerformanceReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Efficiency</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{averageEfficiency.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{summary.averageEfficiency.toFixed(1)}%</p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
               <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,59 +184,66 @@ const PerformanceReportsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Performance Reports</h2>
+          {reports.length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              No performance data available for the selected period.
+            </p>
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Worker</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Period</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cars Washed</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rating</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hours</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hourly Rate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Earnings</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Efficiency</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {reports.map((report) => (
-                <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {report.workerName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {report.period}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {report.carsWashed}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getRatingColor(report.averageRating)}`}>
-                    ⭐ {report.averageRating.toFixed(1)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {report.totalHours}h
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    ${report.hourlyRate.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-medium">
-                    ${report.totalEarnings.toFixed(2)}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getEfficiencyColor(report.efficiency)}`}>
-                    {report.efficiency}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
-                      View Details
-                    </button>
-                  </td>
+        {reports.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Worker</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Period</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cars Washed</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rating</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hours</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hourly Rate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Earnings</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Efficiency</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {reports.map((report) => (
+                  <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {report.workerName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {report.period}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {report.carsWashed}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getRatingColor(report.averageRating)}`}>
+                      ⭐ {report.averageRating.toFixed(1)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {report.totalHours}h
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      ${report.hourlyRate.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-medium">
+                      ${report.totalEarnings.toFixed(2)}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getEfficiencyColor(report.efficiency)}`}>
+                      {report.efficiency}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
