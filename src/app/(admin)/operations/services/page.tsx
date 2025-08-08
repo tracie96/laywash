@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { PlusIcon, TrashBinIcon } from "@/icons";
 
 interface Service {
   id: string;
@@ -8,65 +9,160 @@ interface Service {
   description: string;
   price: number;
   duration: number;
-  category: string;
+  category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
   isActive: boolean;
   popularity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CreateServiceForm {
+  name: string;
+  description: string;
+  price: number;
+  category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
+  duration: number;
 }
 
 const OperationsServicesPage: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateServiceForm>({
+    name: '',
+    description: '',
+    price: 0,
+    category: 'exterior',
+    duration: 30
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockServices: Service[] = [
-      {
-        id: "1",
-        name: "Basic Wash",
-        description: "Exterior wash and basic interior cleaning",
-        price: 25.00,
-        duration: 30,
-        category: "Basic",
-        isActive: true,
-        popularity: 85
-      },
-      {
-        id: "2",
-        name: "Full Wash",
-        description: "Complete exterior and interior cleaning",
-        price: 45.00,
-        duration: 60,
-        category: "Standard",
-        isActive: true,
-        popularity: 92
-      },
-      {
-        id: "3",
-        name: "Premium Wash",
-        description: "Full wash with wax and detailing",
-        price: 75.00,
-        duration: 90,
-        category: "Premium",
-        isActive: true,
-        popularity: 78
-      },
-      {
-        id: "4",
-        name: "Express Wash",
-        description: "Quick exterior wash only",
-        price: 15.00,
-        duration: 15,
-        category: "Basic",
-        isActive: false,
-        popularity: 45
-      }
-    ];
+    fetchServices();
+  }, [searchTerm, filterCategory, filterStatus]);
 
-    setTimeout(() => {
-      setServices(mockServices);
+  const fetchServices = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterCategory !== 'all') params.append('category', filterCategory);
+      if (filterStatus !== 'all') params.append('status', filterStatus);
+      
+      const response = await fetch(`/api/admin/services?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setServices(data.services);
+      } else {
+        setError(data.error || 'Failed to fetch services');
+      }
+    } catch {
+      console.error('Error fetching services');
+      setError('Failed to fetch services from server');
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  const handleCreateService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!createForm.name || !createForm.price || !createForm.duration) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (createForm.price <= 0) {
+      setError('Price must be greater than 0');
+      return;
+    }
+
+    if (createForm.duration <= 0) {
+      setError('Duration must be greater than 0');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/services', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createForm),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowCreateModal(false);
+        setCreateForm({
+          name: '',
+          description: '',
+          price: 0,
+          category: 'exterior',
+          duration: 30
+        });
+        fetchServices(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to create service');
+      }
+    } catch {
+      setError('Failed to create service');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleServiceAction = async (serviceId: string, action: 'toggle' | 'delete') => {
+    try {
+      if (action === 'delete') {
+        const response = await fetch(`/api/admin/services/${serviceId}`, {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          fetchServices(); // Refresh the list
+        } else {
+          setError(data.error || 'Failed to delete service');
+        }
+      } else if (action === 'toggle') {
+        // Find the current service to toggle its status
+        const currentService = services.find(s => s.id === serviceId);
+        if (!currentService) return;
+
+        const response = await fetch(`/api/admin/services/${serviceId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            isActive: !currentService.isActive
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          fetchServices(); // Refresh the list
+        } else {
+          setError(data.error || 'Failed to update service');
+        }
+      }
+    } catch {
+      setError('Failed to perform action');
+    }
+  };
 
   const getStatusColor = (isActive: boolean) => {
     return isActive 
@@ -76,20 +172,44 @@ const OperationsServicesPage: React.FC = () => {
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "Premium":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
-      case "Standard":
+      case "exterior":
         return "bg-blue-light-100 text-blue-light-800 dark:bg-blue-light-900/30 dark:text-blue-light-300";
-      case "Basic":
+      case "interior":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+      case "engine":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+      case "vacuum":
         return "bg-green-light-100 text-green-light-800 dark:bg-green-light-900/30 dark:text-green-light-300";
+      case "complementary":
+        return "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case "exterior": return "Exterior";
+      case "interior": return "Interior";
+      case "engine": return "Engine";
+      case "vacuum": return "Vacuum";
+      case "complementary": return "Complementary";
+      default: return category;
     }
   };
 
   const totalServices = services.length;
   const activeServices = services.filter(s => s.isActive).length;
   const averagePrice = services.length > 0 ? services.reduce((sum, service) => sum + service.price, 0) / services.length : 0;
+
+  const filteredServices = services.filter(service => {
+    if (filterCategory !== 'all' && service.category !== filterCategory) return false;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'active' && !service.isActive) return false;
+      if (filterStatus === 'inactive' && service.isActive) return false;
+    }
+    return true;
+  });
 
   if (loading) {
     return (
@@ -151,12 +271,63 @@ const OperationsServicesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Button */}
-      <div className="flex justify-end">
-        <button className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-          Add New Service
-        </button>
+      {/* Search and Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex flex-wrap gap-4">
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value as 'all' | 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Categories</option>
+              <option value="exterior">Exterior</option>
+              <option value="interior">Interior</option>
+              <option value="engine">Engine</option>
+              <option value="vacuum">Vacuum</option>
+              <option value="complementary">Complementary</option>
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+          </div>
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Add Service
+          </button>
+        </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-red-800 dark:text-red-200">{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Services Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -164,71 +335,219 @@ const OperationsServicesPage: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Service Management</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Popularity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {services.map((service) => (
-                <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {service.name}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                    {service.description}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    ${service.price.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {service.duration} min
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(service.category)}`}>
-                      {service.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center">
-                      <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className="bg-green-light-600 h-2 rounded-full" 
-                          style={{ width: `${service.popularity}%` }}
-                        ></div>
-                      </div>
-                      <span>{service.popularity}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(service.isActive)}`}>
-                      {service.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex space-x-2">
-                      <button className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300">
-                        Edit
-                      </button>
-                      <button className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300">
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          {filteredServices.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="text-gray-400 dark:text-gray-500 text-4xl mb-4">🔧</div>
+              <p className="text-gray-600 dark:text-gray-400">No services found</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                {searchTerm || filterCategory !== 'all' || filterStatus !== 'all'
+                  ? 'Try adjusting your search or filters to see more results.'
+                  : 'Add your first service to get started.'
+                }
+              </p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Popularity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredServices.map((service) => (
+                  <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {service.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          ID: {service.id.slice(0, 8)}...
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                      {service.description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      ${service.price.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {service.duration} min
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(service.category)}`}>
+                        {getCategoryLabel(service.category)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div 
+                            className="bg-green-light-600 h-2 rounded-full" 
+                            style={{ width: `${service.popularity}%` }}
+                          ></div>
+                        </div>
+                        <span>{service.popularity}%</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(service.isActive)}`}>
+                        {service.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => handleServiceAction(service.id, 'toggle')}
+                          className={`${
+                            service.isActive 
+                              ? 'text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300'
+                              : 'text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300'
+                          }`}
+                          title={service.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          {service.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button 
+                          onClick={() => handleServiceAction(service.id, 'delete')}
+                          className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300"
+                          title="Delete"
+                        >
+                          <TrashBinIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
+
+      {/* Create Service Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Service</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateService} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Service Name
+                </label>
+                <input
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter service name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter service description"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={createForm.price}
+                    onChange={(e) => setCreateForm({...createForm, price: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Duration (min)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={createForm.duration}
+                    onChange={(e) => setCreateForm({...createForm, duration: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="30"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Category
+                </label>
+                <select
+                  value={createForm.category}
+                  onChange={(e) => setCreateForm({...createForm, category: e.target.value as 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary'})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="exterior">Exterior</option>
+                  <option value="interior">Interior</option>
+                  <option value="engine">Engine</option>
+                  <option value="vacuum">Vacuum</option>
+                  <option value="complementary">Complementary</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 disabled:bg-green-light-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                >
+                  {submitting ? 'Creating...' : 'Create Service'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
