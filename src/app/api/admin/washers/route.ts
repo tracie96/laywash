@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         is_active,
         created_at,
         updated_at,
-        car_washer_profiles (
+        car_washer_profiles!car_washer_profiles_user_id_fkey (
           assigned_admin_id,
           hourly_rate,
           total_earnings,
