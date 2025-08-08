@@ -199,6 +199,29 @@ const CarWashSidebar: React.FC = () => {
 
   const navItems = getNavItems();
 
+  // State for submenu functionality
+  const [openSubmenu, setOpenSubmenu] = React.useState<number | null>(null);
+  const [subMenuHeight, setSubMenuHeight] = React.useState<Record<number, number>>({});
+  const subMenuRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
+  const manuallyOpenedRef = React.useRef<boolean>(false);
+
+  const isActive = (path: string) => path === pathname;
+
+  const handleSubmenuToggle = (index: number) => {
+    console.log('Submenu toggle clicked for index:', index);
+    manuallyOpenedRef.current = true;
+    setOpenSubmenu((prevOpenSubmenu) => {
+      const newValue = prevOpenSubmenu === index ? null : index;
+      console.log('Setting openSubmenu from', prevOpenSubmenu, 'to', newValue);
+      return newValue;
+    });
+    
+    // Reset the manually opened flag after a short delay
+    setTimeout(() => {
+      manuallyOpenedRef.current = false;
+    }, 100);
+  };
+
   const renderMenuItems = (navItems: NavItem[]) => (
     <ul className="flex flex-col gap-4">
       {navItems.map((nav, index) => (
@@ -214,6 +237,7 @@ const CarWashSidebar: React.FC = () => {
                   : "lg:justify-start"
               }`}
             >
+
               <span
                 className={`${
                   openSubmenu === index
@@ -259,7 +283,7 @@ const CarWashSidebar: React.FC = () => {
               </Link>
             )
           )}
-          {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
+          {nav.subItems && (
             <div
               ref={(el) => {
                 subMenuRefs.current[index] = el;
@@ -268,7 +292,7 @@ const CarWashSidebar: React.FC = () => {
               style={{
                 height:
                   openSubmenu === index
-                    ? `${subMenuHeight[index]}px`
+                    ? `${subMenuHeight[index] || 200}px`
                     : "0px",
               }}
             >
@@ -319,12 +343,6 @@ const CarWashSidebar: React.FC = () => {
     </ul>
   );
 
-  const [openSubmenu, setOpenSubmenu] = React.useState<number | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = React.useState<Record<number, number>>({});
-  const subMenuRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
-
-  const isActive = (path: string) => path === pathname;
-
   React.useEffect(() => {
     // Check if the current path matches any submenu item
     let submenuMatched = false;
@@ -334,37 +352,43 @@ const CarWashSidebar: React.FC = () => {
           if (isActive(subItem.path)) {
             setOpenSubmenu(index);
             submenuMatched = true;
+            manuallyOpenedRef.current = false; // Reset the flag when navigating to a submenu page
           }
         });
       }
     });
 
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
+    // Only close the submenu if we're navigating to a page that's not in any submenu
+    // AND the user hasn't manually opened it
+    if (!submenuMatched && !manuallyOpenedRef.current) {
       setOpenSubmenu(null);
     }
   }, [pathname, navItems, isActive]);
 
   React.useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
+    console.log('openSubmenu changed to:', openSubmenu);
     if (openSubmenu !== null) {
-      if (subMenuRefs.current[openSubmenu]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [openSubmenu]: subMenuRefs.current[openSubmenu]?.scrollHeight || 0,
-        }));
-      }
+      // Use setTimeout to ensure the DOM has updated
+      setTimeout(() => {
+        if (subMenuRefs.current[openSubmenu]) {
+          const height = subMenuRefs.current[openSubmenu]?.scrollHeight || 0;
+          console.log('Calculated height for submenu', openSubmenu, ':', height);
+          setSubMenuHeight((prevHeights) => ({
+            ...prevHeights,
+            [openSubmenu]: height,
+          }));
+        } else {
+          console.log('Submenu ref not found for index:', openSubmenu);
+        }
+      }, 0);
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number) => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (prevOpenSubmenu === index) {
-        return null;
-      }
-      return index;
-    });
-  };
+  // Debug effect to log state changes
+  React.useEffect(() => {
+    console.log('Current state - openSubmenu:', openSubmenu, 'subMenuHeight:', subMenuHeight);
+  }, [openSubmenu, subMenuHeight]);
 
   if (!user) return null;
 
