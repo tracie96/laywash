@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 
 interface CheckIn {
   id: string;
@@ -10,118 +11,122 @@ interface CheckIn {
   licensePlate: string;
   vehicleType: string;
   vehicleColor: string;
+  vehicleModel: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
   completedTime?: Date;
   paidTime?: Date;
-  assignedWasher?: string;
+  assignedWasher: string;
+  assignedWasherId?: string;
+  assignedAdmin: string;
   estimatedDuration: number;
   actualDuration?: number;
   totalPrice: number;
   specialInstructions?: string;
+  paymentStatus: 'pending' | 'paid';
+  paymentMethod?: 'cash' | 'card' | 'mobile_money';
+  customerId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const OperationsCheckInsPage: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled'>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data for development
   useEffect(() => {
-    const mockCheckIns: CheckIn[] = [
-      {
-        id: '1',
-        customerName: 'John Smith',
-        customerPhone: '+1 (555) 123-4567',
-        licensePlate: 'ABC-123',
-        vehicleType: 'Sedan',
-        vehicleColor: 'Silver',
-        services: ['exterior_wash', 'interior_clean'],
-        status: 'pending',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-        estimatedDuration: 45,
-        totalPrice: 35,
-        specialInstructions: 'Please be careful with the leather seats'
-      },
-      {
-        id: '2',
-        customerName: 'Sarah Wilson',
-        customerPhone: '+1 (555) 987-6543',
-        licensePlate: 'XYZ-789',
-        vehicleType: 'SUV',
-        vehicleColor: 'Black',
-        services: ['full_service', 'wax'],
-        status: 'in_progress',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-        assignedWasher: 'Mike Johnson',
-        estimatedDuration: 75,
-        totalPrice: 60,
-        specialInstructions: 'Customer requested extra attention to wheels'
-      },
-      {
-        id: '3',
-        customerName: 'David Brown',
-        customerPhone: '+1 (555) 456-7890',
-        licensePlate: 'DEF-456',
-        vehicleType: 'Truck',
-        vehicleColor: 'White',
-        services: ['exterior_wash', 'tire_shine'],
-        status: 'completed',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        completedTime: new Date(Date.now() - 1000 * 60 * 60 * 1), // 1 hour ago
-        assignedWasher: 'David Brown',
-        estimatedDuration: 40,
-        actualDuration: 38,
-        totalPrice: 25
-      },
-      {
-        id: '4',
-        customerName: 'Lisa Anderson',
-        customerPhone: '+1 (555) 789-0123',
-        licensePlate: 'GHI-789',
-        vehicleType: 'Luxury',
-        vehicleColor: 'Red',
-        services: ['full_service', 'wax', 'tire_shine'],
-        status: 'paid',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-        completedTime: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-        paidTime: new Date(Date.now() - 1000 * 60 * 60 * 2.5), // 2.5 hours ago
-        assignedWasher: 'Mike Johnson',
-        estimatedDuration: 90,
-        actualDuration: 85,
-        totalPrice: 70
-      },
-      {
-        id: '5',
-        customerName: 'Robert Johnson',
-        customerPhone: '+1 (555) 321-6540',
-        licensePlate: 'JKL-012',
-        vehicleType: 'Van',
-        vehicleColor: 'Blue',
-        services: ['exterior_wash'],
-        status: 'cancelled',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-        estimatedDuration: 30,
-        totalPrice: 15
-      }
-    ];
+    fetchCheckIns();
+  }, [searchTerm, filter, paymentFilter]);
 
-    setTimeout(() => {
-      setCheckIns(mockCheckIns);
+  const fetchCheckIns = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (filter !== 'all') params.append('status', filter);
+      if (paymentFilter !== 'all') params.append('paymentStatus', paymentFilter);
+      
+      const response = await fetch(`/api/admin/check-ins?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCheckIns(data.checkIns);
+      } else {
+        setError(data.error || 'Failed to fetch check-ins');
+      }
+    } catch {
+      console.error('Error fetching check-ins');
+      setError('Failed to fetch check-ins from server');
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  const handleStatusUpdate = async (checkInId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchCheckIns(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to update check-in status');
+      }
+    } catch {
+      setError('Failed to update check-in status');
+    }
+  };
+
+  const handlePaymentUpdate = async (checkInId: string, paymentMethod: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentStatus: 'paid',
+          paymentMethod: paymentMethod
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchCheckIns(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to update payment status');
+      }
+    } catch {
+      setError('Failed to update payment status');
+    }
+  };
 
   const filteredCheckIns = checkIns.filter(checkIn => {
     const matchesFilter = filter === 'all' || checkIn.status === filter;
+    const matchesPaymentFilter = paymentFilter === 'all' || checkIn.paymentStatus === paymentFilter;
     const matchesSearch = searchTerm === '' || 
       checkIn.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       checkIn.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
       checkIn.customerPhone.includes(searchTerm);
     
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesPaymentFilter && matchesSearch;
   });
 
   const getStatusBadge = (status: string) => {
@@ -166,8 +171,8 @@ const OperationsCheckInsPage: React.FC = () => {
       completed: checkIns.filter(c => c.status === 'completed').length,
       paid: checkIns.filter(c => c.status === 'paid').length,
       cancelled: checkIns.filter(c => c.status === 'cancelled').length,
-      totalEarnings: checkIns.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.totalPrice, 0),
-      pendingEarnings: checkIns.filter(c => c.status === 'completed' || c.status === 'in_progress').reduce((sum, c) => sum + c.totalPrice, 0)
+      totalEarnings: checkIns.filter(c => c.paymentStatus === 'paid').reduce((sum, c) => sum + c.totalPrice, 0),
+      pendingEarnings: checkIns.filter(c => c.status === 'completed' && c.paymentStatus === 'pending').reduce((sum, c) => sum + c.totalPrice, 0)
     };
     return stats;
   };
@@ -176,21 +181,21 @@ const OperationsCheckInsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading check-ins...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading check-ins...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-6">
+      <PageBreadCrumb pageTitle="Check-ins Management" />
+
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             All Check-ins
@@ -208,7 +213,7 @@ const OperationsCheckInsPage: React.FC = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -252,7 +257,7 @@ const OperationsCheckInsPage: React.FC = () => {
                 Total Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.totalEarnings}
+                ${stats.totalEarnings.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -270,7 +275,7 @@ const OperationsCheckInsPage: React.FC = () => {
                 Pending Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.pendingEarnings}
+                ${stats.pendingEarnings.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -283,8 +288,8 @@ const OperationsCheckInsPage: React.FC = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <input
@@ -349,8 +354,54 @@ const OperationsCheckInsPage: React.FC = () => {
               Paid ({stats.paid})
             </button>
           </div>
+
+          {/* Payment Status Filter */}
+          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+            <button
+              onClick={() => setPaymentFilter('all')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                paymentFilter === 'all'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              All Payments
+            </button>
+            <button
+              onClick={() => setPaymentFilter('pending')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                paymentFilter === 'pending'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Pending Payment
+            </button>
+            <button
+              onClick={() => setPaymentFilter('paid')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                paymentFilter === 'paid'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Paid
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-red-800 dark:text-red-200">{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Check-ins List */}
       <div className="space-y-4">
@@ -365,7 +416,10 @@ const OperationsCheckInsPage: React.FC = () => {
               No check-ins found
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              {searchTerm ? 'No check-ins match your search criteria.' : 'No check-ins found for the selected filter.'}
+              {searchTerm || filter !== 'all' || paymentFilter !== 'all'
+                ? 'No check-ins match your search criteria.'
+                : 'No check-ins found for the selected filter.'
+              }
             </p>
           </div>
         ) : (
@@ -381,6 +435,9 @@ const OperationsCheckInsPage: React.FC = () => {
                       {checkIn.customerName}
                     </h3>
                     {getStatusBadge(checkIn.status)}
+                    {checkIn.paymentStatus === 'paid' && (
+                      <Badge color="success">Paid</Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
@@ -391,6 +448,7 @@ const OperationsCheckInsPage: React.FC = () => {
                       <p className="text-gray-600 dark:text-gray-400">Vehicle</p>
                       <p className="font-medium text-gray-900 dark:text-white">
                         {checkIn.vehicleColor} {checkIn.vehicleType}
+                        {checkIn.vehicleModel && ` (${checkIn.vehicleModel})`}
                       </p>
                     </div>
                     <div>
@@ -401,7 +459,7 @@ const OperationsCheckInsPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Price</p>
-                      <p className="font-medium text-gray-900 dark:text-white">${checkIn.totalPrice}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">${checkIn.totalPrice.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -411,14 +469,18 @@ const OperationsCheckInsPage: React.FC = () => {
               <div className="mb-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Services:</p>
                 <div className="flex flex-wrap gap-2">
-                  {checkIn.services.map((service) => (
-                    <span
-                      key={service}
-                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded"
-                    >
-                      {service.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </span>
-                  ))}
+                  {checkIn.services.length > 0 ? (
+                    checkIn.services.map((service) => (
+                      <span
+                        key={service}
+                        className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded"
+                      >
+                        {service}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">No services specified</span>
+                  )}
                 </div>
               </div>
 
@@ -431,11 +493,19 @@ const OperationsCheckInsPage: React.FC = () => {
                       {checkIn.actualDuration || checkIn.estimatedDuration} min
                     </span>
                   </div>
-                  {checkIn.assignedWasher && (
+                  {checkIn.assignedWasher && checkIn.assignedWasher !== 'Unassigned' && (
                     <div>
                       <span className="text-gray-600 dark:text-gray-400">Washer: </span>
                       <span className="font-medium text-gray-900 dark:text-white">
                         {checkIn.assignedWasher}
+                      </span>
+                    </div>
+                  )}
+                  {checkIn.specialInstructions && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Notes: </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {checkIn.specialInstructions}
                       </span>
                     </div>
                   )}
@@ -452,18 +522,40 @@ const OperationsCheckInsPage: React.FC = () => {
                   {checkIn.status === 'pending' && (
                     <Button
                       size="sm"
-                      onClick={() => window.location.href = `/checkins/active`}
+                      onClick={() => handleStatusUpdate(checkIn.id, 'in_progress')}
                     >
-                      Manage
+                      Start Work
                     </Button>
                   )}
-                  {checkIn.status === 'completed' && (
+                  {checkIn.status === 'in_progress' && (
                     <Button
                       size="sm"
-                      onClick={() => console.log('Mark as paid:', checkIn.id)}
+                      onClick={() => handleStatusUpdate(checkIn.id, 'completed')}
                     >
-                      Mark as Paid
+                      Mark Complete
                     </Button>
+                  )}
+                  {checkIn.status === 'completed' && checkIn.paymentStatus === 'pending' && (
+                    <div className="flex space-x-1">
+                      <Button
+                        size="sm"
+                        onClick={() => handlePaymentUpdate(checkIn.id, 'cash')}
+                      >
+                        Cash
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handlePaymentUpdate(checkIn.id, 'card')}
+                      >
+                        Card
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handlePaymentUpdate(checkIn.id, 'mobile_money')}
+                      >
+                        Mobile
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
