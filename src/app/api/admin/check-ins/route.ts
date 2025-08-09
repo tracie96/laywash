@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       vehicleType: checkIn.vehicle_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
-      services: checkIn.check_in_services?.map(cis => cis.services?.name).filter(Boolean) || [],
+      services: checkIn.check_in_services?.map((cis: { services: { name: string } }) => cis.services?.name).filter(Boolean) || [],
       status: checkIn.status,
       checkInTime: new Date(checkIn.check_in_time),
       completedTime: checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined,
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Helper function to calculate estimated duration based on services
-function calculateEstimatedDuration(checkInServices: any[]): number {
+function calculateEstimatedDuration(checkInServices: { services: { estimated_duration: number } }[]): number {
   if (!checkInServices || checkInServices.length === 0) {
     return 30; // Default duration
   }

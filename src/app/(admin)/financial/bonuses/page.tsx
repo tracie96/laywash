@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useAuth } from "@/context/AuthContext";
 import { PlusIcon, CheckCircleIcon, CloseIcon, TrashBinIcon } from "@/icons";
@@ -64,13 +64,7 @@ const FinancialBonusesPage: React.FC = () => {
   
   const { user } = useAuth();
 
-  useEffect(() => {
-    fetchBonuses();
-    fetchCustomers();
-    fetchWashers();
-  }, [filterType, filterStatus]);
-
-  const fetchBonuses = async () => {
+  const fetchBonuses = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -97,7 +91,13 @@ const FinancialBonusesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, filterStatus]);
+
+  useEffect(() => {
+    fetchBonuses();
+    fetchCustomers();
+    fetchWashers();
+  }, [fetchBonuses]);
 
   const fetchCustomers = async () => {
     try {

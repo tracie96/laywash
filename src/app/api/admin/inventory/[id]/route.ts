@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+//   auth: {
+//     autoRefreshToken: false,
+//     persistSession: false
+//   }
+// });
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const updateData = await request.json();
 
     // Validate the update data
@@ -90,11 +90,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  // request: NextRequest,
+  //  { params }: { params: Promise<{ id: string }> }
+
 ) {
   try {
-    const { id } = params;
+    // const { id } = await params;
 
     // For now, return success with mock data
     // In a real implementation, you would delete from the inventory table

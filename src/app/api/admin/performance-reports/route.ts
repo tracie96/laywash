@@ -71,14 +71,14 @@ export async function GET(request: NextRequest) {
       totalEarnings: number;
       totalHours: number;
       hourlyRate: number;
-      checkIns: any[];
+      checkIns: typeof checkIns;
     }>();
 
     checkIns?.forEach(checkIn => {
       if (!checkIn.assigned_washer_id || !checkIn.assigned_washer) return;
 
       const washerId = checkIn.assigned_washer_id;
-      const washer = checkIn.assigned_washer;
+      const washer = checkIn.assigned_washer?.[0];
 
       if (!washerPerformance.has(washerId)) {
         washerPerformance.set(washerId, {
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           carsWashed: 0,
           totalEarnings: 0,
           totalHours: 0,
-          hourlyRate: washer.car_washer_profiles?.hourly_rate || 15.00,
+          hourlyRate: washer?.car_washer_profiles?.[0]?.hourly_rate || 15.00,
           checkIns: []
         });
       }

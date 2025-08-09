@@ -13,10 +13,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const updateData = await request.json();
 
     // Validate the update data
@@ -45,7 +45,7 @@ export async function PATCH(
     }
 
     // Transform frontend field names to database field names
-    const dbUpdateData: any = {};
+    const dbUpdateData: { name?: string; description?: string; base_price?: number; estimated_duration?: number; category?: string; is_active?: boolean } = {};
     if (updateData.name !== undefined) dbUpdateData.name = updateData.name;
     if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
     if (updateData.price !== undefined) dbUpdateData.base_price = updateData.price;
@@ -102,13 +102,13 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if service exists
-    const { data: existingService, error: checkError } = await supabaseAdmin
+    const { error: checkError } = await supabaseAdmin
       .from('services')
       .select('id, name')
       .eq('id', id)

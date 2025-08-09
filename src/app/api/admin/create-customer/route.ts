@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       vehicleType, 
       vehicleModel, 
       vehicleColor,
-     
+      dateOfBirth
     } = await request.json();
 
     // Validate required input
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         vehicle_type: vehicleType,
         vehicle_model: vehicleModel || null,
         vehicle_color: vehicleColor,
+        date_of_birth: dateOfBirth || null,
         is_registered: true,
         registration_date: new Date().toISOString(),
         total_visits: 0,
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
         vehicleType: customer.vehicle_type,
         vehicleModel: customer.vehicle_model,
         vehicleColor: customer.vehicle_color,
+        dateOfBirth: customer.date_of_birth,
         isRegistered: customer.is_registered,
         registrationDate: customer.registration_date,
         totalVisits: customer.total_visits,

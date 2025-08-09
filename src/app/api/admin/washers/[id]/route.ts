@@ -13,10 +13,11 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+   { params }: { params: Promise<{ id: string }> }
+
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const updateData = await request.json();
 
     // Validate the update data
@@ -35,14 +36,14 @@ export async function PATCH(
     }
 
     // Prepare update data for users table
-    const userUpdateData: any = {};
+    const userUpdateData: { name?: string; email?: string; phone?: string; is_active?: boolean } = {};
     if (updateData.name !== undefined) userUpdateData.name = updateData.name;
     if (updateData.email !== undefined) userUpdateData.email = updateData.email;
     if (updateData.phone !== undefined) userUpdateData.phone = updateData.phone;
     if (updateData.is_active !== undefined) userUpdateData.is_active = updateData.is_active;
 
     // Prepare update data for car_washer_profiles table
-    const profileUpdateData: any = {};
+    const profileUpdateData: { hourly_rate?: number; is_available?: boolean; assigned_admin_id?: string } = {};
     if (updateData.hourlyRate !== undefined) profileUpdateData.hourly_rate = updateData.hourlyRate;
     if (updateData.isAvailable !== undefined) profileUpdateData.is_available = updateData.isAvailable;
     if (updateData.assignedAdminId !== undefined) profileUpdateData.assigned_admin_id = updateData.assignedAdminId;
@@ -118,14 +119,14 @@ export async function PATCH(
       email: updatedWasher.email,
       phone: updatedWasher.phone,
       joinDate: updatedWasher.created_at,
-      status: getWasherStatus(updatedWasher.is_active, updatedWasher.car_washer_profiles?.is_available),
+      status: getWasherStatus(updatedWasher.is_active, updatedWasher.car_washer_profiles?.[0]?.is_available),
       totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
       averageRating: 4.5, // This would need to be calculated from ratings table
       lastActive: 'N/A', // This would need to be tracked separately
-      hourlyRate: updatedWasher.car_washer_profiles?.hourly_rate || 0,
-      totalEarnings: updatedWasher.car_washer_profiles?.total_earnings || 0,
-      isAvailable: updatedWasher.car_washer_profiles?.is_available || false,
-      assignedAdminId: updatedWasher.car_washer_profiles?.assigned_admin_id || null
+      hourlyRate: updatedWasher.car_washer_profiles?.[0]?.hourly_rate || 0,
+      totalEarnings: updatedWasher.car_washer_profiles?.[0]?.total_earnings || 0,
+      isAvailable: updatedWasher.car_washer_profiles?.[0]?.is_available || false,
+      assignedAdminId: updatedWasher.car_washer_profiles?.[0]?.assigned_admin_id || null
     };
 
     return NextResponse.json({
@@ -144,10 +145,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+   { params }: { params: Promise<{ id: string }> }
+
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Instead of deleting, we deactivate the washer
     const { error: userError } = await supabaseAdmin

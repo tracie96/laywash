@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
 
@@ -10,72 +10,158 @@ interface CheckIn {
   licensePlate: string;
   vehicleType: string;
   vehicleColor: string;
+  vehicleModel?: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
   assignedWasher?: string;
+  assignedWasherId?: string;
   estimatedDuration: number;
+  actualDuration?: number;
   totalPrice: number;
   specialInstructions?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  customerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Washer {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  status: 'active' | 'inactive' | 'on_leave';
+  isAvailable: boolean;
+  hourlyRate: number;
+  totalEarnings: number;
 }
 
 const ActiveCheckInsPage: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [washers, setWashers] = useState<Washer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  // Mock data for development
-  useEffect(() => {
-    const mockCheckIns: CheckIn[] = [
-      {
-        id: '1',
-        customerName: 'John Smith',
-        customerPhone: '+1 (555) 123-4567',
-        licensePlate: 'ABC-123',
-        vehicleType: 'Sedan',
-        vehicleColor: 'Silver',
-        services: ['exterior_wash', 'interior_clean'],
-        status: 'pending',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-        estimatedDuration: 45,
-        totalPrice: 35,
-        specialInstructions: 'Please be careful with the leather seats'
-      },
-      {
-        id: '2',
-        customerName: 'Sarah Wilson',
-        customerPhone: '+1 (555) 987-6543',
-        licensePlate: 'XYZ-789',
-        vehicleType: 'SUV',
-        vehicleColor: 'Black',
-        services: ['full_service', 'wax'],
-        status: 'in_progress',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-        assignedWasher: 'Mike Johnson',
-        estimatedDuration: 75,
-        totalPrice: 60,
-        specialInstructions: 'Customer requested extra attention to wheels'
-      },
-      {
-        id: '3',
-        customerName: 'David Brown',
-        customerPhone: '+1 (555) 456-7890',
-        licensePlate: 'DEF-456',
-        vehicleType: 'Truck',
-        vehicleColor: 'White',
-        services: ['exterior_wash', 'tire_shine'],
-        status: 'pending',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-        estimatedDuration: 40,
-        totalPrice: 25
+  // Fetch active check-ins from API
+  const fetchActiveCheckIns = async (search = '') => {
+    try {
+      const searchParams = new URLSearchParams({
+        status: 'all',
+        limit: '100',
+        sortBy: 'check_in_time',
+        sortOrder: 'desc'
+      });
+      
+      if (search.trim()) {
+        searchParams.append('search', search.trim());
       }
-    ];
+      
+      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        // Filter only active check-ins (pending and in_progress)
+        const activeCheckIns = result.checkIns.filter((checkIn: CheckIn) => 
+          checkIn.status === 'pending' || checkIn.status === 'in_progress'
+        );
+        setCheckIns(activeCheckIns);
+      } else {
+        throw new Error(result.error || 'Failed to fetch check-ins');
+      }
+    } catch (err) {
+      console.error('Error fetching check-ins:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load check-ins');
+    }
+  };
 
-    setTimeout(() => {
-      setCheckIns(mockCheckIns);
-      setIsLoading(false);
-    }, 1000);
+  // Fetch available washers from API
+  const fetchWashers = async () => {
+    try {
+      const response = await fetch('/api/admin/washers');
+      const result = await response.json();
+      
+      if (result.success) {
+        // Filter only available washers
+        const availableWashers = result.washers.filter((washer: Washer) => 
+          washer.status === 'active' && washer.isAvailable
+        );
+        setWashers(availableWashers);
+      } else {
+        throw new Error(result.error || 'Failed to fetch washers');
+      }
+    } catch (err) {
+      console.error('Error fetching washers:', err);
+      // Don't set error here as washers are not critical for the page to function
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        await Promise.all([
+          fetchActiveCheckIns(),
+          fetchWashers()
+        ]);
+      } catch (err) {
+        console.error('Error loading data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
+
+  // Search functionality with debouncing
+  const performSearch = useCallback(async (query: string) => {
+    setSearchLoading(true);
+    setError(null);
+    try {
+      await fetchActiveCheckIns(query);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery !== '') {
+        performSearch(searchQuery);
+      } else {
+        // If search is cleared, fetch all active check-ins
+        performSearch('');
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, performSearch]);
+
+  // Refresh data function
+  const refreshData = () => {
+    setIsLoading(true);
+    setError(null);
+    fetchActiveCheckIns(searchQuery).finally(() => setIsLoading(false));
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
 
   const filteredCheckIns = checkIns.filter(checkIn => {
     if (filter === 'all') return checkIn.status === 'pending' || checkIn.status === 'in_progress';
@@ -105,35 +191,120 @@ const ActiveCheckInsPage: React.FC = () => {
   };
 
   const handleStatusChange = async (checkInId: string, newStatus: string) => {
-    // TODO: Implement API call to update status
-    console.log('Updating status:', checkInId, newStatus);
-    
-    setCheckIns(prev => prev.map(checkIn => 
-      checkIn.id === checkInId 
-        ? { ...checkIn, status: newStatus as CheckIn['status'] }
-        : checkIn
-    ));
+    try {
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update local state with the response data
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, ...result.checkIn }
+            : checkIn
+        ));
+      } else {
+        throw new Error(result.error || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update status');
+    }
   };
 
-  const handleAssignWasher = async (checkInId: string, washerName: string) => {
-    // TODO: Implement API call to assign washer
-    console.log('Assigning washer:', checkInId, washerName);
-    
-    setCheckIns(prev => prev.map(checkIn => 
-      checkIn.id === checkInId 
-        ? { ...checkIn, assignedWasher: washerName, status: 'in_progress' as CheckIn['status'] }
-        : checkIn
-    ));
+  const handleAssignWasher = async (checkInId: string, washerId: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          assignedWasherId: washerId,
+          status: 'in_progress'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update local state with the response data
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, ...result.checkIn }
+            : checkIn
+        ));
+      } else {
+        throw new Error(result.error || 'Failed to assign washer');
+      }
+    } catch (err) {
+      console.error('Error assigning washer:', err);
+      alert(err instanceof Error ? err.message : 'Failed to assign washer');
+    }
   };
 
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading check-ins...</p>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Active Check-ins
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Loading check-ins data...
+            </p>
           </div>
+        </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="border rounded-xl p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 animate-pulse">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-1/4 mb-2"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, j) => (
+                      <div key={j}>
+                        <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4 mb-1"></div>
+                        <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-full mb-2"></div>
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-2/3"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Active Check-ins
+            </h1>
+            <p className="text-red-600 dark:text-red-400 mt-2">
+              Error: {error}
+            </p>
+          </div>
+          <Button
+            onClick={refreshData}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -151,12 +322,70 @@ const ActiveCheckInsPage: React.FC = () => {
             Manage pending and in-progress car wash services
           </p>
         </div>
-        <Button
-          onClick={() => window.location.href = '/checkins/new'}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          New Check-in
-        </Button>
+        <div className="flex space-x-3">
+          <Button
+            variant="outline"
+            onClick={refreshData}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Refresh'}
+          </Button>
+          <Button
+            onClick={() => window.location.href = '/checkins/new'}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            New Check-in
+          </Button>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg 
+              className="h-5 w-5 text-gray-400" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search by license plate, customer name, phone, or email..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="block w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              {searchLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
+              ) : (
+                <button
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            {searchLoading ? 'Searching...' : `Showing results for "${searchQuery}"`}
+          </p>
+        )}
       </div>
 
       {/* Filter Tabs */}
@@ -236,7 +465,7 @@ const ActiveCheckInsPage: React.FC = () => {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Vehicle</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {checkIn.vehicleColor} {checkIn.vehicleType}
+                        {checkIn.vehicleColor} {checkIn.vehicleModel || checkIn.vehicleType}
                       </p>
                     </div>
                     <div>
@@ -300,13 +529,32 @@ const ActiveCheckInsPage: React.FC = () => {
                 <div className="flex space-x-2">
                   {checkIn.status === 'pending' && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAssignWasher(checkIn.id, 'Mike Johnson')}
-                      >
-                        Assign Washer
-                      </Button>
+                      {washers.length > 0 ? (
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssignWasher(checkIn.id, e.target.value);
+                            }
+                          }}
+                          value=""
+                          className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <option value="">Assign Washer</option>
+                          {washers.map((washer) => (
+                            <option key={washer.id} value={washer.id}>
+                              {washer.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                        >
+                          No Washers Available
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -322,6 +570,7 @@ const ActiveCheckInsPage: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleStatusChange(checkIn.id, 'completed')}
+                        className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                       >
                         Mark Complete
                       </Button>

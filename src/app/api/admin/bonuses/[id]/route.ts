@@ -13,10 +13,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { action, approvedBy } = await request.json();
 
     if (!action) {
@@ -26,7 +26,7 @@ export async function PATCH(
       );
     }
 
-    let updateData: any = {};
+    let updateData: { status?: string; approved_by?: string; approved_at?: string; paid_at?: string } = {};
 
     switch (action) {
       case 'approve':
@@ -114,10 +114,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if bonus exists and is not already paid
     const { data: existingBonus, error: checkError } = await supabaseAdmin

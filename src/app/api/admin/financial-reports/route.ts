@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
     checkIns?.forEach(checkIn => {
       const date = new Date(checkIn.check_in_time);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthName = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
 
       if (!monthlyData.has(monthKey)) {
         monthlyData.set(monthKey, {
@@ -89,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate expenses (estimated as 30% of revenue for demo purposes)
     // In a real application, you would track actual expenses
-    monthlyData.forEach((data, monthKey) => {
+    monthlyData.forEach((data) => {
       data.totalExpenses = data.totalRevenue * 0.3; // 30% of revenue as expenses
     });
 

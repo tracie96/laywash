@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper function to calculate service popularity (placeholder implementation)
-function calculatePopularity(service: any): number {
+function calculatePopularity(service: { id: string }): number {
+  console.log('service', service);
   // This would typically be calculated based on:
   // - Number of times the service has been selected
   // - Revenue generated from the service

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+  import React, { useState, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import Button from '@/components/ui/button/Button';
 
@@ -48,11 +48,7 @@ const ToolsChargesPage: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchCharges();
-  }, [searchTerm, filterStatus, sortBy, sortOrder]);
-
-  const fetchCharges = async () => {
+  const fetchCharges = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -77,7 +73,7 @@ const ToolsChargesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, filterStatus, sortBy, sortOrder]);
 
   const handleCreateCharge = async (e: React.FormEvent) => {
     e.preventDefault();

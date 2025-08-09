@@ -49,7 +49,7 @@ export interface Database {
           address: string | null;
           cv_url: string | null;
           picture_url: string | null;
-          next_of_kin: any;
+          next_of_kin: { name: string; phone: string; address: string }[];
           created_at: string;
           updated_at: string;
         };
@@ -60,7 +60,7 @@ export interface Database {
           address?: string | null;
           cv_url?: string | null;
           picture_url?: string | null;
-          next_of_kin?: any;
+          next_of_kin?: { name: string; phone: string; address: string }[];
           created_at?: string;
           updated_at?: string;
         };
@@ -71,7 +71,7 @@ export interface Database {
           address?: string | null;
           cv_url?: string | null;
           picture_url?: string | null;
-          next_of_kin?: any;
+          next_of_kin?: { name: string; phone: string; address: string }[];
           created_at?: string;
           updated_at?: string;
         };

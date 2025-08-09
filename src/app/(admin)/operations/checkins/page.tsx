@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
@@ -39,11 +39,7 @@ const OperationsCheckInsPage: React.FC = () => {
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCheckIns();
-  }, [searchTerm, filter, paymentFilter]);
-
-  const fetchCheckIns = async () => {
+  const fetchCheckIns = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -67,7 +63,11 @@ const OperationsCheckInsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchTerm, filter, paymentFilter]);
+
+  useEffect(() => {
+    fetchCheckIns();
+  }, [fetchCheckIns]);
 
   const handleStatusUpdate = async (checkInId: string, newStatus: string) => {
     try {

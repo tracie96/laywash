@@ -1,35 +1,173 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface DashboardMetrics {
+  totalIncome: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  carCount: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  activeWashers: number;
+  pendingCheckIns: number;
+  lowStockItems: number;
+  topPerformingWashers: TopPerformingWasher[];
+  recentActivities: RecentActivity[];
+}
+
+interface TopPerformingWasher {
+  washer: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    isActive: boolean;
+    totalEarnings: number;
+    isAvailable: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  carsWashed: number;
+  totalEarnings: number;
+}
+
+interface RecentActivity {
+  type: string;
+  description: string;
+  timestamp: Date;
+}
+
+interface CheckIn {
+  id: string;
+  customerName: string;
+  licensePlate: string;
+  status: string;
+  checkInTime: Date;
+  assignedWasher: string;
+  assignedWasherId?: string;
+  vehicleType?: string;
+  vehicleColor?: string;
+  vehicleModel?: string;
+  services: string[];
+  totalPrice?: number;
+  paymentStatus?: string;
+}
 
 const AdminDashboard: React.FC = () => {
-  // Mock data for admin dashboard
-  const metrics = {
-    todayCheckIns: 15,
-    pendingCheckIns: 3,
-    completedToday: 12,
-    totalEarnings: 1800,
-    activeWashers: 4,
-    lowStockItems: 2,
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [recentCheckIns, setRecentCheckIns] = useState<CheckIn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch dashboard metrics
+  const fetchDashboardMetrics = async () => {
+    try {
+      const response = await fetch('/api/admin/dashboard-metrics');
+      const result = await response.json();
+      
+      if (result.success) {
+        setMetrics(result.data);
+      } else {
+        throw new Error(result.error || 'Failed to fetch dashboard metrics');
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard metrics:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load metrics');
+    }
   };
 
-  const recentCheckIns = [
-    {
-      id: '1',
-      customerName: 'John Smith',
-      licensePlate: 'ABC-123',
-      status: 'in_progress',
-      assignedWasher: 'Mike Johnson',
-      checkInTime: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    },
-    {
-      id: '2',
-      customerName: 'Sarah Wilson',
-      licensePlate: 'XYZ-789',
-      status: 'pending',
-      assignedWasher: 'David Brown',
-      checkInTime: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-    },
-  ];
+  // Fetch recent check-ins
+  const fetchRecentCheckIns = async () => {
+    try {
+      const response = await fetch('/api/admin/check-ins?limit=5&sortBy=check_in_time&sortOrder=desc');
+      const result = await response.json();
+      
+      if (result.success) {
+        setRecentCheckIns(result.checkIns || []);
+      } else {
+        throw new Error(result.error || 'Failed to fetch recent check-ins');
+      }
+    } catch (err) {
+      console.error('Error fetching recent check-ins:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load recent check-ins');
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        await Promise.all([
+          fetchDashboardMetrics(),
+          fetchRecentCheckIns()
+        ]);
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Loading dashboard data...
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 animate-pulse">
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2 mb-2"></div>
+              <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Admin Dashboard
+            </h1>
+            <p className="text-red-600 dark:text-red-400 mt-2">
+              Error: {error}
+            </p>
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -61,7 +199,7 @@ const AdminDashboard: React.FC = () => {
                 Today&apos;s Check-ins
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {metrics.todayCheckIns}
+                {metrics?.carCount?.daily || 0}
               </p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -80,7 +218,7 @@ const AdminDashboard: React.FC = () => {
                 Pending Check-ins
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {metrics.pendingCheckIns}
+                {metrics?.pendingCheckIns || 0}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -99,7 +237,7 @@ const AdminDashboard: React.FC = () => {
                 Today&apos;s Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${metrics.totalEarnings.toLocaleString()}
+                ${(metrics?.totalIncome?.daily || 0).toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
@@ -160,7 +298,8 @@ const AdminDashboard: React.FC = () => {
             Recent Check-ins
           </h3>
           <div className="space-y-4">
-            {recentCheckIns.map((checkIn) => (
+            {recentCheckIns.length > 0 ? (
+              recentCheckIns.map((checkIn) => (
               <div key={checkIn.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-medium text-gray-900 dark:text-white">
@@ -169,24 +308,40 @@ const AdminDashboard: React.FC = () => {
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                     checkIn.status === 'in_progress' 
                       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                        : checkIn.status === 'completed'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                       : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
                   }`}>
-                    {checkIn.status === 'in_progress' ? 'In Progress' : 'Pending'}
+                      {checkIn.status === 'in_progress' ? 'In Progress' : 
+                       checkIn.status === 'completed' ? 'Completed' : 'Pending'}
                   </span>
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                   <p>License: {checkIn.licensePlate}</p>
                   <p>Washer: {checkIn.assignedWasher}</p>
-                  <p>Time: {checkIn.checkInTime.toLocaleTimeString()}</p>
+                    <p>Time: {new Date(checkIn.checkInTime).toLocaleTimeString()}</p>
+                    {checkIn.services && checkIn.services.length > 0 && (
+                      <p>Services: {checkIn.services.join(', ')}</p>
+                    )}
+                    {checkIn.totalPrice && (
+                      <p className="font-medium text-green-600 dark:text-green-400">
+                        ${checkIn.totalPrice.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>No recent check-ins found</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
 
       {/* Alerts */}
-      {metrics.lowStockItems > 0 && (
+      {metrics && metrics.lowStockItems > 0 && (
         <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
           <div className="flex items-center space-x-3">
             <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,6 +358,57 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Additional Metrics Cards - Weekly and Monthly Performance */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Weekly Earnings */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Weekly Earnings
+            </p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
+              ${(metrics?.totalIncome?.weekly || 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Monthly Earnings */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Monthly Earnings
+            </p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
+              ${(metrics?.totalIncome?.monthly || 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Active Washers */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Active Washers
+            </p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
+              {metrics?.activeWashers || 0}
+            </p>
+          </div>
+        </div>
+
+        {/* Monthly Cars */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Monthly Cars
+            </p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
+              {metrics?.carCount?.monthly || 0}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

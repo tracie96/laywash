@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+//   auth: {
+//     autoRefreshToken: false,
+//     persistSession: false
+//   }
+// });
 
 export async function GET(request: NextRequest) {
   try {
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     // Apply sorting
     filteredItems.sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue, bValue;
       
       switch (sortBy) {
         case 'name':
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper function to determine stock status
-function getStockStatus(item: any): string {
+function getStockStatus(item: { currentStock: number; minStockLevel: number }): string {
   if (item.currentStock <= item.minStockLevel) return 'low';
   if (item.currentStock <= item.minStockLevel * 2) return 'medium';
   return 'good';

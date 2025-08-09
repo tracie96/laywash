@@ -13,10 +13,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const updateData = await request.json();
 
     // Validate the update data
@@ -42,7 +42,7 @@ export async function PATCH(
     }
 
     // Transform frontend field names to database field names
-    const dbUpdateData: any = {};
+    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; payment_time?: string } = {};
     if (updateData.status !== undefined) dbUpdateData.status = updateData.status;
     if (updateData.paymentStatus !== undefined) dbUpdateData.payment_status = updateData.paymentStatus;
     if (updateData.paymentMethod !== undefined) dbUpdateData.payment_method = updateData.paymentMethod;
@@ -126,7 +126,7 @@ export async function PATCH(
       vehicleType: checkIn.vehicle_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
-      services: checkIn.check_in_services?.map((cis: any) => cis.services?.name).filter(Boolean) || [],
+      services: checkIn.check_in_services?.map((cis: { services: { name: string } }) => cis.services?.name).filter(Boolean) || [],
       status: checkIn.status,
       checkInTime: new Date(checkIn.check_in_time),
       completedTime: checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined,
@@ -162,7 +162,7 @@ export async function PATCH(
 }
 
 // Helper function to calculate estimated duration based on services
-function calculateEstimatedDuration(checkInServices: any[]): number {
+function calculateEstimatedDuration(checkInServices: { services: { estimated_duration: number } }[]): number {
   if (!checkInServices || checkInServices.length === 0) {
     return 30; // Default duration
   }

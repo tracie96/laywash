@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
@@ -52,11 +52,7 @@ const StockInventoryPage: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchInventory();
-  }, [searchTerm, filter, sortBy, sortOrder]);
-
-  const fetchInventory = async () => {
+  const fetchInventoy = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -82,7 +78,7 @@ const StockInventoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchTerm, filter, sortBy, sortOrder]);
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +123,7 @@ const StockInventoryPage: React.FC = () => {
           price: 0,
           supplier: ''
         });
-        fetchInventory(); // Refresh the list
+        fetchInventoy(); // Refresh the list
       } else {
         setError(data.error || 'Failed to create inventory item');
       }
@@ -153,7 +149,7 @@ const StockInventoryPage: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        fetchInventory(); // Refresh the list
+          fetchInventoy(); // Refresh the list
       } else {
         setError(data.error || 'Failed to update stock');
       }

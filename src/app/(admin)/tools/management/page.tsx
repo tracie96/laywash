@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
-import Button from '@/components/ui/button/Button';
+import Button from "@/components/ui/button/Button";
 
 interface Tool {
   id: string;
@@ -48,11 +48,7 @@ const ToolsManagementPage: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchTools();
-  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder]);
-
-  const fetchTools = async () => {
+  const fetchTools = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -78,7 +74,7 @@ const ToolsManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder]);
 
   const handleCreateTool = async (e: React.FormEvent) => {
     e.preventDefault();

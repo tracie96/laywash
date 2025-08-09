@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       date: checkIn.check_in_time,
       status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
       paymentMethod: checkIn.payment_method || 'Not specified',
-      serviceType: checkIn.check_in_services?.map(cis => cis.services?.name).filter(Boolean).join(', ') || 'Not specified',
+      serviceType: checkIn.check_in_services?.map((cis: { services?: { name?: string }[] }) => cis.services?.[0]?.name).filter(Boolean).join(', ') || 'Not specified',
       licensePlate: checkIn.license_plate,
       vehicleType: checkIn.vehicle_type,
       vehicleModel: checkIn.vehicle_model,

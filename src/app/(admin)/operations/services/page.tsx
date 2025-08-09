@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { PlusIcon, TrashBinIcon } from "@/icons";
 
@@ -41,11 +41,7 @@ const OperationsServicesPage: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchServices();
-  }, [searchTerm, filterCategory, filterStatus]);
-
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -69,7 +65,7 @@ const OperationsServicesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, filterCategory, filterStatus]);
 
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,7 +351,6 @@ const OperationsServicesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Popularity</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -387,17 +382,7 @@ const OperationsServicesPage: React.FC = () => {
                         {getCategoryLabel(service.category)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                          <div 
-                            className="bg-green-light-600 h-2 rounded-full" 
-                            style={{ width: `${service.popularity}%` }}
-                          ></div>
-                        </div>
-                        <span>{service.popularity}%</span>
-                      </div>
-                    </td>
+                
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(service.isActive)}`}>
                         {service.isActive ? "Active" : "Inactive"}

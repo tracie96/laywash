@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get current date and calculate period boundaries
     const now = new Date();
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     const activeWashers = washersData?.filter(washer => 
-      washer.car_washer_profiles?.is_available
+      washer.car_washer_profiles?.[0]?.is_available
     ).length || 0;
 
     // 4. Fetch pending check-ins count
@@ -139,13 +139,13 @@ export async function GET(request: NextRequest) {
       if (!washerPerformance.has(washerId)) {
         washerPerformance.set(washerId, {
           washer: {
-            id: checkIn.assigned_washer.id,
-            name: checkIn.assigned_washer.name,
-            email: checkIn.assigned_washer.email,
-            phone: checkIn.assigned_washer.phone,
+            id: checkIn.assigned_washer[0].id,
+            name: checkIn.assigned_washer[0].name,
+            email: checkIn.assigned_washer[0].email,
+            phone: checkIn.assigned_washer[0].phone,
             role: 'car_washer',
             isActive: true,
-            totalEarnings: checkIn.assigned_washer.car_washer_profiles?.total_earnings || 0,
+            totalEarnings: checkIn.assigned_washer[0].car_washer_profiles?.[0]?.total_earnings || 0,
             isAvailable: true,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -188,8 +188,8 @@ export async function GET(request: NextRequest) {
 
     // Format recent activities
     const recentActivities = recentCheckIns?.slice(0, 5).map(checkIn => {
-      const customerName = checkIn.customers?.name || 'Unknown Customer';
-      const vehicleModel = checkIn.customers?.vehicle_model || 'Vehicle';
+      const customerName = checkIn.customers?.[0]?.name || 'Unknown Customer';
+      const vehicleModel = checkIn.customers?.[0]?.vehicle_model || 'Vehicle';
       
       let description = '';
       let type = '';

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 
 interface PerformanceReport {
@@ -34,7 +34,7 @@ const PerformanceReportsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState('1'); // Default to last 1 month
 
-  const fetchPerformanceReports = async () => {
+  const fetchPerformanceReports = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -54,11 +54,11 @@ const PerformanceReportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
   useEffect(() => {
     fetchPerformanceReports();
-  }, [period]);
+  }, [fetchPerformanceReports]);
 
   const getEfficiencyColor = (efficiency: number) => {
     if (efficiency >= 95) return "text-green-600 dark:text-green-400";
