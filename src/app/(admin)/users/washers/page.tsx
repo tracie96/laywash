@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 interface Washer {
   id: string;
@@ -22,6 +23,7 @@ const UsersWashersPage: React.FC = () => {
   const [washers, setWashers] = useState<Washer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     fetchWashers();
@@ -45,6 +47,37 @@ const UsersWashersPage: React.FC = () => {
       setError('Failed to connect to server');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeactivateWasher = async (washerId: string, washerName: string) => {
+    const confirmDeactivate = window.confirm(
+      `Are you sure you want to deactivate ${washerName}? They will no longer be able to access the system or receive new assignments.`
+    );
+    
+    if (!confirmDeactivate) return;
+
+    try {
+      const response = await fetch(`/api/admin/washers/${washerId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: false }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the washers list
+        await fetchWashers();
+        alert(`${washerName} has been successfully deactivated.`);
+      } else {
+        alert(`Failed to deactivate ${washerName}: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error deactivating washer:', err);
+      alert(`Failed to deactivate ${washerName}. Please try again.`);
     }
   };
 
@@ -171,7 +204,10 @@ const UsersWashersPage: React.FC = () => {
           </svg>
           Refresh
         </button>
-        <button className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+        <button 
+          onClick={() => router.push('/add-worker')}
+          className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+        >
           Add New Washer
         </button>
       </div>
@@ -194,7 +230,10 @@ const UsersWashersPage: React.FC = () => {
                 Get started by creating a new washer account.
               </p>
               <div className="mt-6">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500">
+                <button 
+                  onClick={() => router.push('/add-worker')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500"
+                >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
@@ -252,13 +291,22 @@ const UsersWashersPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
-                        <button className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300">
+                        <button 
+                          onClick={() => router.push(`/workers/edit?id=${washer.id}`)}
+                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
+                        >
                           Edit
                         </button>
-                        <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
+                        <button 
+                          onClick={() => router.push(`/reports/performance?washerId=${washer.id}`)}
+                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 transition-colors"
+                        >
                           Performance
                         </button>
-                        <button className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300">
+                        <button 
+                          onClick={() => handleDeactivateWasher(washer.id, washer.name)}
+                          className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300 transition-colors"
+                        >
                           Deactivate
                         </button>
                       </div>

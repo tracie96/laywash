@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole, Customer } from '../types/carwash';
 import { AuthService } from '../lib/auth';
+import { UploadService } from '../lib/upload';
 
 interface AuthContextType {
   user: User | null;
@@ -12,7 +13,17 @@ interface AuthContextType {
   hasRole: (role: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
   signUpSuperAdmin: (name: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  createAdmin: (name: string, email: string, phone: string) => Promise<{ success: boolean; error?: string }>;
+  createAdmin: (
+    name: string, 
+    email: string, 
+    phone: string, 
+    password: string,
+    location?: string, 
+    address?: string, 
+    nextOfKin?: Array<{name: string; phone: string; address: string}>, 
+    cvFile?: File, 
+    pictureFile?: File
+  ) => Promise<{ success: boolean; error?: string }>;
   createCarWasher: (name: string, email: string, phone: string, hourlyRate?: number) => Promise<{ success: boolean; error?: string }>;
   createCustomer: (customerData: {
     name: string;
@@ -120,13 +131,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const createAdmin = async (name: string, email: string, phone: string): Promise<{ success: boolean; error?: string }> => {
+  const createAdmin = async (
+    name: string, 
+    email: string, 
+    phone: string, 
+    password: string,
+    location?: string,
+    address?: string, 
+    nextOfKin?: Array<{name: string; phone: string; address: string}>, 
+    cvFile?: File, 
+    pictureFile?: File
+  ): Promise<{ success: boolean; error?: string }> => {
     if (!user || user.role !== 'super_admin') {
       console.error('Only Super Admins can create admin users');
       return { success: false, error: 'Only Super Admins can create admin users' };
     }
 
     try {
+      let cvUrl = '';
+      let pictureUrl = '';
+
+      // Generate a temporary ID for file naming (we'll use this before we get the actual user ID)
+      const tempId = Date.now().toString();
+
+      // Upload files if provided
+      if (cvFile) {
+        const cvUpload = await UploadService.uploadAdminCV(cvFile, tempId);
+        if (!cvUpload.success) {
+          return { success: false, error: `CV upload failed: ${cvUpload.error}` };
+        }
+        cvUrl = cvUpload.url!;
+      }
+
+      if (pictureFile) {
+        const pictureUpload = await UploadService.uploadAdminPicture(pictureFile, tempId);
+        if (!pictureUpload.success) {
+          return { success: false, error: `Picture upload failed: ${pictureUpload.error}` };
+        }
+        pictureUrl = pictureUpload.url!;
+      }
+
+      // Create admin with all the data
       const response = await fetch('/api/admin/create-admin', {
         method: 'POST',
         headers: {
@@ -136,6 +181,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           name,
           email,
           phone,
+          password,
+          address: address || '',
+          location,
+          nextOfKin: nextOfKin || [],
+          cvUrl: cvUrl || null,
+          pictureUrl: pictureUrl || null,
           createdBy: user.id,
         }),
       });

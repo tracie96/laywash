@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 interface Admin {
   id: string;
@@ -12,12 +13,21 @@ interface Admin {
   lastLogin: string;
   permissions: string[];
   location?: string | null;
+  cvUrl?: string | null;
+  pictureUrl?: string | null;
+  address?: string | null;
+  nextOfKin?: {
+    name: string;
+    phone: string;
+    address: string;
+  }[];
 }
 
 const UsersAdminsPage: React.FC = () => {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     fetchAdmins();
@@ -159,9 +169,12 @@ const UsersAdminsPage: React.FC = () => {
           </svg>
           Refresh
         </button>
-        <button className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-          Add New Admin
-        </button>
+        <button 
+          onClick={() => router.push('/add-admin')} 
+          className="bg-green-light-600 hover:bg-green-light-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+        >
+            Add New Admin
+          </button>
       </div>
 
       {/* Admins Table */}
@@ -182,7 +195,10 @@ const UsersAdminsPage: React.FC = () => {
                 Get started by creating a new admin account.
               </p>
               <div className="mt-6">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500">
+                <button 
+                  onClick={() => router.push('/add-admin')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500"
+                >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>

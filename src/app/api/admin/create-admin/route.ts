@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { EmailService } from '../../../../lib/email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Client for signup (uses anon key)
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Admin client for database operations (uses service key)
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
@@ -14,24 +18,48 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, phone } = await request.json();
+    const { name, email, phone, password, address, location, nextOfKin, cvUrl, pictureUrl } = await request.json();
 
     // Validate input
-    if (!name || !email || !phone) {
+    if (!name || !email || !phone || !password) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields: name, email, phone, and password are required' },
         { status: 400 }
       );
     }
 
-    // Generate a temporary password
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    // Validate password
+    if (password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters long' },
+        { status: 400 }
+      );
+    }
 
-    // Create the user in Supabase Auth
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Validate next of kin (optional)
+    if (nextOfKin && Array.isArray(nextOfKin) && nextOfKin.length > 0) {
+      for (const kin of nextOfKin) {
+        if (!kin.name || !kin.phone || !kin.address) {
+          return NextResponse.json(
+            { success: false, error: 'Each next of kin must have name, phone, and address' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Create the user in Supabase Auth using signup (this sends confirmation email)
+    const { data, error } = await supabase.auth.signUp({
       email,
-      password: tempPassword,
-      email_confirm: true,
+      password: password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard`,
+        data: {
+          name: name,
+          role: 'admin',
+          phone: phone
+        }
+      }
     });
 
     if (error) {
@@ -71,21 +99,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create admin profile
-    const { error: adminProfileError } = await supabaseAdmin
-      .from('admin_profiles')
-      .insert({
-        user_id: data.user.id,
-        location: null, // Will be set by Super Admin later
-      });
+    // Create admin profile with new fields (if data provided)
+    if (address || location || cvUrl || pictureUrl || (nextOfKin && nextOfKin.length > 0)) {
+      const { error: adminProfileError } = await supabaseAdmin
+        .from('admin_profiles')
+        .insert({
+          user_id: data.user.id,
+          location: location || null,
+          address: address || null,
+          cv_url: cvUrl || null,
+          picture_url: pictureUrl || null,
+          next_of_kin: nextOfKin || null,
+        });
 
-    if (adminProfileError) {
-      console.error('Failed to create admin profile:', adminProfileError);
-      // Don't fail the entire operation for this
+      if (adminProfileError) {
+        console.error('Failed to create admin profile:', adminProfileError);
+        // Don't fail the entire operation for this
+      }
     }
 
-    // Send email to admin with temporary password
-    await EmailService.sendTemporaryPassword(email, name, tempPassword, 'admin');
+    // Admin account created successfully without email notification
 
     return NextResponse.json({
       success: true,
@@ -94,7 +127,8 @@ export async function POST(request: NextRequest) {
         name: userProfile.name,
         email: userProfile.email,
         phone: userProfile.phone,
-        password: tempPassword,
+        // password not returned for security
+        requiresEmailConfirmation: !data.session, // true if email confirmation is required
         role: userProfile.role,
         isActive: userProfile.is_active,
       }

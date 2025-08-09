@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Fetch admins from the users table with role = 'admin'
     const { data: admins, error } = await supabaseAdmin
@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         admin_profiles (
-          location
+          location,
+          address,
+          cv_url,
+          picture_url,
+          next_of_kin
         )
       `)
       .eq('role', 'admin')
@@ -41,17 +45,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match the frontend interface
-    const transformedAdmins = admins.map(admin => ({
-      id: admin.id,
-      name: admin.name,
-      email: admin.email,
-      phone: admin.phone,
-      joinDate: admin.created_at,
-      status: admin.is_active ? 'active' : 'inactive',
-      lastLogin: 'N/A', // This would need to be tracked separately
-      permissions: getPermissionsForRole(admin.role),
-      location: admin.admin_profiles?.location || null
-    }));
+    const transformedAdmins = admins.map(admin => {
+      const profile = admin.admin_profiles?.[0];
+      return {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        phone: admin.phone,
+        joinDate: admin.created_at,
+        status: admin.is_active ? 'active' : 'inactive',
+        lastLogin: 'N/A', // This would need to be tracked separately
+        permissions: getPermissionsForRole(admin.role),
+        location: profile?.location || null,
+        address: profile?.address || null,
+        cvUrl: profile?.cv_url || null,
+        pictureUrl: profile?.picture_url || null,
+        nextOfKin: profile?.next_of_kin || []
+      };
+    });
 
     return NextResponse.json({
       success: true,

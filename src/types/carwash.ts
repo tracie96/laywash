@@ -16,6 +16,14 @@ export interface User {
 export interface Admin extends User {
   role: 'admin';
   location?: string;
+  address?: string;
+  cvUrl?: string;
+  pictureUrl?: string;
+  nextOfKin?: Array<{
+    name: string;
+    phone: string;
+    address: string;
+  }>;
   assignedWashers?: string[]; // IDs of assigned car washers
 }
 

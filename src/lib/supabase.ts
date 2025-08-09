@@ -46,6 +46,10 @@ export interface Database {
           id: string;
           user_id: string;
           location: string | null;
+          address: string | null;
+          cv_url: string | null;
+          picture_url: string | null;
+          next_of_kin: any;
           created_at: string;
           updated_at: string;
         };
@@ -53,6 +57,10 @@ export interface Database {
           id?: string;
           user_id: string;
           location?: string | null;
+          address?: string | null;
+          cv_url?: string | null;
+          picture_url?: string | null;
+          next_of_kin?: any;
           created_at?: string;
           updated_at?: string;
         };
@@ -60,6 +68,10 @@ export interface Database {
           id?: string;
           user_id?: string;
           location?: string | null;
+          address?: string | null;
+          cv_url?: string | null;
+          picture_url?: string | null;
+          next_of_kin?: any;
           created_at?: string;
           updated_at?: string;
         };

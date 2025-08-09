@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Fetch car washers from the users table with role = 'car_washer'
     const { data: washers, error } = await supabaseAdmin
@@ -44,21 +44,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match the frontend interface
-    const transformedWashers = washers.map(washer => ({
-      id: washer.id,
-      name: washer.name,
-      email: washer.email,
-      phone: washer.phone,
-      joinDate: washer.created_at,
-      status: getWasherStatus(washer.is_active, washer.car_washer_profiles?.is_available),
-      totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
-      averageRating: 4.5, // This would need to be calculated from ratings table
-      lastActive: 'N/A', // This would need to be tracked separately
-      hourlyRate: washer.car_washer_profiles?.hourly_rate || 0,
-      totalEarnings: washer.car_washer_profiles?.total_earnings || 0,
-      isAvailable: washer.car_washer_profiles?.is_available || false,
-      assignedAdminId: washer.car_washer_profiles?.assigned_admin_id || null
-    }));
+    const transformedWashers = washers.map(washer => {
+      const profile = washer.car_washer_profiles?.[0];
+      return {
+        id: washer.id,
+        name: washer.name,
+        email: washer.email,
+        phone: washer.phone,
+        joinDate: washer.created_at,
+        status: getWasherStatus(washer.is_active, profile?.is_available),
+        totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
+        averageRating: 4.5, // This would need to be calculated from ratings table
+        lastActive: 'N/A', // This would need to be tracked separately
+        hourlyRate: profile?.hourly_rate || 0,
+        totalEarnings: profile?.total_earnings || 0,
+        isAvailable: profile?.is_available || false,
+        assignedAdminId: profile?.assigned_admin_id || null
+      };
+    });
 
     return NextResponse.json({
       success: true,
