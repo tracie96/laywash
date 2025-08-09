@@ -9,8 +9,8 @@ import DemographicCard from "@/components/ecommerce/DemographicCard";
 
 export const metadata: Metadata = {
   title:
-    "Next.js E-commerce Dashboard | LayWash - Next.js Dashboard Template",
-  description: "This is Next.js Home for LayWash Dashboard Template",
+"AACC Portal",
+  description: "This is Home for AACC Portal",
 };
 
 export default function Ecommerce() {

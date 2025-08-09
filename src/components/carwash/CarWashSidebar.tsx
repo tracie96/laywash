@@ -399,7 +399,7 @@ const CarWashSidebar: React.FC = () => {
                 <CarIcon />
               </div>
               <span className="text-xl font-bold text-gray-900 dark:text-white">
-                LAYWASH
+                AACC
               </span>
             </div>
           ) : (
