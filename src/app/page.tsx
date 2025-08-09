@@ -13,10 +13,10 @@ export default function HomePage() {
         if (storedUser) {
           router.push('/dashboard');
         } else {
-          router.push('/signup');
+          router.push('/signin');
         }
       } catch {
-        router.push('/signup');
+        router.push('/signin');
       }
     };
 
