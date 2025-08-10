@@ -35,6 +35,7 @@ export async function GET(
           assigned_admin_id,
           total_earnings,
           is_available,
+          assigned_location,
           address,
           next_of_kin
         )
@@ -152,9 +153,10 @@ export async function GET(
       assignedAdminName,
       totalCheckIns: totalAllCheckIns,
       completedCheckIns: actualCompletedCount,
-      averageRating: 4.5, // TODO: Calculate from actual ratings
+      averageRating: 4.5, 
       createdAt: new Date(worker.created_at),
       lastActive: new Date(worker.updated_at),
+      assigned_location: profile?.assigned_location || "Not specified",
       address: profile?.address || 'Address not provided',
       emergencyContact: profile?.next_of_kin?.[0]?.name || 'Not provided',
       emergencyPhone: profile?.next_of_kin?.[0]?.phone || 'Not provided',

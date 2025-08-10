@@ -29,7 +29,8 @@ export async function GET() {
           assigned_admin_id,
           address,
           total_earnings,
-          is_available
+          is_available,
+          assigned_location
         )
       `)
       .eq('role', 'car_washer')
@@ -105,6 +106,7 @@ export async function GET() {
         isAvailable: profile?.is_available ?? true,
         assignedAdminId: profile?.assigned_admin_id || null,
         assignedAdminName,
+        assigned_location: profile?.assigned_location || "Not specified",
         totalCheckIns: stats.totalCheckIns,
         completedCheckIns: stats.completedCheckIns,
         averageRating: 4.5, // TODO: Calculate from actual ratings

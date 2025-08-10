@@ -38,9 +38,10 @@ export async function PATCH(
     if (updateData.is_active !== undefined) userUpdateData.is_active = updateData.is_active;
 
     // Prepare update data for car_washer_profiles table
-    const profileUpdateData: { is_available?: boolean; assigned_admin_id?: string } = {};
+    const profileUpdateData: { is_available?: boolean; assigned_admin_id?: string; assigned_location?: string } = {};
     if (updateData.isAvailable !== undefined) profileUpdateData.is_available = updateData.isAvailable;
     if (updateData.assignedAdminId !== undefined) profileUpdateData.assigned_admin_id = updateData.assignedAdminId;
+    if (updateData.assigned_location !== undefined) profileUpdateData.assigned_location = updateData.assigned_location;
 
     // Update user data if there are changes
     if (Object.keys(userUpdateData).length > 0) {
@@ -90,6 +91,7 @@ export async function PATCH(
         car_washer_profiles!car_washer_profiles_user_id_fkey (
           assigned_admin_id,
           total_earnings,
+          assigned_location,
           is_available
         )
       `)
@@ -112,6 +114,7 @@ export async function PATCH(
       email: updatedWasher.email,
       phone: updatedWasher.phone,
       joinDate: updatedWasher.created_at,
+      assigned_location: updatedWasher.car_washer_profiles?.[0]?.assigned_location || "Not specified",
       status: getWasherStatus(updatedWasher.is_active, updatedWasher.car_washer_profiles?.[0]?.is_available),
       totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
       averageRating: 4.5, // This would need to be calculated from ratings table

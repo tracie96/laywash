@@ -55,7 +55,7 @@ export interface Customer {
   vehicleType: string;
   vehicleModel?: string;
   vehicleColor?: string;
-  isRegistered: boolean; // true for registered customers, false for instant/walk-in
+  isRegistered: boolean; 
   registrationDate?: Date;
   totalVisits: number;
   totalSpent: number;

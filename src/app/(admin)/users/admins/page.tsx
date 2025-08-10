@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
+import EditAdminModal from "@/components/admin/EditAdminModal";
 
 interface Admin {
   id: string;
@@ -27,6 +28,8 @@ const UsersAdminsPage: React.FC = () => {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -51,6 +54,45 @@ const UsersAdminsPage: React.FC = () => {
       setError('Failed to connect to server');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditAdmin = (admin: Admin) => {
+    setEditingAdmin(admin);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingAdmin(null);
+  };
+
+  const handleSaveAdmin = async (adminId: string, updatedData: Partial<Admin>) => {
+    try {
+      const response = await fetch(`/api/admin/admins/${adminId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update the admin in the local state
+        setAdmins(prevAdmins =>
+          prevAdmins.map(admin =>
+            admin.id === adminId ? { ...admin, ...data.admin } : admin
+          )
+        );
+        handleCloseEditModal();
+      } else {
+        throw new Error(data.error || 'Failed to update admin');
+      }
+    } catch (error) {
+      console.error('Error updating admin:', error);
+      throw error; // Re-throw to let the modal handle the error display
     }
   };
 
@@ -213,6 +255,7 @@ const UsersAdminsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Phone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Location</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Join Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Login</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
@@ -231,6 +274,9 @@ const UsersAdminsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {admin.phone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {admin.location}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {new Date(admin.joinDate).toLocaleDateString()}
@@ -254,7 +300,10 @@ const UsersAdminsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
-                        <button className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300">
+                        <button 
+                          onClick={() => handleEditAdmin(admin)}
+                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 font-medium"
+                        >
                           Edit
                         </button>
                         <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
@@ -272,6 +321,14 @@ const UsersAdminsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Admin Modal */}
+      <EditAdminModal
+        admin={editingAdmin}
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveAdmin}
+      />
     </div>
   );
 };

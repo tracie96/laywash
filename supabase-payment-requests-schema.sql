@@ -68,3 +68,5 @@ COMMENT ON COLUMN carwasher_payment_requests.status IS 'Request status: pending,
 COMMENT ON COLUMN carwasher_payment_requests.requested_for_period_start IS 'Start date for the period this payment covers';
 COMMENT ON COLUMN carwasher_payment_requests.requested_for_period_end IS 'End date for the period this payment covers';
 
+
+
