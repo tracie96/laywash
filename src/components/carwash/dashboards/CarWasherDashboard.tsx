@@ -1,52 +1,140 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+
+interface Assignment {
+  id: string;
+  customerName: string;
+  licensePlate: string;
+  vehicleType: string;
+  vehicleModel?: string;
+  services: string[];
+  estimatedDuration: number;
+  checkInTime: Date;
+  amount: number;
+}
+
+interface CompletedJob {
+  id: string;
+  customerName: string;
+  licensePlate: string;
+  vehicleType: string;
+  completedAt: Date;
+  earnings: number;
+}
+
+interface Metrics {
+  todayEarnings: number;
+  carsCompleted: number;
+  pendingAssignments: number;
+  totalEarnings: number;
+}
+
+interface DashboardData {
+  metrics: Metrics;
+  currentAssignments: Assignment[];
+  recentCompleted: CompletedJob[];
+}
 
 const CarWasherDashboard: React.FC = () => {
-  // Mock data for car washer dashboard
-  const metrics = {
-    todayEarnings: 180,
-    carsCompleted: 6,
-    pendingAssignments: 2,
-    totalEarnings: 1250,
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Get current user ID from auth context
+  // TODO: Replace with actual auth integration
+  const getCurrentUserId = () => {
+    // Example: const { user } = useAuth(); return user?.id;
+    // For testing, you can use a real washer ID from your database
+    return 'current-user-id'; // Replace with actual implementation
   };
 
-  const currentAssignments = [
-    {
-      id: '1',
-      customerName: 'John Smith',
-      licensePlate: 'ABC-123',
-      vehicleType: 'Sedan',
-      services: ['Exterior Wash', 'Interior Clean'],
-      estimatedDuration: 45,
-      checkInTime: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    },
-    {
-      id: '2',
-      customerName: 'Sarah Wilson',
-      licensePlate: 'XYZ-789',
-      vehicleType: 'SUV',
-      services: ['Full Service Wash'],
-      estimatedDuration: 60,
-      checkInTime: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-    },
-  ];
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const washerId = getCurrentUserId();
+      const response = await fetch(`/api/admin/carwasher-dashboard?washerId=${washerId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Transform dates back to Date objects
+        const transformedData = {
+          ...result.data,
+          currentAssignments: result.data.currentAssignments.map((assignment: Assignment & { checkInTime: string }) => ({
+            ...assignment,
+            checkInTime: new Date(assignment.checkInTime)
+          })),
+          recentCompleted: result.data.recentCompleted.map((completed: CompletedJob & { completedAt: string }) => ({
+            ...completed,
+            completedAt: new Date(completed.completedAt)
+          }))
+        };
+        
+        setDashboardData(transformedData);
+      } else {
+        setError(result.error || 'Failed to load dashboard data');
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const recentCompleted = [
-    {
-      id: '3',
-      customerName: 'Mike Johnson',
-      licensePlate: 'DEF-456',
-      completedAt: new Date(Date.now() - 1000 * 60 * 90), // 1.5 hours ago
-      earnings: 30,
-    },
-    {
-      id: '4',
-      customerName: 'Lisa Brown',
-      licensePlate: 'GHI-789',
-      completedAt: new Date(Date.now() - 1000 * 60 * 120), // 2 hours ago
-      earnings: 25,
-    },
-  ];
+  useEffect(() => {
+    fetchDashboardData();
+    
+    // Refresh data every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
+    
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  const handleMarkComplete = async (assignmentId: string) => {
+    try {
+      // TODO: Implement mark complete functionality
+      console.log('Mark complete:', assignmentId);
+      // Refresh data after marking complete
+      await fetchDashboardData();
+    } catch (err) {
+      console.error('Error marking assignment complete:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+        <button 
+          onClick={fetchDashboardData}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return <div>No data available</div>;
+  }
+
+  const { metrics, currentAssignments, recentCompleted } = dashboardData;
 
   return (
     <div className="space-y-6">
@@ -61,6 +149,12 @@ const CarWasherDashboard: React.FC = () => {
           </p>
         </div>
         <div className="text-right">
+          <button 
+            onClick={fetchDashboardData}
+            className="mb-2 px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
           <p className="text-sm text-gray-500 dark:text-gray-400">Today&apos;s Summary</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white">
             {new Date().toLocaleDateString()}
@@ -155,7 +249,12 @@ const CarWasherDashboard: React.FC = () => {
             Current Assignments
           </h3>
           <div className="space-y-4">
-            {currentAssignments.map((assignment) => (
+            {currentAssignments.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                No current assignments
+              </p>
+            ) : (
+              currentAssignments.map((assignment) => (
               <div key={assignment.id} className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-900 dark:text-white">
@@ -173,7 +272,10 @@ const CarWasherDashboard: React.FC = () => {
                   <p>Started: {assignment.checkInTime.toLocaleTimeString()}</p>
                 </div>
                 <div className="mt-3 flex space-x-2">
-                  <button className="px-3 py-1 bg-green-light-600 text-white text-sm rounded-lg hover:bg-green-light-700 transition-colors">
+                  <button 
+                    onClick={() => handleMarkComplete(assignment.id)}
+                    className="px-3 py-1 bg-green-light-600 text-white text-sm rounded-lg hover:bg-green-light-700 transition-colors"
+                  >
                     Mark Complete
                   </button>
                   <button className="px-3 py-1 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors">
@@ -181,7 +283,8 @@ const CarWasherDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -191,7 +294,12 @@ const CarWasherDashboard: React.FC = () => {
             Recently Completed
           </h3>
           <div className="space-y-4">
-            {recentCompleted.map((completed) => (
+            {recentCompleted.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                No completed jobs today
+              </p>
+            ) : (
+              recentCompleted.map((completed) => (
               <div key={completed.id} className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-900 dark:text-white">
@@ -209,7 +317,8 @@ const CarWasherDashboard: React.FC = () => {
                   </p>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
