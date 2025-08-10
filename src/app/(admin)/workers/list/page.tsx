@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import WorkerDetailModal from '@/components/carwash/WorkerDetailModal';
@@ -9,7 +9,7 @@ interface Worker {
   name: string;
   email: string;
   phone: string;
-  hourlyRate: number;
+  address: string;
   totalEarnings: number;
   isAvailable: boolean;
   assignedAdminId: string;
@@ -30,81 +30,33 @@ const WorkerListPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data for development
-  useEffect(() => {
-    const mockWorkers: Worker[] = [
-      {
-        id: '1',
-        name: 'Mike Johnson',
-        email: 'mike.johnson@carwash.com',
-        phone: '+1 (555) 123-4567',
-        hourlyRate: 15.00,
-        totalEarnings: 1250.00,
-        isAvailable: true,
-        assignedAdminId: 'admin1',
-        assignedAdminName: 'John Admin',
-        totalCheckIns: 45,
-        completedCheckIns: 42,
-        averageRating: 4.8,
-        createdAt: new Date('2024-01-15'),
-        lastActive: new Date()
-      },
-      {
-        id: '2',
-        name: 'David Brown',
-        email: 'david.brown@carwash.com',
-        phone: '+1 (555) 987-6543',
-        hourlyRate: 14.50,
-        totalEarnings: 980.00,
-        isAvailable: true,
-        assignedAdminId: 'admin1',
-        assignedAdminName: 'John Admin',
-        totalCheckIns: 32,
-        completedCheckIns: 30,
-        averageRating: 4.6,
-        createdAt: new Date('2024-02-01'),
-        lastActive: new Date(Date.now() - 1000 * 60 * 30) // 30 minutes ago
-      },
-      {
-        id: '3',
-        name: 'Sarah Wilson',
-        email: 'sarah.wilson@carwash.com',
-        phone: '+1 (555) 456-7890',
-        hourlyRate: 16.00,
-        totalEarnings: 2100.00,
-        isAvailable: false,
-        assignedAdminId: 'admin2',
-        assignedAdminName: 'Lisa Admin',
-        totalCheckIns: 78,
-        completedCheckIns: 75,
-        averageRating: 4.9,
-        createdAt: new Date('2023-12-10'),
-        lastActive: new Date(Date.now() - 1000 * 60 * 60 * 2) // 2 hours ago
-      },
-      {
-        id: '4',
-        name: 'Robert Chen',
-        email: 'robert.chen@carwash.com',
-        phone: '+1 (555) 789-0123',
-        hourlyRate: 15.50,
-        totalEarnings: 850.00,
-        isAvailable: true,
-        assignedAdminId: 'admin2',
-        assignedAdminName: 'Lisa Admin',
-        totalCheckIns: 28,
-        completedCheckIns: 26,
-        averageRating: 4.7,
-        createdAt: new Date('2024-02-15'),
-        lastActive: new Date(Date.now() - 1000 * 60 * 15) // 15 minutes ago
+  // Fetch workers from API
+  const fetchWorkers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/admin/washers');
+      const data = await response.json();
+      
+      if (data.success) {
+        setWorkers(data.washers || []);
+      } else {
+        setError(data.error || 'Failed to fetch workers');
       }
-    ];
-
-    setTimeout(() => {
-      setWorkers(mockWorkers);
+    } catch (error) {
+      console.error('Error fetching workers:', error);
+      setError('Failed to fetch workers');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchWorkers();
+  }, [fetchWorkers]);
 
   const filteredAndSortedWorkers = workers
     .filter(worker => {
@@ -186,6 +138,7 @@ const WorkerListPage: React.FC = () => {
   };
 
   const handleViewWorker = (workerId: string) => {
+    console.log('handleViewWorker called with ID:', workerId); // Debug log
     setSelectedWorkerId(workerId);
     setIsModalOpen(true);
   };
@@ -195,6 +148,32 @@ const WorkerListPage: React.FC = () => {
     setSelectedWorkerId(null);
   };
 
+  const handleToggleAvailability = async (workerId: string, currentAvailability: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/washers/${workerId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isAvailable: !currentAvailability
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh the workers list
+        fetchWorkers();
+      } else {
+        setError(data.error || 'Failed to update worker availability');
+      }
+    } catch (error) {
+      console.error('Error updating worker availability:', error);
+      setError('Failed to update worker availability');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -202,6 +181,29 @@ const WorkerListPage: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600 dark:text-gray-400">Loading workers...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 text-red-500">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Error loading workers
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+            <Button onClick={fetchWorkers} variant="outline">
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
@@ -220,12 +222,20 @@ const WorkerListPage: React.FC = () => {
             Manage and monitor car washer performance
           </p>
         </div>
-        <Button
-          onClick={() => window.location.href = '/add-worker'}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          Add New Worker
-        </Button>
+        <div className="flex space-x-3">
+          <Button
+            onClick={fetchWorkers}
+            variant="outline"
+          >
+            Refresh
+          </Button>
+          <Button
+            onClick={() => window.location.href = '/add-worker'}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Add New Worker
+          </Button>
+        </div>
       </div>
 
       {/* Statistics */}
@@ -444,9 +454,9 @@ const WorkerListPage: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                           ${worker.totalEarnings.toFixed(2)}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          ${worker.hourlyRate}/hr
-                        </div>
+                                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {worker.address}
+                          </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -467,6 +477,14 @@ const WorkerListPage: React.FC = () => {
                           onClick={() => window.location.href = `/workers/edit/${worker.id}`}
                         >
                           Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleAvailability(worker.id, worker.isAvailable)}
+                          className={worker.isAvailable ? 'text-orange-600 hover:text-orange-700' : 'text-green-600 hover:text-green-700'}
+                        >
+                          {worker.isAvailable ? 'Set Unavailable' : 'Set Available'}
                         </Button>
                       </div>
                     </td>

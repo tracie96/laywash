@@ -23,7 +23,6 @@ interface Worker {
   name: string;
   email: string;
   phone: string;
-  hourlyRate: number;
   totalEarnings: number;
   isAvailable: boolean;
   assignedAdminId: string;
@@ -56,111 +55,38 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'performance'>('overview');
   const [worker, setWorker] = useState<Worker | null>(null);
   const [carWashHistory, setCarWashHistory] = useState<CarWashRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadWorkerData = async () => {
-      setIsLoading(true);
+      if (!workerId) return;
       
-      // Mock data - replace with actual API calls
-      const mockWorker: Worker = {
-        id: workerId,
-        name: 'Mike Johnson',
-        email: 'mike.johnson@carwash.com',
-        phone: '+1 (555) 123-4567',
-        hourlyRate: 15.00,
-        totalEarnings: 1250.00,
-        isAvailable: true,
-        assignedAdminId: 'admin1',
-        assignedAdminName: 'John Admin',
-        totalCheckIns: 45,
-        completedCheckIns: 42,
-        averageRating: 4.8,
-        createdAt: new Date('2024-01-15'),
-        lastActive: new Date(),
-        address: '123 Main St, City, State 12345',
-        emergencyContact: 'Jane Johnson',
-        emergencyPhone: '+1 (555) 987-6543',
-        skills: ['Exterior Wash', 'Interior Cleaning', 'Waxing', 'Detailing'],
-        certifications: ['Car Wash Safety', 'Customer Service Excellence'],
-        notes: 'Reliable worker with excellent customer feedback. Specializes in premium detailing services.'
-      };
-
-      const mockCarWashHistory: CarWashRecord[] = [
-        {
-          id: '1',
-          carModel: 'Toyota Camry',
-          color: 'Red',
-          licensePlate: 'ABC-1234',
-          serviceType: 'Premium Wash',
-          price: 45.00,
-          rating: 5,
-          completedAt: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-          duration: 45,
-          customerName: 'John Smith',
-          customerPhone: '+1 (555) 111-2222'
-        },
-        {
-          id: '2',
-          carModel: 'Honda Civic ',
-          color: 'Blue',
-          licensePlate: 'XYZ-5678',
-          serviceType: 'Basic Wash',
-          price: 25.00,
-          rating: 4,
-          completedAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-          duration: 30,
-          customerName: 'Sarah Wilson',
-          customerPhone: '+1 (555) 333-4444'
-        },
-        {
-          id: '3',
-          carModel: 'BMW X5 2024',
-          color: 'Black',
-          licensePlate: 'LUX-9999',
-          serviceType: 'Full Detail',
-          price: 120.00,
-          rating: 5,
-          completedAt: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-          duration: 120,
-          customerName: 'Michael Brown',
-          customerPhone: '+1 (555) 555-6666'
-        },
-        {
-          id: '4',
-          carModel: 'Ford F-150 2023',
-          color: 'White',
-          licensePlate: 'TRK-7777',
-          serviceType: 'Truck Wash',
-          price: 35.00,
-          rating: 4,
-          completedAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-          duration: 40,
-          customerName: 'David Lee',
-          customerPhone: '+1 (555) 777-8888'
-        },
-        {
-          id: '5',
-          carModel: 'Tesla Model 3 2024',
-          color: 'Green',
-          licensePlate: 'EV-2024',
-          serviceType: 'Electric Vehicle Care',
-          price: 55.00,
-          rating: 5,
-          completedAt: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-          duration: 50,
-          customerName: 'Emily Chen',
-          customerPhone: '+1 (555) 999-0000'
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('Fetching worker details for ID:', workerId); // Debug log
+        const response = await fetch(`/api/admin/washers/${workerId}/details`);
+        const data = await response.json();
+        
+        console.log('Worker details response:', data); // Debug log
+        
+        if (data.success) {
+          setWorker(data.worker);
+          setCarWashHistory(data.carWashHistory || []);
+        } else {
+          setError(data.error || 'Failed to fetch worker details');
         }
-      ];
-
-      setTimeout(() => {
-        setWorker(mockWorker);
-        setCarWashHistory(mockCarWashHistory);
+      } catch (error) {
+        console.error('Error fetching worker details:', error);
+        setError('Failed to fetch worker details');
+      } finally {
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
     if (isOpen && workerId) {
+      console.log('Modal opened with workerId:', workerId); // Debug log
       loadWorkerData();
     }
   }, [isOpen, workerId]);
@@ -214,6 +140,53 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-600 dark:text-gray-400">Loading worker details...</p>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (error) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} className="max-w-4xl">
+        <div className="p-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 text-red-500">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Error loading worker details
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+              <Button onClick={onClose} variant="outline">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (!worker) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} className="max-w-4xl">
+        <div className="p-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Worker not found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                The worker details could not be found.
+              </p>
+              <Button onClick={onClose} variant="outline">
+                Close
+              </Button>
             </div>
           </div>
         </div>
@@ -359,88 +332,106 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
               <Badge color="success">{carWashHistory.length} cars washed</Badge>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Car Details
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Service
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Customer
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Price
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Rating
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Completed
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {carWashHistory.map((record) => (
-                      <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {record.carModel}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {record.licensePlate}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {record.serviceType}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatDuration(record.duration)}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {record.customerName}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {record.customerPhone}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            ${record.price.toFixed(2)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className="text-sm text-gray-900 dark:text-white mr-1">
-                              {record.rating}
-                            </span>
-                            <span className="text-yellow-500">⭐</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {formatDate(record.completedAt)}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {carWashHistory.length === 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    No completed car washes
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    This worker hasn&apos;t completed any car wash services yet.
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Car Details
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Service
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Customer
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Price
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Rating
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Completed
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {carWashHistory.map((record) => (
+                        <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                {record.carModel}
+                              </div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {record.licensePlate}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm text-gray-900 dark:text-white">
+                                {record.serviceType}
+                              </div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {formatDuration(record.duration)}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm text-gray-900 dark:text-white">
+                                {record.customerName}
+                              </div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {record.customerPhone}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              ${record.price.toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <span className="text-sm text-gray-900 dark:text-white mr-1">
+                                {record.rating}
+                              </span>
+                              <span className="text-yellow-500">⭐</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatDate(record.completedAt)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -455,7 +446,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
                       Total Cars Washed
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {performanceStats.totalCars}
+                      {worker.totalCheckIns}
                     </p>
                   </div>
                   <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">

@@ -24,7 +24,15 @@ interface AuthContextType {
     cvFile?: File, 
     pictureFile?: File
   ) => Promise<{ success: boolean; error?: string }>;
-  createCarWasher: (name: string, email: string, phone: string, hourlyRate?: number) => Promise<{ success: boolean; error?: string }>;
+  createCarWasher: (
+    name: string, 
+    email: string, 
+    phone: string, 
+    password: string,
+    hourlyRate?: number,
+    nextOfKin?: Array<{name: string; phone: string; address: string}>,
+    pictureFile?: File
+  ) => Promise<{ success: boolean; error?: string }>;
   createCustomer: (customerData: {
     name: string;
     email?: string;
@@ -41,6 +49,7 @@ interface AuthContextType {
     sortOrder?: 'asc' | 'desc';
   }) => Promise<{ success: boolean; customers?: Customer[]; error?: string }>;
   searchCustomersByEmail: (email: string) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
+  searchCustomers: (params: { email?: string; licensePlate?: string }) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,13 +208,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const createCarWasher = async (name: string, email: string, phone: string, hourlyRate?: number): Promise<{ success: boolean; error?: string }> => {
+  const createCarWasher = async (
+    name: string, 
+    email: string, 
+    phone: string, 
+    password: string,
+    hourlyRate?: number,
+    nextOfKin?: Array<{name: string; phone: string; address: string}>,
+    pictureFile?: File
+  ): Promise<{ success: boolean; error?: string }> => {
     if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
       console.error('Only Super Admins and Admins can create car washer users');
       return { success: false, error: 'Only Super Admins and Admins can create car washer users' };
     }
 
     try {
+      let pictureUrl = '';
+
+      // Generate a temporary ID for file naming (we'll use this before we get the actual user ID)
+      const tempId = Date.now().toString();
+
+      // Upload picture if provided
+      if (pictureFile) {
+        const pictureUpload = await UploadService.uploadWorkerPicture(pictureFile, tempId);
+        if (!pictureUpload.success) {
+          return { success: false, error: `Picture upload failed: ${pictureUpload.error}` };
+        }
+        pictureUrl = pictureUpload.url!;
+      }
+
       const response = await fetch('/api/admin/create-carwasher', {
         method: 'POST',
         headers: {
@@ -215,7 +246,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           name,
           email,
           phone,
+          password,
           hourlyRate,
+          nextOfKin: nextOfKin || [],
+          pictureUrl: pictureUrl || null,
           createdBy: user.id,
         }),
       });
@@ -305,6 +339,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const searchCustomers = async (params: { email?: string; licensePlate?: string }): Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }> => {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      console.error('Only Super Admins and Admins can search customers');
+      return { success: false, error: 'Only Super Admins and Admins can search customers' };
+    }
+
+    if (!params.email && !params.licensePlate) {
+      return { success: false, error: 'Email or license plate is required for search' };
+    }
+
+    try {
+      const searchParams = new URLSearchParams();
+      if (params.email) searchParams.append('email', params.email);
+      if (params.licensePlate) searchParams.append('licensePlate', params.licensePlate);
+
+      const response = await fetch(`/api/admin/customers/search?${searchParams.toString()}`);
+      const result = await response.json();
+      return { success: result.success, customers: result.customers, found: result.found, error: result.error };
+    } catch (error) {
+      console.error('Search customers error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
   const hasRole = (role: UserRole): boolean => {
     return user?.role === role;
   };
@@ -327,6 +385,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     createCustomer,
     fetchCustomers,
     searchCustomersByEmail,
+    searchCustomers,
   };
 
   return (

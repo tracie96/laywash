@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { PlusIcon, TrashBinIcon } from "@/icons";
 
@@ -67,6 +67,11 @@ const OperationsServicesPage: React.FC = () => {
     }
   }, [searchTerm, filterCategory, filterStatus]);
 
+  // Fetch services on component mount and when filters change
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -108,7 +113,7 @@ const OperationsServicesPage: React.FC = () => {
           category: 'exterior',
           duration: 30
         });
-        fetchServices(); // Refresh the list
+        fetchServices(); 
       } else {
         setError(data.error || 'Failed to create service');
       }

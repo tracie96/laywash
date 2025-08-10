@@ -63,6 +63,13 @@ export class UploadService {
   }
 
   /**
+   * Upload worker profile picture
+   */
+  static async uploadWorkerPicture(file: File, workerId: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    return this.uploadFile(file, 'worker-pictures', 'profiles', `${workerId}-profile`);
+  }
+
+  /**
    * Delete a file from Supabase storage
    */
   static async deleteFile(bucket: string, filePath: string): Promise<{ success: boolean; error?: string }> {

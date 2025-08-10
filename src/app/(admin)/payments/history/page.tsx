@@ -1,105 +1,112 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 
 interface Payment {
   id: string;
-  checkInId: string;
   customerName: string;
   licensePlate: string;
   amount: number;
-  paymentMethod: 'cash' | 'card' | 'mobile_money';
-  status: 'pending' | 'paid';
-  processedAt: Date;
-  processedBy: string;
-  services: string[];
+  paymentMethod: 'cash' | 'card' | 'mobile_money' | 'Not specified';
+  status: 'pending' | 'completed';
+  date: string;
+  serviceType: string;
+  vehicleType?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+  checkInTime: string;
+  completionTime?: string;
+  customerId?: string;
+  assignedWasherId?: string;
+  assignedAdminId?: string;
+  remarks?: string;
 }
 
 const PaymentHistoryPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock payment data
-  useEffect(() => {
-    const mockPayments: Payment[] = [
-      {
-        id: '1',
-        checkInId: 'checkin-001',
-        customerName: 'John Smith',
-        licensePlate: 'ABC-123',
-        amount: 35.00,
-        paymentMethod: 'card',
-        status: 'paid',
-        processedAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        processedBy: 'Mike Johnson',
-        services: ['exterior_wash', 'interior_clean']
-      },
-      {
-        id: '2',
-        checkInId: 'checkin-002',
-        customerName: 'Sarah Wilson',
-        licensePlate: 'XYZ-789',
-        amount: 60.00,
-        paymentMethod: 'cash',
-        status: 'paid',
-        processedAt: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-        processedBy: 'David Brown',
-        services: ['full_service', 'wax']
-      },
-      {
-        id: '3',
-        checkInId: 'checkin-003',
-        customerName: 'David Brown',
-        licensePlate: 'DEF-456',
-        amount: 25.00,
-        paymentMethod: 'mobile_money',
-        status: 'pending',
-        processedAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-        processedBy: 'Mike Johnson',
-        services: ['exterior_wash', 'tire_shine']
-      },
-      {
-        id: '4',
-        checkInId: 'checkin-004',
-        customerName: 'Lisa Anderson',
-        licensePlate: 'GHI-789',
-        amount: 70.00,
-        paymentMethod: 'card',
-        status: 'paid',
-        processedAt: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-        processedBy: 'Sarah Wilson',
-        services: ['full_service', 'wax', 'tire_shine']
+  const fetchPayments = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (filter !== 'all') params.append('status', filter === 'completed' ? 'paid' : filter);
+      params.append('sortBy', 'check_in_time');
+      params.append('sortOrder', 'desc');
+      params.append('limit', '100');
+      
+      const response = await fetch(`/api/admin/payments?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPayments(data.payments || []);
+      } else {
+        setError(data.error || 'Failed to fetch payments');
       }
-    ];
-
-    setTimeout(() => {
-      setPayments(mockPayments);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      setError('Failed to fetch payments');
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  }, [searchTerm, filter]);
 
-  const filteredPayments = payments.filter(payment => {
-    const matchesFilter = filter === 'all' || payment.status === filter;
-    const matchesSearch = searchTerm === '' || 
-      payment.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.licensePlate.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesFilter && matchesSearch;
-  });
+  // Fetch payment data from API with debounce for search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchPayments();
+    }, searchTerm ? 500 : 0); // Debounce search, but load immediately on first render
+
+    return () => clearTimeout(timeoutId);
+  }, [fetchPayments, searchTerm]);
+
+  const handleMarkAsPaid = async (paymentId: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/${paymentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentStatus: 'paid'
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh the payments list
+        fetchPayments();
+      } else {
+        setError(data.error || 'Failed to update payment status');
+      }
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      setError('Failed to update payment status');
+    }
+  };
+
+  // Since filtering is now handled server-side, we can just use all payments
+  const filteredPayments = payments;
 
   const calculateStats = () => {
     const stats = {
       total: payments.length,
       pending: payments.filter(p => p.status === 'pending').length,
-      paid: payments.filter(p => p.status === 'paid').length,
-      totalAmount: payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0),
+      completed: payments.filter(p => p.status === 'completed').length,
+      totalAmount: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0),
       pendingAmount: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
-      cashPayments: payments.filter(p => p.paymentMethod === 'cash' && p.status === 'paid').length,
-      cardPayments: payments.filter(p => p.paymentMethod === 'card' && p.status === 'paid').length,
-      mobilePayments: payments.filter(p => p.paymentMethod === 'mobile_money' && p.status === 'paid').length
+      cashPayments: payments.filter(p => p.paymentMethod === 'cash' && p.status === 'completed').length,
+      cardPayments: payments.filter(p => p.paymentMethod === 'card' && p.status === 'completed').length,
+      mobilePayments: payments.filter(p => p.paymentMethod === 'mobile_money' && p.status === 'completed').length
     };
     return stats;
   };
@@ -108,8 +115,8 @@ const PaymentHistoryPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid':
-        return <Badge color="success">Paid</Badge>;
+      case 'completed':
+        return <Badge color="success">Completed</Badge>;
       case 'pending':
         return <Badge color="warning">Pending</Badge>;
       default:
@@ -155,9 +162,31 @@ const PaymentHistoryPage: React.FC = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 text-red-500">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Error loading payments
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+            <Button onClick={fetchPayments} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           Payment History
@@ -256,14 +285,14 @@ const PaymentHistoryPage: React.FC = () => {
             All Payments ({stats.total})
           </button>
           <button
-            onClick={() => setFilter('paid')}
+            onClick={() => setFilter('completed')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === 'paid'
+              filter === 'completed'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            Paid ({stats.paid})
+            Completed ({stats.completed})
           </button>
           <button
             onClick={() => setFilter('pending')}
@@ -338,9 +367,9 @@ const PaymentHistoryPage: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <p className="text-gray-600 dark:text-gray-400">Processed At</p>
+                      <p className="text-gray-600 dark:text-gray-400">Date</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {payment.processedAt.toLocaleString()}
+                        {new Date(payment.date).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -351,21 +380,16 @@ const PaymentHistoryPage: React.FC = () => {
               <div className="mb-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Services:</p>
                 <div className="flex flex-wrap gap-2">
-                  {payment.services.map((service) => (
-                    <span
-                      key={service}
-                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded"
-                    >
-                      {service.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </span>
-                  ))}
+                  <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded">
+                    {payment.serviceType || 'Not specified'}
+                  </span>
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Processed by: <span className="font-medium text-gray-900 dark:text-white">{payment.processedBy}</span>
+                  Check-in ID: <span className="font-medium text-gray-900 dark:text-white">{payment.id}</span>
                 </div>
                 
                 <div className="flex space-x-2">
@@ -379,7 +403,7 @@ const PaymentHistoryPage: React.FC = () => {
                   {payment.status === 'pending' && (
                     <Button
                       size="sm"
-                      onClick={() => console.log('Mark as paid:', payment.id)}
+                      onClick={() => handleMarkAsPaid(payment.id)}
                     >
                       Mark as Paid
                     </Button>

@@ -28,12 +28,7 @@ export async function PATCH(
       );
     }
 
-    if (updateData.hourlyRate !== undefined && (typeof updateData.hourlyRate !== 'number' || updateData.hourlyRate < 0)) {
-      return NextResponse.json(
-        { success: false, error: 'hourlyRate must be a positive number' },
-        { status: 400 }
-      );
-    }
+
 
     // Prepare update data for users table
     const userUpdateData: { name?: string; email?: string; phone?: string; is_active?: boolean } = {};
@@ -43,8 +38,7 @@ export async function PATCH(
     if (updateData.is_active !== undefined) userUpdateData.is_active = updateData.is_active;
 
     // Prepare update data for car_washer_profiles table
-    const profileUpdateData: { hourly_rate?: number; is_available?: boolean; assigned_admin_id?: string } = {};
-    if (updateData.hourlyRate !== undefined) profileUpdateData.hourly_rate = updateData.hourlyRate;
+    const profileUpdateData: { is_available?: boolean; assigned_admin_id?: string } = {};
     if (updateData.isAvailable !== undefined) profileUpdateData.is_available = updateData.isAvailable;
     if (updateData.assignedAdminId !== undefined) profileUpdateData.assigned_admin_id = updateData.assignedAdminId;
 
@@ -95,7 +89,6 @@ export async function PATCH(
         updated_at,
         car_washer_profiles!car_washer_profiles_user_id_fkey (
           assigned_admin_id,
-          hourly_rate,
           total_earnings,
           is_available
         )
@@ -123,7 +116,7 @@ export async function PATCH(
       totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
       averageRating: 4.5, // This would need to be calculated from ratings table
       lastActive: 'N/A', // This would need to be tracked separately
-      hourlyRate: updatedWasher.car_washer_profiles?.[0]?.hourly_rate || 0,
+
       totalEarnings: updatedWasher.car_washer_profiles?.[0]?.total_earnings || 0,
       isAvailable: updatedWasher.car_washer_profiles?.[0]?.is_available || false,
       assignedAdminId: updatedWasher.car_washer_profiles?.[0]?.assigned_admin_id || null

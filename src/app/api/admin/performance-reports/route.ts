@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           name,
           email,
           car_washer_profiles!car_washer_profiles_user_id_fkey (
-            hourly_rate,
+
             total_earnings
           )
         )
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       carsWashed: number;
       totalEarnings: number;
       totalHours: number;
-      hourlyRate: number;
+
       checkIns: typeof checkIns;
     }>();
 
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           carsWashed: 0,
           totalEarnings: 0,
           totalHours: 0,
-          hourlyRate: washer?.car_washer_profiles?.[0]?.hourly_rate || 15.00,
+
           checkIns: []
         });
       }
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         carsWashed: performance.carsWashed,
         averageRating: parseFloat(averageRating.toFixed(1)),
         totalHours: parseFloat(performance.totalHours.toFixed(1)),
-        hourlyRate: performance.hourlyRate,
+
         totalEarnings: parseFloat(performance.totalEarnings.toFixed(2)),
         efficiency: efficiency,
         date: now.toISOString().split('T')[0]

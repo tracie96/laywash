@@ -37,7 +37,7 @@ const FormField: React.FC<{
 
 const NewCheckInPage: React.FC = () => {
   const router = useRouter();
-  const { searchCustomersByEmail } = useAuth();
+  const { searchCustomers } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [success, setSuccess] = useState('');
@@ -92,8 +92,11 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const searchCustomer = async () => {
-    if (!formData.customerEmail.trim()) {
-      setError('Please enter an email address to search');
+    const email = formData.customerEmail.trim();
+    const licensePlate = formData.licensePlate.trim();
+    
+    if (!email && !licensePlate) {
+      setError('Please enter an email address or license plate to search');
       return;
     }
 
@@ -103,7 +106,10 @@ const NewCheckInPage: React.FC = () => {
     setShowCustomerResults(false);
 
     try {
-      const result = await searchCustomersByEmail(formData.customerEmail.trim());
+      const result = await searchCustomers({ 
+        email: email || undefined, 
+        licensePlate: licensePlate || undefined 
+      });
       
       if (!result.success) {
         setError(result.error || 'Failed to search for customer');
@@ -113,9 +119,9 @@ const NewCheckInPage: React.FC = () => {
       if (result.found && result.customers) {
         setFoundCustomers(result.customers);
         setShowCustomerResults(true);
-        setSuccess(`Found ${result.customers.length} vehicle(s) for this customer`);
+        setSuccess(`Found ${result.customers.length} vehicle(s) matching your search`);
       } else {
-        setSuccess('No existing customer found with this email. You can proceed to register a new customer.');
+        setSuccess('No existing customer found with this information. You can proceed to register a new customer.');
         setShowCustomerResults(false);
       }
     } catch {
@@ -212,22 +218,43 @@ const NewCheckInPage: React.FC = () => {
             <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-3">
               Search for Existing Customer
             </h3>
-            <div className="flex gap-3">
-              <div className="flex-1">
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+              Search by email address or license plate number (or both)
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <div>
+                <Label htmlFor="search-email" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
+                  Email Address
+                </Label>
                 <InputField
+                  id="search-email"
                   type="email"
                   value={formData.customerEmail}
                   onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-                  placeholder="Enter customer email to search"
+                  placeholder="Enter customer email"
                 />
               </div>
+              <div>
+                <Label htmlFor="search-license" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
+                  License Plate
+                </Label>
+                <InputField
+                  id="search-license"
+                  type="text"
+                  value={formData.licensePlate}
+                  onChange={(e) => handleInputChange('licensePlate', e.target.value)}
+                  placeholder="Enter license plate number"
+                />
+              </div>
+            </div>
+            <div className="flex justify-center">
               <Button
                 type="button"
                 onClick={searchCustomer}
                 disabled={isSearching}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
               >
-                {isSearching ? 'Searching...' : 'Search'}
+                {isSearching ? 'Searching...' : 'Search Customer'}
               </Button>
             </div>
           </div>

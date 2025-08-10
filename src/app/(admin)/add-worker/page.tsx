@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Input from '../../../components/form/input/InputField';
@@ -13,9 +13,12 @@ const AddWorkerPage: React.FC = () => {
     name: '',
     email: '',
     phone: '',
-    hourlyRate: '',
-    assignedAdmin: ''
+    password: '',
+    assignedAdmin: '',
+    nextOfKin: [{ name: '', phone: '', address: '' }]
   });
+  const [pictureFile, setPictureFile] = useState<File | null>(null);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -30,11 +33,41 @@ const AddWorkerPage: React.FC = () => {
     }));
   };
 
+  const handleNextOfKinChange = (index: number, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      nextOfKin: prev.nextOfKin.map((kin, i) => 
+        i === index ? { ...kin, [field]: value } : kin
+      )
+    }));
+  };
+
+  const addNextOfKin = () => {
+    setFormData(prev => ({
+      ...prev,
+      nextOfKin: [...prev.nextOfKin, { name: '', phone: '', address: '' }]
+    }));
+  };
+
+  const removeNextOfKin = (index: number) => {
+    if (formData.nextOfKin.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        nextOfKin: prev.nextOfKin.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.phone) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
@@ -43,17 +76,23 @@ const AddWorkerPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const hourlyRate = formData.hourlyRate ? parseFloat(formData.hourlyRate) : undefined;
       const result = await createCarWasher(
         formData.name,
         formData.email,
         formData.phone,
-        hourlyRate
+        formData.password,
+        undefined, // hourlyRate removed
+        formData.nextOfKin,
+        pictureFile || undefined
       );
 
       if (result.success) {
-        setSuccess('Car washer account created successfully! A temporary password has been generated and sent to their email.');
-        setFormData({ name: '', email: '', phone: '', hourlyRate: '', assignedAdmin: '' });
+        setSuccess('Car washer account created successfully! Login credentials have been sent to their email.');
+        setFormData({ name: '', email: '', phone: '', password: '', assignedAdmin: '', nextOfKin: [{ name: '', phone: '', address: '' }] });
+        setPictureFile(null);
+        if (pictureInputRef.current) {
+          pictureInputRef.current.value = '';
+        }
       } else {
         setError(result.error || 'Failed to create car washer account. Please try again.');
       }
@@ -66,7 +105,6 @@ const AddWorkerPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      {/* Header */}
       <div className="mb-6">
         <Link
           href="/(admin)/dashboard"
@@ -147,25 +185,24 @@ const AddWorkerPage: React.FC = () => {
             />
           </div>
 
-          {/* Hourly Rate */}
+          {/* Password */}
           <div>
             <Label>
-              Hourly Rate ($)
+              Password <span className="text-error-500">*</span>
             </Label>
             <Input
-              type="number"
-              step={0.01}
-              min="0"
-              placeholder="Enter hourly rate (optional)"
-              defaultValue={formData.hourlyRate}
-              onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
+              type="password"
+              placeholder="Create a password for the car washer"
+              value={formData.password}
+              onChange={(e) => handleInputChange('password', e.target.value)}
             />
+            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
           </div>
 
           {/* Assigned Admin */}
           <div>
             <Label>
-              Assigned Admin
+              Assigned Location
             </Label>
             <Input
               type="text"
@@ -173,6 +210,95 @@ const AddWorkerPage: React.FC = () => {
               defaultValue={formData.assignedAdmin}
               onChange={(e) => handleInputChange('assignedAdmin', e.target.value)}
             />
+          </div>
+
+          {/* Picture Upload */}
+          <div>
+            <Label>
+              Profile Picture
+            </Label>
+            <div className="mt-2">
+              <input
+                ref={pictureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => setPictureFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-500 dark:text-gray-400
+                           file:mr-4 file:py-2 file:px-4
+                           file:rounded-lg file:border-0
+                           file:text-sm file:font-medium
+                           file:bg-blue-50 file:text-blue-700
+                           hover:file:bg-blue-100
+                           dark:file:bg-blue-900 dark:file:text-blue-300
+                           dark:hover:file:bg-blue-800"
+              />
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                PNG, JPG, GIF up to 10MB
+              </p>
+            </div>
+          </div>
+
+          {/* Next of Kin Section */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Label>
+                Next of Kin Information
+              </Label>
+              <button
+                type="button"
+                onClick={addNextOfKin}
+                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                + Add Another
+              </button>
+            </div>
+            {formData.nextOfKin.map((kin, index) => (
+              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Next of Kin {index + 1}
+                  </h4>
+                  {formData.nextOfKin.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeNextOfKin(index)}
+                      className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      type="text"
+                      placeholder="Full name"
+                      value={kin.name}
+                      onChange={(e) => handleNextOfKinChange(index, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Phone</Label>
+                    <Input
+                      type="tel"
+                      placeholder="Phone number"
+                      value={kin.phone}
+                      onChange={(e) => handleNextOfKinChange(index, 'phone', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Address</Label>
+                    <Input
+                      type="text"
+                      placeholder="Address"
+                      value={kin.address}
+                      onChange={(e) => handleNextOfKinChange(index, 'address', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Submit Button */}
@@ -215,10 +341,12 @@ const AddWorkerPage: React.FC = () => {
                 What happens next?
               </h4>
               <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                <li>• A temporary password will be generated automatically</li>
-                <li>• The car washer will receive an email with login credentials</li>
+                <li>• The password you create will be used for their account</li>
+                <li>• The car washer will receive an email with their login credentials</li>
                 <li>• They can handle car wash operations and check-ins</li>
                 <li>• They can track their earnings and performance</li>
+                <li>• Profile picture and next of kin information help with identification</li>
+                <li>• No CV is required for car washer positions</li>
               </ul>
             </div>
           </div>

@@ -31,6 +31,11 @@ const OperationsCustomersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -105,6 +110,43 @@ const OperationsCustomersPage: React.FC = () => {
     resetForm();
   };
 
+  // Handle view customer
+  const handleViewCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowViewModal(true);
+  };
+
+  // Handle edit customer
+  const handleEditCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData({
+      name: customer.name,
+      email: customer.email || '',
+      phone: customer.phone,
+      dob: '', // Keep empty for security
+      licensePlate: customer.licensePlate,
+      vehicleType: customer.vehicleType,
+      vehicleModel: customer.vehicleModel || '',
+      vehicleColor: customer.vehicleColor || '',
+      dateOfBirth: customer.dateOfBirth || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle close view modal
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setSelectedCustomer(null);
+  };
+
+  // Handle close edit modal
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedCustomer(null);
+    setEditError(null);
+    resetForm();
+  };
+
   // Handle form submission
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +177,43 @@ const OperationsCustomersPage: React.FC = () => {
       setCreateError('Failed to create customer. Please try again.');
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  // Handle edit customer submission
+  const handleUpdateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) return;
+    
+    setEditLoading(true);
+    setEditError(null);
+
+    try {
+      const response = await fetch(`/api/admin/customers/${selectedCustomer.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update the customer in the local state
+        setCustomers(prev => prev.map(customer => 
+          customer.id === selectedCustomer.id ? result.customer : customer
+        ));
+        handleCloseEditModal();
+        // Show success message could be added here
+      } else {
+        setEditError(result.error || 'Failed to update customer');
+      }
+    } catch (err) {
+      console.error('Error updating customer:', err);
+      setEditError('Failed to update customer. Please try again.');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -356,13 +435,15 @@ const OperationsCustomersPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button 
-                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300"
+                          onClick={() => handleViewCustomer(customer)}
+                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
                           title="View Details"
                         >
                           <EyeIcon className="w-4 h-4" />
                         </button>
                         <button 
-                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300"
+                          onClick={() => handleEditCustomer(customer)}
+                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 transition-colors"
                           title="Edit Customer"
                         >
                           <PencilIcon className="w-4 h-4" />
@@ -563,6 +644,330 @@ const OperationsCustomersPage: React.FC = () => {
                     </div>
                   ) : (
                     'Create Customer'
+                  )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {/* View Customer Modal */}
+      <Modal isOpen={showViewModal} onClose={handleCloseViewModal} className="max-w-2xl">
+        <div className="p-6">
+          {selectedCustomer && (
+            <div>
+              {/* Modal Header */}
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Customer Details</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  View detailed information for {selectedCustomer.name}
+                </p>
+              </div>
+
+              {/* Customer Information */}
+              <div className="space-y-6">
+                {/* Basic Info Section */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Basic Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
+                      <p className="text-gray-900 dark:text-white">{selectedCustomer.name}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
+                      <p className="text-gray-900 dark:text-white">{selectedCustomer.phone}</p>
+                    </div>
+                    {selectedCustomer.email && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                        <p className="text-gray-900 dark:text-white">{selectedCustomer.email}</p>
+                      </div>
+                    )}
+                    {selectedCustomer.dateOfBirth && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date of Birth</label>
+                        <p className="text-gray-900 dark:text-white">{new Date(selectedCustomer.dateOfBirth).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vehicle Info Section */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Vehicle Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">License Plate</label>
+                      <p className="text-gray-900 dark:text-white font-mono">{selectedCustomer.licensePlate}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vehicle Type</label>
+                      <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleType}</p>
+                    </div>
+                    {selectedCustomer.vehicleModel && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Model</label>
+                        <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleModel}</p>
+                      </div>
+                    )}
+                    {selectedCustomer.vehicleColor && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
+                        <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleColor}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Account Status Section */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Account Status</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedCustomer.isRegistered)}`}>
+                        {getStatusText(selectedCustomer.isRegistered)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Visits</label>
+                      <p className="text-gray-900 dark:text-white">{selectedCustomer.totalVisits}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Spent</label>
+                      <p className="text-gray-900 dark:text-white font-semibold">${selectedCustomer.totalSpent.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Registration Info Section */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Registration Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Created On</label>
+                      <p className="text-gray-900 dark:text-white">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</label>
+                      <p className="text-gray-900 dark:text-white">{new Date(selectedCustomer.updatedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCloseViewModal}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCloseViewModal();
+                    handleEditCustomer(selectedCustomer);
+                  }}
+                  className="px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors"
+                >
+                  Edit Customer
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Edit Customer Modal */}
+      <Modal isOpen={showEditModal} onClose={handleCloseEditModal} className="max-w-lg">
+        <div className="p-6">
+          <form onSubmit={handleUpdateCustomer}>
+            {/* Modal Header */}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Customer</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Update customer information for {selectedCustomer?.name}
+              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="space-y-5">
+                {/* Error Display */}
+                {editError && (
+                  <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="text-red-800 dark:text-red-200 text-sm">{editError}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter customer name"
+                  />
+                </div>
+
+                {/* Email (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter email address (optional)"
+                  />
+                </div>
+
+                {/* Date of Birth (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={handleInputChange}
+                    max={new Date().toISOString().split('T')[0]} // Prevents future dates
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Optional - helps with promotions and special offers
+                  </p>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+                {/* License Plate */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    License Plate <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="licensePlate"
+                    value={formData.licensePlate}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter license plate"
+                  />
+                </div>
+
+                {/* Vehicle Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Vehicle Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="vehicleType"
+                    value={formData.vehicleType}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                  >
+                    <option value="">Select vehicle type</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Truck">Truck</option>
+                    <option value="Hatchback">Hatchback</option>
+                    <option value="Coupe">Coupe</option>
+                    <option value="Convertible">Convertible</option>
+                    <option value="Van">Van</option>
+                    <option value="Motorcycle">Motorcycle</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* Vehicle Model (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Vehicle Model
+                  </label>
+                  <input
+                    type="text"
+                    name="vehicleModel"
+                    value={formData.vehicleModel}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter vehicle model (optional)"
+                  />
+                </div>
+
+                {/* Vehicle Color */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Vehicle Color <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="vehicleColor"
+                    value={formData.vehicleColor}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter vehicle color"
+                  />
+                </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  disabled={editLoading}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              <button
+                  type="submit"
+                  disabled={editLoading || !isFormValid()}
+                  className="px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editLoading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Updating...
+                    </div>
+                  ) : (
+                    'Update Customer'
                   )}
               </button>
             </div>

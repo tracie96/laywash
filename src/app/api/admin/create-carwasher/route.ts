@@ -15,23 +15,40 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, phone, hourlyRate, createdBy } = await request.json();
+    const { name, email, phone, password, nextOfKin, pictureUrl, createdBy } = await request.json();
 
     // Validate input
-    if (!name || !email || !phone) {
+    if (!name || !email || !phone || !password) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields: name, email, phone, and password are required' },
         { status: 400 }
       );
     }
 
-    // Generate a temporary password
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    // Validate password
+    if (password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters long' },
+        { status: 400 }
+      );
+    }
 
-    // Create the user in Supabase Auth
+    // Validate next of kin (optional)
+    if (nextOfKin && Array.isArray(nextOfKin) && nextOfKin.length > 0) {
+      for (const kin of nextOfKin) {
+        if (!kin.name || !kin.phone || !kin.address) {
+          return NextResponse.json(
+            { success: false, error: 'Each next of kin must have name, phone, and address' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Create the user in Supabase Auth using the provided password
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: tempPassword,
+      password: password,
       email_confirm: true,
     });
 
@@ -78,9 +95,11 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: data.user.id,
         assigned_admin_id: createdBy,
-        hourly_rate: hourlyRate || null,
+
         total_earnings: 0,
         is_available: true,
+        picture_url: pictureUrl || null,
+        next_of_kin: nextOfKin || [],
       });
 
     if (washerProfileError) {
@@ -88,8 +107,8 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire operation for this
     }
 
-    // Send email to washer with temporary password
-    await EmailService.sendTemporaryPassword(email, name, tempPassword, 'car_washer');
+    // Send email to washer with login credentials
+    await EmailService.sendTemporaryPassword(email, name, password, 'car_washer');
 
     return NextResponse.json({
       success: true,

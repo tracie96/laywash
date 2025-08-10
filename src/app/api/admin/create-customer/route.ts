@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
+console.log('Creating customer',  dateOfBirth)
     // Create customer in the database
     const { data: customer, error: insertError } = await supabaseAdmin
       .from('customers')
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Create customer error:', insertError);
       return NextResponse.json(
-        { success: false, error: 'Failed to create customer' },
+        { success: false, error: 'Failed to create customer ' + insertError.message },
         { status: 500 }
       );
     }

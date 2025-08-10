@@ -33,6 +33,12 @@ export interface CarWasher extends User {
   hourlyRate?: number;
   totalEarnings: number;
   isAvailable: boolean;
+  pictureUrl?: string;
+  nextOfKin?: Array<{
+    name: string;
+    phone: string;
+    address: string;
+  }>;
 }
 
 export interface SuperAdmin extends User {

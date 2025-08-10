@@ -10,16 +10,24 @@ interface CheckIn {
   licensePlate: string;
   vehicleType: string;
   vehicleColor: string;
+  vehicleModel?: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
   completedTime?: Date;
   paidTime?: Date;
   assignedWasher?: string;
+  assignedWasherId?: string;
+  assignedAdmin?: string;
   estimatedDuration: number;
   actualDuration?: number;
   totalPrice: number;
   specialInstructions?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  customerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const CheckInHistoryPage: React.FC = () => {
@@ -27,80 +35,65 @@ const CheckInHistoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'completed' | 'paid' | 'cancelled'>('all');
 
-  // Mock data for development
+  // Fetch real data from API
   useEffect(() => {
-    const mockCheckIns: CheckIn[] = [
-      {
-        id: '1',
-        customerName: 'John Smith',
-        customerPhone: '+1 (555) 123-4567',
-        licensePlate: 'ABC-123',
-        vehicleType: 'Sedan',
-        vehicleColor: 'Silver',
-        services: ['exterior_wash', 'interior_clean'],
-        status: 'paid',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        completedTime: new Date(Date.now() - 1000 * 60 * 60 * 1.5), // 1.5 hours ago
-        paidTime: new Date(Date.now() - 1000 * 60 * 60 * 1), // 1 hour ago
-        assignedWasher: 'Mike Johnson',
-        estimatedDuration: 45,
-        actualDuration: 42,
-        totalPrice: 35,
-        specialInstructions: 'Please be careful with the leather seats'
-      },
-      {
-        id: '2',
-        customerName: 'Sarah Wilson',
-        customerPhone: '+1 (555) 987-6543',
-        licensePlate: 'XYZ-789',
-        vehicleType: 'SUV',
-        vehicleColor: 'Black',
-        services: ['full_service', 'wax'],
-        status: 'completed',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-        completedTime: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-        assignedWasher: 'David Brown',
-        estimatedDuration: 75,
-        actualDuration: 78,
-        totalPrice: 60,
-        specialInstructions: 'Customer requested extra attention to wheels'
-      },
-      {
-        id: '3',
-        customerName: 'David Brown',
-        customerPhone: '+1 (555) 456-7890',
-        licensePlate: 'DEF-456',
-        vehicleType: 'Truck',
-        vehicleColor: 'White',
-        services: ['exterior_wash', 'tire_shine'],
-        status: 'cancelled',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-        estimatedDuration: 40,
-        totalPrice: 25
-      },
-      {
-        id: '4',
-        customerName: 'Lisa Anderson',
-        customerPhone: '+1 (555) 789-0123',
-        licensePlate: 'GHI-789',
-        vehicleType: 'Luxury',
-        vehicleColor: 'Red',
-        services: ['full_service', 'wax', 'tire_shine'],
-        status: 'paid',
-        checkInTime: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-        completedTime: new Date(Date.now() - 1000 * 60 * 60 * 7), // 7 hours ago
-        paidTime: new Date(Date.now() - 1000 * 60 * 60 * 6.5), // 6.5 hours ago
-        assignedWasher: 'Mike Johnson',
-        estimatedDuration: 90,
-        actualDuration: 85,
-        totalPrice: 70
-      }
-    ];
+    const fetchCheckIns = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch check-ins that are completed, paid, or cancelled for history
+        const response = await fetch('/api/admin/check-ins?status=all&limit=100');
+        const data = await response.json();
 
-    setTimeout(() => {
-      setCheckIns(mockCheckIns);
-      setIsLoading(false);
-    }, 1000);
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch check-ins');
+        }
+
+        if (data.success && data.checkIns) {
+          // Transform the API response to match our interface
+          const transformedCheckIns: CheckIn[] = data.checkIns
+            .filter((checkIn: CheckIn) => 
+              ['completed', 'paid', 'cancelled'].includes(checkIn.status)
+            )
+            .map((checkIn: CheckIn) => ({
+              id: checkIn.id,
+              customerName: checkIn.customerName,
+              customerPhone: checkIn.customerPhone,
+              licensePlate: checkIn.licensePlate,
+              vehicleType: checkIn.vehicleType,
+              vehicleColor: checkIn.vehicleColor,
+              vehicleModel: checkIn.vehicleModel,
+              services: checkIn.services || [],
+              status: checkIn.status,
+              checkInTime: new Date(checkIn.checkInTime),
+              completedTime: checkIn.completedTime ? new Date(checkIn.completedTime) : undefined,
+              paidTime: checkIn.paidTime ? new Date(checkIn.paidTime) : undefined,
+              assignedWasher: checkIn.assignedWasher,
+              assignedWasherId: checkIn.assignedWasherId,
+              assignedAdmin: checkIn.assignedAdmin,
+              estimatedDuration: checkIn.estimatedDuration || 0,
+              actualDuration: checkIn.actualDuration,
+              totalPrice: checkIn.totalPrice || 0,
+              specialInstructions: checkIn.specialInstructions,
+              paymentStatus: checkIn.paymentStatus,
+              paymentMethod: checkIn.paymentMethod,
+              customerId: checkIn.customerId,
+              createdAt: checkIn.createdAt,
+              updatedAt: checkIn.updatedAt
+            }));
+
+          setCheckIns(transformedCheckIns);
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } catch (error) {
+        console.error('Error fetching check-ins:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCheckIns();
   }, []);
 
   const filteredCheckIns = checkIns.filter(checkIn => {

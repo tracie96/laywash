@@ -27,7 +27,7 @@ export async function GET() {
         updated_at,
         car_washer_profiles!car_washer_profiles_user_id_fkey (
           assigned_admin_id,
-          hourly_rate,
+          address,
           total_earnings,
           is_available
         )
@@ -43,25 +43,75 @@ export async function GET() {
       );
     }
 
+    // Fetch assigned admin names
+    const adminIds = washers
+      ?.map(w => w.car_washer_profiles?.[0]?.assigned_admin_id)
+      .filter(Boolean) || [];
+
+    const { data: admins } = await supabaseAdmin
+      .from('users')
+      .select('id, name')
+      .in('id', adminIds)
+      .eq('role', 'admin');
+
+    const adminMap = new Map(admins?.map(admin => [admin.id, admin.name]) || []);
+
+    // Fetch check-in statistics for each washer
+    const washerIds = washers?.map(w => w.id) || [];
+    const { data: checkInStats } = await supabaseAdmin
+      .from('car_check_ins')
+      .select('assigned_washer_id, status, updated_at')
+      .in('assigned_washer_id', washerIds);
+
+    // Calculate stats for each washer
+    const washerStats = new Map();
+    checkInStats?.forEach(checkIn => {
+      const washerId = checkIn.assigned_washer_id;
+      if (!washerStats.has(washerId)) {
+        washerStats.set(washerId, {
+          totalCheckIns: 0,
+          completedCheckIns: 0,
+          lastActive: null
+        });
+      }
+      
+      const stats = washerStats.get(washerId);
+      stats.totalCheckIns += 1;
+      
+      if (checkIn.status === 'completed') {
+        stats.completedCheckIns += 1;
+      }
+      
+      // Track most recent activity
+      const updateTime = new Date(checkIn.updated_at);
+      if (!stats.lastActive || updateTime > stats.lastActive) {
+        stats.lastActive = updateTime;
+      }
+    });
+
     // Transform the data to match the frontend interface
-    const transformedWashers = washers.map(washer => {
+    const transformedWashers = washers?.map(washer => {
       const profile = washer.car_washer_profiles?.[0];
+      const stats = washerStats.get(washer.id) || { totalCheckIns: 0, completedCheckIns: 0, lastActive: null };
+      const assignedAdminName = profile?.assigned_admin_id ? adminMap.get(profile.assigned_admin_id) || 'Unassigned' : 'Unassigned';
+      
       return {
         id: washer.id,
         name: washer.name,
         email: washer.email,
         phone: washer.phone,
-        joinDate: washer.created_at,
-        status: getWasherStatus(washer.is_active, profile?.is_available),
-        totalCarsWashed: 0, // This would need to be calculated from car_check_ins table
-        averageRating: 4.5, // This would need to be calculated from ratings table
-        lastActive: 'N/A', // This would need to be tracked separately
-        hourlyRate: profile?.hourly_rate || 0,
+        address: profile?.address || "Not specified",
         totalEarnings: profile?.total_earnings || 0,
-        isAvailable: profile?.is_available || false,
-        assignedAdminId: profile?.assigned_admin_id || null
+        isAvailable: profile?.is_available ?? true,
+        assignedAdminId: profile?.assigned_admin_id || null,
+        assignedAdminName,
+        totalCheckIns: stats.totalCheckIns,
+        completedCheckIns: stats.completedCheckIns,
+        averageRating: 4.5, // TODO: Calculate from actual ratings
+        createdAt: new Date(washer.created_at),
+        lastActive: stats.lastActive || new Date(washer.updated_at)
       };
-    });
+    }) || [];
 
     return NextResponse.json({
       success: true,
@@ -77,9 +127,4 @@ export async function GET() {
   }
 }
 
-// Helper function to determine washer status
-function getWasherStatus(isActive: boolean, isAvailable: boolean | null): 'active' | 'inactive' | 'on_leave' {
-  if (!isActive) return 'inactive';
-  if (isAvailable === false) return 'on_leave';
-  return 'active';
-}
+

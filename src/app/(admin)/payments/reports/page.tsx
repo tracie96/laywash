@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 
 interface PaymentReport {
@@ -17,48 +17,38 @@ const PaymentReportsPage: React.FC = () => {
   const [reports, setReports] = useState<PaymentReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock report data
-  useEffect(() => {
-    const mockReports: PaymentReport[] = [
-      {
-        date: '2024-03-15',
-        totalPayments: 12,
-        totalRevenue: 450.00,
-        cashPayments: 5,
-        cardPayments: 4,
-        mobilePayments: 3,
-        pendingPayments: 2,
-        pendingAmount: 75.00
-      },
-      {
-        date: '2024-03-14',
-        totalPayments: 15,
-        totalRevenue: 580.00,
-        cashPayments: 7,
-        cardPayments: 5,
-        mobilePayments: 3,
-        pendingPayments: 1,
-        pendingAmount: 35.00
-      },
-      {
-        date: '2024-03-13',
-        totalPayments: 10,
-        totalRevenue: 380.00,
-        cashPayments: 4,
-        cardPayments: 4,
-        mobilePayments: 2,
-        pendingPayments: 0,
-        pendingAmount: 0.00
+  // Fetch payment reports from API
+  const fetchReports = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams();
+      params.append('reportType', reportType);
+      params.append('period', selectedPeriod);
+      
+      const response = await fetch(`/api/admin/payment-reports?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReports(data.reports || []);
+      } else {
+        setError(data.error || 'Failed to fetch reports');
       }
-    ];
-
-    setTimeout(() => {
-      setReports(mockReports);
+    } catch (error) {
+      console.error('Error fetching payment reports:', error);
+      setError('Failed to fetch reports');
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  }, [reportType, selectedPeriod]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   const calculateTotals = () => {
     return reports.reduce((totals, report) => ({
@@ -86,6 +76,38 @@ const PaymentReportsPage: React.FC = () => {
     return reports.length > 0 ? totals.totalRevenue / reports.length : 0;
   };
 
+  const exportToCSV = () => {
+    if (reports.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = ['Date', 'Total Payments', 'Revenue', 'Cash Payments', 'Card Payments', 'Mobile Payments', 'Pending Payments', 'Pending Amount'];
+    const csvContent = [
+      headers.join(','),
+      ...reports.map(report => [
+        report.date,
+        report.totalPayments,
+        report.totalRevenue.toFixed(2),
+        report.cashPayments,
+        report.cardPayments,
+        report.mobilePayments,
+        report.pendingPayments,
+        report.pendingAmount.toFixed(2)
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payment-reports-${reportType}-${selectedPeriod}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -93,6 +115,29 @@ const PaymentReportsPage: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600 dark:text-gray-400">Loading reports...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 text-red-500">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Error loading reports
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+            <Button onClick={fetchReports} variant="outline">
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
@@ -112,7 +157,7 @@ const PaymentReportsPage: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={() => console.log('Export report')}
+          onClick={exportToCSV}
           className="bg-green-600 hover:bg-green-700"
         >
           Export Report
@@ -168,6 +213,15 @@ const PaymentReportsPage: React.FC = () => {
             <option value="month">This Month</option>
             <option value="quarter">This Quarter</option>
           </select>
+
+          {/* Refresh Button */}
+          <Button
+            onClick={fetchReports}
+            variant="outline"
+            className="px-4 py-2"
+          >
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -323,31 +377,49 @@ const PaymentReportsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {reports.map((report) => (
-                <tr key={report.date} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {new Date(report.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {report.totalPayments}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    ${report.totalRevenue.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {report.cashPayments}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {report.cardPayments}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {report.mobilePayments}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {report.pendingPayments} (${report.pendingAmount.toFixed(2)})
+              {reports.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      No payment data found
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      No payment transactions were found for the selected period.
+                    </p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                reports.map((report) => (
+                  <tr key={report.date} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {new Date(report.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {report.totalPayments}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      ${report.totalRevenue.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {report.cashPayments}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {report.cardPayments}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {report.mobilePayments}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {report.pendingPayments} (${report.pendingAmount.toFixed(2)})
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
