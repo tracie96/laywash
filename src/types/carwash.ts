@@ -201,6 +201,42 @@ export interface WasherLoan {
   remarks?: string;
 }
 
+// Milestone Types
+export interface Milestone {
+  id: string;
+  name: string;
+  description: string;
+  type: 'visits' | 'spending' | 'custom';
+  condition: {
+    operator: '>=' | '<=' | '=' | '>' | '<';
+    value: number;
+    period?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
+  };
+  reward?: {
+    type: 'discount' | 'bonus' | 'free_service';
+    value: number;
+    description?: string;
+  };
+  isActive: boolean;
+  createdBy: string; // Admin ID
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CustomerMilestoneAchievement {
+  id: string;
+  customerId: string;
+  customer: Customer;
+  milestoneId: string;
+  milestone: Milestone;
+  achievedAt: Date;
+  achievedValue: number; // The actual value that triggered the milestone
+  rewardClaimed: boolean;
+  claimedAt?: Date;
+  claimedBy?: string; // Admin ID who processed the reward
+  notes?: string;
+}
+
 // Bonus Types
 export interface Bonus {
   id: string;

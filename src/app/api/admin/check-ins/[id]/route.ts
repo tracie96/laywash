@@ -117,6 +117,26 @@ export async function PATCH(
       );
     }
 
+    // If the check-in was just completed, trigger milestone checking for the customer
+    if (updateData.status === 'completed' && checkIn.customers?.[0]?.id) {
+      try {
+        // Call milestone achievement checking API
+        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin/milestone-achievements`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            customerId: checkIn.customers[0].id,
+            forceCheck: false
+          }),
+        });
+      } catch (milestoneError) {
+        // Don't fail the check-in update if milestone checking fails
+        console.error('Error checking milestones:', milestoneError);
+      }
+    }
+
     // Transform the response to match frontend interface
     const transformedCheckIn = {
       id: checkIn.id,

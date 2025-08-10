@@ -58,7 +58,8 @@ const superAdminItems: NavItem[] = [
     subItems: [
       { name: "Customer Database", path: "/operations/customers", pro: false },
       { name: "Services", path: "/operations/services", pro: false },
-      { name: "Check-ins", path: "/operations/checkins", pro: false }
+      { name: "Check-ins", path: "/operations/checkins", pro: false },
+      { name: "Milestones", path: "/milestones", pro: false }
     ],
     roles: ["super_admin"]
   },
