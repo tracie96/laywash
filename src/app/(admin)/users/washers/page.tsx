@@ -25,6 +25,7 @@ const UsersWashersPage: React.FC = () => {
   const [washers, setWashers] = useState<Washer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'unavailable'>('all');
   const router = useRouter();
 
   useEffect(() => {
@@ -51,6 +52,19 @@ const UsersWashersPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Filter washers based on selected status
+  const filteredWashers = filterStatus === 'all' 
+    ? washers 
+    : washers.filter(w => 
+        filterStatus === 'available' ? w.isAvailable : !w.isAvailable
+      );
+
+  // Calculate totals based on filtered data
+  const totalWashers = filteredWashers.length;
+  const activeWashers = filteredWashers.filter(w => w.isAvailable).length;
+  const unavailableWashers = filteredWashers.filter(w => !w.isAvailable).length;
+  const totalCheckInsCompleted = filteredWashers.reduce((sum, washer) => sum + washer.completedCheckIns, 0);
 
   const handleDeactivateWasher = async (washerId: string, washerName: string) => {
     const confirmDeactivate = window.confirm(
@@ -92,16 +106,6 @@ const UsersWashersPage: React.FC = () => {
   const getStatusText = (isAvailable: boolean) => {
     return isAvailable ? "Available" : "Unavailable";
   };
-
-  const getRatingColor = (rating: number) => {
-    if (rating >= 4.5) return "text-green-600 dark:text-green-400";
-    if (rating >= 4.0) return "text-orange-600 dark:text-orange-400";
-    return "text-error-600 dark:text-error-400";
-  };
-
-  const totalWashers = washers.length;
-  const activeWashers = washers.filter(w => w.isAvailable).length;
-  const totalCheckInsCompleted = washers.reduce((sum, washer) => sum + washer.completedCheckIns, 0);
 
   if (loading) {
     return (
@@ -148,7 +152,7 @@ const UsersWashersPage: React.FC = () => {
       <PageBreadCrumb pageTitle="Manage Washers" />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -172,6 +176,20 @@ const UsersWashersPage: React.FC = () => {
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unavailable Washers</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{unavailableWashers}</p>
+            </div>
+            <div className="p-3 bg-gray-100 dark:bg-gray-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
               </svg>
             </div>
           </div>
@@ -211,34 +229,94 @@ const UsersWashersPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex space-x-2 mb-4">
+        <button
+          onClick={() => setFilterStatus('all')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+            filterStatus === 'all'
+              ? 'bg-green-light-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+        >
+          All Washers
+        </button>
+        <button
+          onClick={() => setFilterStatus('available')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+            filterStatus === 'available'
+              ? 'bg-green-light-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+        >
+          Available Washers
+        </button>
+        <button
+          onClick={() => setFilterStatus('unavailable')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+            filterStatus === 'unavailable'
+              ? 'bg-green-light-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+        >
+          Unavailable Washers
+        </button>
+      </div>
+
       {/* Washers Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Washer Management</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Washer Management
+              {filterStatus !== 'all' && (
+                <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                  ({filterStatus === 'available' ? 'Available' : 'Unavailable'} Washers)
+                </span>
+              )}
+            </h2>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Showing {filteredWashers.length} of {washers.length} washers
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
-          {washers.length === 0 ? (
+          {filteredWashers.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto h-12 w-12 text-gray-400">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No washers found</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                {filterStatus === 'all' 
+                  ? 'No washers found' 
+                  : filterStatus === 'available' 
+                    ? 'No available washers found' 
+                    : 'No unavailable washers found'
+                }
+              </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Get started by creating a new washer account.
+                {filterStatus === 'all' 
+                  ? 'Get started by creating a new washer account.'
+                  : filterStatus === 'available'
+                    ? 'All washers are currently unavailable.'
+                    : 'All washers are currently available.'
+                }
               </p>
-              <div className="mt-6">
-                <button 
-                  onClick={() => router.push('/add-worker')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500"
-                >
-                  <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add New Washer
-                </button>
-              </div>
+              {filterStatus === 'all' && (
+                <div className="mt-6">
+                  <button 
+                    onClick={() => router.push('/add-worker')}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-light-600 hover:bg-green-light-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-light-500"
+                  >
+                    <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add New Washer
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <table className="w-full">
@@ -250,14 +328,13 @@ const UsersWashersPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Join Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Check-ins</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rating</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Earnings</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Location</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {washers?.map((washer) => (
+                {filteredWashers?.map((washer) => (
                   <tr key={washer.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {washer.name}
@@ -279,9 +356,7 @@ const UsersWashersPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {washer.completedCheckIns} / {washer.totalCheckIns}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getRatingColor(washer.averageRating)}`}>
-                      ⭐ {washer.averageRating.toFixed(1)}
-                    </td>
+                
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       ${washer.totalEarnings.toFixed(2)}
                     </td>

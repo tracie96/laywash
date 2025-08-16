@@ -30,6 +30,7 @@ const UsersAdminsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [locationFilter, setLocationFilter] = useState<string>('all');
   const router = useRouter();
 
   useEffect(() => {
@@ -106,6 +107,15 @@ const UsersAdminsPage: React.FC = () => {
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
     }
   };
+
+  // Filter admins by location
+  const filteredAdmins = admins.filter(admin => {
+    if (locationFilter === 'all') return true;
+    return admin.location === locationFilter;
+  });
+
+  // Get unique locations for filter dropdown
+  const uniqueLocations = Array.from(new Set(admins.map(admin => admin.location).filter(Boolean)));
 
   const totalAdmins = admins.length;
   const activeAdmins = admins.filter(a => a.status === "active").length;
@@ -219,13 +229,38 @@ const UsersAdminsPage: React.FC = () => {
           </button>
       </div>
 
+      {/* Location Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Filter by Location</h3>
+          <div className="flex items-center space-x-4">
+            <label htmlFor="location-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Location:
+            </label>
+            <select
+              id="location-filter"
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="block w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-light-500 focus:border-green-light-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="all">All Locations</option>
+              {uniqueLocations.map((location) => (
+                <option key={location} value={location || ''}>
+                  {location || 'Unknown'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Admins Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Management</h2>
         </div>
         <div className="overflow-x-auto">
-          {admins.length === 0 ? (
+          {filteredAdmins.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto h-12 w-12 text-gray-400">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -264,7 +299,7 @@ const UsersAdminsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {admins.map((admin) => (
+                {filteredAdmins.map((admin) => (
                   <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {admin.name}

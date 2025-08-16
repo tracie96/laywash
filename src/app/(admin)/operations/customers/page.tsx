@@ -37,7 +37,6 @@ const OperationsCustomersPage: React.FC = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -49,7 +48,7 @@ const OperationsCustomersPage: React.FC = () => {
     vehicleColor: '',
     dateOfBirth: ''
   });
-
+console.log(customers);
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,7 +60,6 @@ const OperationsCustomersPage: React.FC = () => {
       
       const response = await fetch(`/api/admin/customers?${params.toString()}`);
       const data = await response.json();
-      
       if (data.success) {
         setCustomers(data.customers);
       } else {
@@ -79,7 +77,6 @@ const OperationsCustomersPage: React.FC = () => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -88,7 +85,6 @@ const OperationsCustomersPage: React.FC = () => {
     }));
   };
 
-  // Reset form and modal state
   const resetForm = () => {
     setFormData({
       name: '',
@@ -104,26 +100,24 @@ const OperationsCustomersPage: React.FC = () => {
     setCreateError(null);
   };
 
-  // Handle modal close
   const handleCloseModal = () => {
     setShowCreateModal(false);
     resetForm();
   };
 
-  // Handle view customer
   const handleViewCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setShowViewModal(true);
   };
 
-  // Handle edit customer
   const handleEditCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
+
     setFormData({
       name: customer.name,
       email: customer.email || '',
       phone: customer.phone,
-      dob: '', // Keep empty for security
+      dob: '', 
       licensePlate: customer.licensePlate,
       vehicleType: customer.vehicleType,
       vehicleModel: customer.vehicleModel || '',
@@ -133,13 +127,11 @@ const OperationsCustomersPage: React.FC = () => {
     setShowEditModal(true);
   };
 
-  // Handle close view modal
   const handleCloseViewModal = () => {
     setShowViewModal(false);
     setSelectedCustomer(null);
   };
 
-  // Handle close edit modal
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setSelectedCustomer(null);
@@ -147,7 +139,7 @@ const OperationsCustomersPage: React.FC = () => {
     resetForm();
   };
 
-  // Handle form submission
+  
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
@@ -165,10 +157,8 @@ const OperationsCustomersPage: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        // Add the new customer to the local state
         setCustomers(prev => [result.customer, ...prev]);
         handleCloseModal();
-        // Show success message could be added here
       } else {
         setCreateError(result.error || 'Failed to create customer');
       }
@@ -180,7 +170,6 @@ const OperationsCustomersPage: React.FC = () => {
     }
   };
 
-  // Handle edit customer submission
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer) return;
@@ -205,7 +194,6 @@ const OperationsCustomersPage: React.FC = () => {
           customer.id === selectedCustomer.id ? result.customer : customer
         ));
         handleCloseEditModal();
-        // Show success message could be added here
       } else {
         setEditError(result.error || 'Failed to update customer');
       }
@@ -217,7 +205,7 @@ const OperationsCustomersPage: React.FC = () => {
     }
   };
 
-  // Form validation
+  
   const isFormValid = () => {
     return formData.name.trim() && 
            formData.phone.trim() && 
@@ -295,7 +283,7 @@ const OperationsCustomersPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue?.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -425,7 +413,7 @@ const OperationsCustomersPage: React.FC = () => {
                       {customer.totalVisits}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      ${customer.totalSpent.toFixed(2)}
+                      ${customer?.totalSpent?.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(customer.isRegistered)}`}>
@@ -736,7 +724,7 @@ const OperationsCustomersPage: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Spent</label>
-                      <p className="text-gray-900 dark:text-white font-semibold">${selectedCustomer.totalSpent.toFixed(2)}</p>
+                      <p className="text-gray-900 dark:text-white font-semibold">${selectedCustomer?.totalSpent?.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>

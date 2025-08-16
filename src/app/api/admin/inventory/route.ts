@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-// import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-//   auth: {
-//     autoRefreshToken: false,
-//     persistSession: false
-//   }
-// });
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function GET(request: NextRequest) {
   try {
+    // For now, skip complex authentication to get the system working
+    // In production, this should be properly authenticated
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const category = searchParams.get('category') || 'all';
@@ -20,141 +23,76 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortOrder = searchParams.get('sortOrder') || 'asc';
 
-    // For now, return mock data since we don't have an inventory table yet
-    // In a real implementation, you would query the inventory table
-    const mockInventoryItems = [
-      {
-        id: '1',
-        name: 'Car Wash Soap',
-        category: 'Cleaning Supplies',
-        currentStock: 25,
-        minStockLevel: 10,
-        maxStockLevel: 50,
-        unit: 'Liters',
-        price: 15.99,
-        supplier: 'ABC Supplies',
-        lastUpdated: new Date().toISOString(),
-        lastRestocked: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-        totalValue: 399.75,
-        isActive: true
-      },
-      {
-        id: '2',
-        name: 'Microfiber Towels',
-        category: 'Cleaning Supplies',
-        currentStock: 8,
-        minStockLevel: 15,
-        maxStockLevel: 100,
-        unit: 'Pieces',
-        price: 2.50,
-        supplier: 'XYZ Textiles',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        lastRestocked: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-        totalValue: 20.00,
-        isActive: true
-      },
-      {
-        id: '3',
-        name: 'Wax Polish',
-        category: 'Finishing Products',
-        currentStock: 12,
-        minStockLevel: 5,
-        maxStockLevel: 30,
-        unit: 'Bottles',
-        price: 8.99,
-        supplier: 'Premium Products',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-        lastRestocked: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-        totalValue: 107.88,
-        isActive: true
-      },
-      {
-        id: '4',
-        name: 'Tire Shine',
-        category: 'Finishing Products',
-        currentStock: 18,
-        minStockLevel: 8,
-        maxStockLevel: 25,
-        unit: 'Bottles',
-        price: 6.50,
-        supplier: 'Premium Products',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-        lastRestocked: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-        totalValue: 117.00,
-        isActive: true
-      },
-      {
-        id: '5',
-        name: 'Glass Cleaner',
-        category: 'Cleaning Supplies',
-        currentStock: 5,
-        minStockLevel: 12,
-        maxStockLevel: 40,
-        unit: 'Bottles',
-        price: 4.99,
-        supplier: 'ABC Supplies',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-        lastRestocked: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
-        totalValue: 24.95,
-        isActive: true
-      }
-    ];
+    // Build the query using existing stock_items table
+    let query = supabaseAdmin
+      .from('stock_items')
+      .select('*');
+    // Temporarily removed .eq('is_active', true) to debug
 
     // Apply search filter
-    let filteredItems = mockInventoryItems;
     if (search) {
-      filteredItems = filteredItems.filter(item => 
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.category.toLowerCase().includes(search.toLowerCase()) ||
-        item.supplier.toLowerCase().includes(search.toLowerCase())
-      );
+      try {
+        query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%,supplier.ilike.%${search}%`);
+      } catch (filterError) {
+        console.error('Search filter error:', filterError);
+        // Continue without search filter if it fails
+      }
     }
 
     // Apply category filter
     if (category !== 'all') {
-      filteredItems = filteredItems.filter(item => item.category === category);
+      query = query.eq('category', category);
     }
 
-    // Apply status filter
+    // Apply sorting - map frontend field names to actual database field names
+    let dbSortColumn = 'name';
+    if (sortBy === 'currentStock') dbSortColumn = 'current_stock';
+    else if (sortBy === 'lastUpdated') dbSortColumn = 'updated_at';
+    else if (['name', 'category'].includes(sortBy)) dbSortColumn = sortBy;
+    
+    query = query.order(dbSortColumn, { ascending: sortOrder === 'asc' });
+
+    const { data: inventory, error } = await query;
+    
+    console.log('Query result:', { data: inventory?.length, error }); // Debug: log results
+    
+    if (error) {
+      console.error('Database error details:', error);
+    }
+
+    if (error) {
+      console.error('Error fetching inventory:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch inventory' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the data to match the frontend interface
+    const transformedItems = inventory?.map(item => ({
+      id: item.id,
+      name: item.name || 'Unknown Item',
+      category: item.category || 'General',
+      currentStock: item.current_stock || 0,
+      minStockLevel: item.minimum_stock || 0,
+      maxStockLevel: 0, // Not available in your schema
+      unit: item.unit || 'units',
+      price: item.cost_per_unit || 0,
+      supplier: item.supplier || 'Unknown',
+      lastUpdated: item.updated_at || item.created_at || new Date().toISOString(),
+      lastRestocked: item.updated_at || item.created_at || new Date().toISOString(),
+      totalValue: (item.current_stock || 0) * (item.cost_per_unit || 0),
+      isActive: item.is_active || true
+    })) || [];
+
+    // Apply status filter after transformation
+    let filteredItems = transformedItems;
     if (status !== 'all') {
       filteredItems = filteredItems.filter(item => {
         const stockStatus = getStockStatus(item);
         return stockStatus === status;
       });
     }
-
-    // Apply sorting
-    filteredItems.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'currentStock':
-          aValue = a.currentStock;
-          bValue = b.currentStock;
-          break;
-        case 'totalValue':
-          aValue = a.totalValue;
-          bValue = b.totalValue;
-          break;
-        case 'lastUpdated':
-          aValue = new Date(a.lastUpdated);
-          bValue = new Date(b.lastUpdated);
-          break;
-        default:
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
 
     return NextResponse.json({
       success: true,
@@ -206,27 +144,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, return success with mock data
-    // In a real implementation, you would insert into the inventory table
-    const newItem = {
-      id: Date.now().toString(),
-      name,
-      category,
-      currentStock,
-      minStockLevel,
-      maxStockLevel,
-      unit,
-      price,
-      supplier,
-      lastUpdated: new Date().toISOString(),
-      lastRestocked: new Date().toISOString(),
-      totalValue: currentStock * price,
+    // Insert into the inventory table using existing field names
+    const { data: newItem, error: insertError } = await supabaseAdmin
+      .from('inventory')
+      .insert([{
+        name,
+        category,
+        quantity: currentStock,
+        min_stock_level: minStockLevel,
+        max_stock_level: maxStockLevel,
+        unit,
+        cost_per_unit: price,
+        supplier,
+        last_restocked: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error creating inventory item:', insertError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create inventory item' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the response to match frontend interface
+    const transformedItem = {
+      id: newItem.id,
+      name: newItem.name,
+      category: newItem.category,
+      currentStock: newItem.quantity,
+      minStockLevel: newItem.min_stock_level,
+      maxStockLevel: newItem.max_stock_level,
+      unit: newItem.unit,
+      price: newItem.cost_per_unit,
+      supplier: newItem.supplier,
+      lastUpdated: newItem.updated_at,
+      lastRestocked: newItem.last_restocked,
+      totalValue: newItem.quantity * newItem.cost_per_unit,
       isActive: true
     };
 
     return NextResponse.json({
       success: true,
-      item: newItem
+      item: transformedItem
     });
 
   } catch (error) {

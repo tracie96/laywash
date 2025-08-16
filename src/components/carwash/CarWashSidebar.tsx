@@ -86,7 +86,7 @@ const superAdminItems: NavItem[] = [
     icon: <ReportIcon />,
     name: "Reports & Analytics",
     subItems: [
-      { name: "Performance Reports", path: "/reports/performance", pro: false },
+      // { name: "Performance Reports", path: "/reports/performance", pro: false },
       { name: "Sales Reports", path: "/reports/sales", pro: false },
       { name: "Stock Reports", path: "/reports/stock", pro: false }
     ],
@@ -144,7 +144,8 @@ const adminItems: NavItem[] = [
     name: "Stock",
     subItems: [
       { name: "Inventory", path: "/stock/inventory", pro: false },
-      { name: "Update Stock", path: "/stock/update", pro: false }
+      { name: "Update Stock", path: "/stock/update", pro: false },
+      { name: "Sales", path: "/sales", pro: false }
     ],
     roles: ["admin"]
   }
@@ -179,7 +180,7 @@ const washerItems: NavItem[] = [
 ];
 
 const CarWashSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleMobileSidebar } = useSidebar();
   const pathname = usePathname();
   const { user, hasRole } = useAuth();
 
@@ -205,6 +206,13 @@ const CarWashSidebar: React.FC = () => {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isActive = useCallback((path: string) => path === pathname, [pathname]);
+
+  // Function to handle link clicks and close mobile sidebar
+  const handleLinkClick = useCallback(() => {
+    if (isMobileOpen) {
+      toggleMobileSidebar();
+    }
+  }, [isMobileOpen, toggleMobileSidebar]);
 
   const renderMenuItems = (navItems: NavItem[], menuType: "main") => (
     <ul className="flex flex-col gap-4">
@@ -249,6 +257,7 @@ const CarWashSidebar: React.FC = () => {
             nav.path && (
               <Link
                 href={nav.path}
+                onClick={handleLinkClick}
                 className={`menu-item group ${
                   isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
@@ -286,6 +295,7 @@ const CarWashSidebar: React.FC = () => {
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
+                      onClick={handleLinkClick}
                       className={`menu-dropdown-item ${
                         isActive(subItem.path)
                           ? "menu-dropdown-item-active"
@@ -399,7 +409,7 @@ const CarWashSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/">
+        <Link href="/" onClick={handleLinkClick}>
           {isExpanded || isHovered || isMobileOpen ? (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-green-light-600 rounded-lg flex items-center justify-center">

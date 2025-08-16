@@ -206,7 +206,7 @@ const AddWorkerPage: React.FC = () => {
             </Label>
             <Input
               type="text"
-              placeholder="Enter assigned admin (optional)"
+              placeholder="Enter assigned admin"
               defaultValue={formData.assignedAdmin}
               onChange={(e) => handleInputChange('assignedAdmin', e.target.value)}
             />

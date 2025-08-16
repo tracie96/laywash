@@ -57,6 +57,8 @@ const NewCheckInPage: React.FC = () => {
     estimatedDuration: 30,
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const vehicleTypes = [
     { value: 'sedan', label: 'Sedan' },
     { value: 'suv', label: 'SUV' },
@@ -92,10 +94,9 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const searchCustomer = async () => {
-    const email = formData.customerEmail.trim();
-    const licensePlate = formData.licensePlate.trim();
+    const query = searchQuery.trim();
     
-    if (!email && !licensePlate) {
+    if (!query) {
       setError('Please enter an email address or license plate to search');
       return;
     }
@@ -106,10 +107,13 @@ const NewCheckInPage: React.FC = () => {
     setShowCustomerResults(false);
 
     try {
-      const result = await searchCustomers({ 
-        email: email || undefined, 
-        licensePlate: licensePlate || undefined 
-      });
+      // Determine if the query looks like an email or license plate
+      const isEmail = query.includes('@');
+      const searchParams = isEmail 
+        ? { email: query, licensePlate: undefined }
+        : { email: undefined, licensePlate: query };
+
+      const result = await searchCustomers(searchParams);
       
       if (!result.success) {
         setError(result.error || 'Failed to search for customer');
@@ -121,7 +125,7 @@ const NewCheckInPage: React.FC = () => {
         setShowCustomerResults(true);
         setSuccess(`Found ${result.customers.length} vehicle(s) matching your search`);
       } else {
-        setSuccess('No existing customer found with this information. You can proceed to register a new customer.');
+        setError('No existing customer found with this information. You can proceed to register a new customer.');
         setShowCustomerResults(false);
       }
     } catch {
@@ -219,33 +223,19 @@ const NewCheckInPage: React.FC = () => {
               Search for Existing Customer
             </h3>
             <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-              Search by email address or license plate number (or both)
+              Search by email address or license plate number
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <div>
-                <Label htmlFor="search-email" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
-                  Email Address
-                </Label>
-                <InputField
-                  id="search-email"
-                  type="email"
-                  value={formData.customerEmail}
-                  onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-                  placeholder="Enter customer email"
-                />
-              </div>
-              <div>
-                <Label htmlFor="search-license" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
-                  License Plate
-                </Label>
-                <InputField
-                  id="search-license"
-                  type="text"
-                  value={formData.licensePlate}
-                  onChange={(e) => handleInputChange('licensePlate', e.target.value)}
-                  placeholder="Enter license plate number"
-                />
-              </div>
+            <div className="mb-3">
+              <Label htmlFor="search-customer" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
+                Search Customer
+              </Label>
+              <InputField
+                id="search-customer"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Enter email address or license plate number"
+              />
             </div>
             <div className="flex justify-center">
               <Button

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
@@ -51,8 +51,11 @@ const StockInventoryPage: React.FC = () => {
     supplier: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [inventoryChangeNotification, setInventoryChangeNotification] = useState<string | null>(null);
 
   const fetchInventoy = useCallback(async () => {
+    console.log('i got here')
     try {
       setIsLoading(true);
       setError(null);
@@ -68,7 +71,15 @@ const StockInventoryPage: React.FC = () => {
       console.log({data})
 
       if (data.success) {
+        const previousCount = stockItems.length;
         setStockItems(data.inventory);
+        setLastUpdateTime(new Date());
+        
+        // Show notification if inventory count changed (indicating sales or updates)
+        if (previousCount > 0 && data.inventory.length !== previousCount) {
+          setInventoryChangeNotification('Inventory has been updated');
+          setTimeout(() => setInventoryChangeNotification(null), 5000);
+        }
       } else {
         setError(data.error || 'Failed to fetch inventory');
       }
@@ -78,7 +89,21 @@ const StockInventoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter, sortBy, sortOrder]);
+  }, [searchTerm, filter, sortBy, sortOrder, stockItems]);
+
+  // Add useEffect to fetch data on mount and when dependencies change
+  useEffect(() => {
+    fetchInventoy();
+  }, [fetchInventoy]);
+
+  // Add auto-refresh every 30 seconds to keep inventory up-to-date
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchInventoy();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchInventoy]);
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +255,9 @@ const StockInventoryPage: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Comprehensive view of all inventory items
           </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+            Last updated: {lastUpdateTime.toLocaleTimeString()}
+          </p>
         </div>
         <div className="flex space-x-3">
           <Button
@@ -243,6 +271,12 @@ const StockInventoryPage: React.FC = () => {
             className="bg-blue-600 hover:bg-blue-700"
           >
             Update Stock
+          </Button>
+          <Button
+            onClick={() => window.location.href = '/sales'}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            Create Sale
           </Button>
         </div>
       </div>
@@ -381,6 +415,28 @@ const StockInventoryPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Inventory Change Notification */}
+      {inventoryChangeNotification && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-blue-800 dark:text-blue-200">{inventoryChangeNotification}</span>
+            </div>
+            <button
+              onClick={() => setInventoryChangeNotification(null)}
+              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (

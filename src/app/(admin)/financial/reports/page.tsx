@@ -1,33 +1,48 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 
 interface FinancialReport {
   id: string;
   period: string;
-  totalRevenue: number;
-  totalExpenses: number;
-  netProfit: number;
-  customerCount: number;
-  averageTransaction: number;
   date: string;
+  
+  // Revenue breakdown
+  totalRevenue: number;
+  carWashRevenue: number;
+  productSalesRevenue: number;
+  
+  // Expense breakdown
+  totalExpenses: number;
+  washerSalaries: number;
+  washerBonuses: number;
+  customerBonuses: number;
+  adminSalaries: number;
+  
+  // Net profit
+  netProfit: number;
+  profitMargin: number;
+  
+  // Metrics
+  customerCount: number;
+  transactionCount: number;
+  carWashCount: number;
+  productSaleCount: number;
+  averageTransaction: number;
 }
 
 const FinancialReportsPage: React.FC = () => {
   const [reports, setReports] = useState<FinancialReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('6');
 
-  useEffect(() => {
-    fetchFinancialReports();
-  }, []);
-
-  const fetchFinancialReports = async () => {
+  const fetchFinancialReports = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/admin/financial-reports');
+      const response = await fetch(`/api/admin/financial-reports?period=${selectedPeriod}`);
       const data = await response.json();
       
       if (data.success) {
@@ -41,11 +56,44 @@ const FinancialReportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPeriod]);
 
-  const totalRevenue = reports.reduce((sum, report) => sum + report.totalRevenue, 0);
-  const totalExpenses = reports.reduce((sum, report) => sum + report.totalExpenses, 0);
-  const totalProfit = reports.reduce((sum, report) => sum + report.netProfit, 0);
+  useEffect(() => {
+    fetchFinancialReports();
+  }, [fetchFinancialReports]);
+
+  // Calculate totals across all periods
+  const totals = reports.reduce((acc, report) => ({
+    totalRevenue: acc.totalRevenue + report.totalRevenue,
+    carWashRevenue: acc.carWashRevenue + report.carWashRevenue,
+    productSalesRevenue: acc.productSalesRevenue + report.productSalesRevenue,
+    totalExpenses: acc.totalExpenses + report.totalExpenses,
+    washerSalaries: acc.washerSalaries + report.washerSalaries,
+    washerBonuses: acc.washerBonuses + report.washerBonuses,
+    customerBonuses: acc.customerBonuses + report.customerBonuses,
+    adminSalaries: acc.adminSalaries + report.adminSalaries,
+    netProfit: acc.netProfit + report.netProfit,
+    customerCount: Math.max(acc.customerCount, report.customerCount), // Max per period
+    transactionCount: acc.transactionCount + report.transactionCount,
+    carWashCount: acc.carWashCount + report.carWashCount,
+    productSaleCount: acc.productSaleCount + report.productSaleCount
+  }), {
+    totalRevenue: 0,
+    carWashRevenue: 0,
+    productSalesRevenue: 0,
+    totalExpenses: 0,
+    washerSalaries: 0,
+    washerBonuses: 0,
+    customerBonuses: 0,
+    adminSalaries: 0,
+    netProfit: 0,
+    customerCount: 0,
+    transactionCount: 0,
+    carWashCount: 0,
+    productSaleCount: 0
+  });
+
+  const overallProfitMargin = totals.totalRevenue > 0 ? (totals.netProfit / totals.totalRevenue) * 100 : 0;
 
   if (loading) {
     return (
@@ -91,18 +139,44 @@ const FinancialReportsPage: React.FC = () => {
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Financial Reports" />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Period Selector */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Report Period</h3>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="3">Last 3 Months</option>
+            <option value="6">Last 6 Months</option>
+            <option value="12">Last 12 Months</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Revenue Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totals.totalRevenue.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
               </svg>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Car Wash:</span>
+              <span className="text-green-600 dark:text-green-400">${totals.carWashRevenue.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Product Sales:</span>
+              <span className="text-green-600 dark:text-green-400">${totals.productSalesRevenue.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -111,12 +185,22 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totals.totalExpenses.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-error-100 dark:bg-error-900/30 rounded-lg">
               <svg className="w-6 h-6 text-error-600 dark:text-error-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Washer Salaries:</span>
+              <span className="text-error-600 dark:text-error-400">${totals.washerSalaries.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Admin Salaries:</span>
+              <span className="text-error-600 dark:text-error-400">${totals.adminSalaries.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -125,12 +209,46 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Net Profit</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalProfit.toFixed(2)}</p>
+              <p className={`text-2xl font-bold ${totals.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
+                ${totals.netProfit.toFixed(2)}
+              </p>
             </div>
-            <div className="p-3 bg-blue-light-100 dark:bg-blue-light-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-blue-light-600 dark:text-blue-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`p-3 rounded-lg ${totals.netProfit >= 0 ? 'bg-blue-light-100 dark:bg-blue-light-900/30' : 'bg-error-100 dark:bg-error-900/30'}`}>
+              <svg className={`w-6 h-6 ${totals.netProfit >= 0 ? 'text-blue-light-600 dark:text-blue-light-400' : 'text-error-600 dark:text-error-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Profit Margin:</span>
+              <span className={`font-medium ${overallProfitMargin >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
+                {overallProfitMargin.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Transactions</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totals.transactionCount}</p>
+            </div>
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Car Washes:</span>
+              <span className="text-purple-600 dark:text-purple-400">{totals.carWashCount}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Product Sales:</span>
+              <span className="text-purple-600 dark:text-purple-400">{totals.productSaleCount}</span>
             </div>
           </div>
         </div>
@@ -152,10 +270,10 @@ const FinancialReportsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Reports Table */}
+      {/* Detailed Reports Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Financial Reports</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Monthly Financial Breakdown</h2>
         </div>
         <div className="overflow-x-auto">
           {reports.length === 0 ? (
@@ -178,8 +296,8 @@ const FinancialReportsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Expenses</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Net Profit</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customers</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Transaction</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Margin</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transactions</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -189,20 +307,43 @@ const FinancialReportsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {report.period}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                      ${report.totalRevenue.toFixed(2)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm">
+                        <div className="text-green-600 dark:text-green-400 font-medium">
+                          ${report.totalRevenue.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          CW: ${report.carWashRevenue.toFixed(2)} | PS: ${report.productSalesRevenue.toFixed(2)}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-error-600 dark:text-error-400">
-                      ${report.totalExpenses.toFixed(2)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm">
+                        <div className="text-error-600 dark:text-error-400 font-medium">
+                          ${report.totalExpenses.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          WS: ${report.washerSalaries.toFixed(2)} | AS: ${report.adminSalaries.toFixed(2)}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">
-                      ${report.netProfit.toFixed(2)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${report.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
+                        ${report.netProfit.toFixed(2)}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {report.customerCount}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${report.profitMargin >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
+                        {report.profitMargin.toFixed(1)}%
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      ${report.averageTransaction.toFixed(2)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <div>Total: {report.transactionCount}</div>
+                        <div className="text-xs">
+                          CW: {report.carWashCount} | PS: {report.productSaleCount}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">

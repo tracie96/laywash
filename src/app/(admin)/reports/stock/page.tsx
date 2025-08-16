@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 
 interface StockReport {
@@ -15,68 +15,79 @@ interface StockReport {
   cost: number;
 }
 
+interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  currentStock: number;
+  minStockLevel: number;
+  price?: number;
+  costPerUnit?: number;
+  lastRestocked?: string;
+  lastUpdated?: string;
+}
+
 const StockReportsPage: React.FC = () => {
   const [reports, setReports] = useState<StockReport[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockReports: StockReport[] = [
-      {
-        id: "1",
-        itemName: "Car Wash Soap",
-        category: "Cleaning Supplies",
-        currentStock: 25,
-        minimumStock: 10,
-        reorderPoint: 15,
-        lastRestocked: "2024-01-10",
-        usageRate: 5,
-        status: "in_stock",
-        cost: 25.00
-      },
-      {
-        id: "2",
-        itemName: "Microfiber Cloths",
-        category: "Cleaning Supplies",
-        currentStock: 8,
-        minimumStock: 20,
-        reorderPoint: 25,
-        lastRestocked: "2024-01-05",
-        usageRate: 12,
-        status: "low_stock",
-        cost: 5.00
-      },
-      {
-        id: "3",
-        itemName: "Wax Polish",
-        category: "Finishing Products",
-        currentStock: 0,
-        minimumStock: 5,
-        reorderPoint: 8,
-        lastRestocked: "2024-01-01",
-        usageRate: 3,
-        status: "out_of_stock",
-        cost: 35.00
-      },
-      {
-        id: "4",
-        itemName: "Tire Shine",
-        category: "Finishing Products",
-        currentStock: 15,
-        minimumStock: 8,
-        reorderPoint: 12,
-        lastRestocked: "2024-01-12",
-        usageRate: 4,
-        status: "in_stock",
-        cost: 18.00
-      }
-    ];
+  const fetchStockReports = useCallback(async () => {
+    console.log('Fetching stock reports...');
+    try {
+      setLoading(true);
+      
+      const response = await fetch('/api/admin/inventory?sortBy=name&sortOrder=asc');
+      const data = await response.json();
+      console.log('Stock reports API response:', data);
 
-    setTimeout(() => {
-      setReports(mockReports);
+      if (data.success && data.inventory && Array.isArray(data.inventory)) {
+        // Transform inventory data to stock reports format
+        const stockReports: StockReport[] = data.inventory.map((item: InventoryItem) => {
+          // Calculate status based on current stock vs minimum stock
+          let status: "in_stock" | "low_stock" | "out_of_stock";
+          if (item.currentStock === 0) {
+            status = "out_of_stock";
+          } else if (item.currentStock <= item.minStockLevel) {
+            status = "low_stock";
+          } else {
+            status = "in_stock";
+          }
+
+          // Calculate usage rate (mock calculation for now)
+          const usageRate = Math.floor(Math.random() * 10) + 1; // Random 1-10 items per day
+
+          return {
+            id: item.id,
+            itemName: item.name,
+            category: item.category,
+            currentStock: item.currentStock,
+            minimumStock: item.minStockLevel,
+            reorderPoint: item.minStockLevel + 5, // Set reorder point 5 above minimum
+            lastRestocked: item.lastRestocked || item.lastUpdated || new Date().toISOString().split('T')[0],
+            usageRate,
+            status,
+            cost: item.price || item.costPerUnit || 0
+          };
+        });
+        
+        console.log('Transformed stock reports:', stockReports);
+        setReports(stockReports);
+      } else {
+        console.error('Failed to fetch inventory data:', data.error || 'No inventory data found');
+        console.error('Data structure:', data);
+        setReports([]);
+      }
+    } catch (error) {
+      console.error('Error fetching stock reports:', error);
+      setReports([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStockReports();
+  }, [fetchStockReports]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -116,6 +127,37 @@ const StockReportsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Stock Reports" />
+
+      {/* Header with Refresh Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Stock Reports
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Real-time inventory status and stock management
+          </p>
+        </div>
+        <button
+          onClick={fetchStockReports}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center space-x-2"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Refreshing...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Refresh</span>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -168,6 +210,15 @@ const StockReportsPage: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Stock Reports</h2>
         </div>
         <div className="overflow-x-auto">
+          {reports.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="text-gray-400 dark:text-gray-500 text-4xl mb-4">📦</div>
+              <p className="text-gray-600 dark:text-gray-400">No stock items found</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                The inventory appears to be empty. Please check if items have been added to the inventory.
+              </p>
+            </div>
+          ) : (
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
@@ -225,6 +276,7 @@ const StockReportsPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+          )}
         </div>
       </div>
     </div>

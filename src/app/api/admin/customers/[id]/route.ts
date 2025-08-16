@@ -169,7 +169,6 @@ export async function GET(
         { status: 404 }
       );
     }
-
     // Transform the data to match the frontend interface
     const transformedCustomer = {
       id: customer.id,
