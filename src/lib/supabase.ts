@@ -167,6 +167,10 @@ export interface Database {
           is_active: boolean;
           category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
           estimated_duration: number;
+          washer_commission_percentage: number;
+          company_commission_percentage: number;
+          max_washers_per_service: number;
+          commission_notes: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -178,6 +182,10 @@ export interface Database {
           is_active?: boolean;
           category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
           estimated_duration: number;
+          washer_commission_percentage?: number;
+          company_commission_percentage?: number;
+          max_washers_per_service?: number;
+          commission_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -189,6 +197,10 @@ export interface Database {
           is_active?: boolean;
           category?: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
           estimated_duration?: number;
+          washer_commission_percentage?: number;
+          company_commission_percentage?: number;
+          max_washers_per_service?: number;
+          commission_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -233,6 +233,10 @@ export interface Service {
   isActive: boolean;
   category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
   estimatedDuration: number; // in minutes
+  washerCommissionPercentage: number;
+  companyCommissionPercentage: number;
+  maxWashersPerService: number;
+  commissionNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

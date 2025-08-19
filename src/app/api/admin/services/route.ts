@@ -59,6 +59,10 @@ export async function GET(request: NextRequest) {
       price: service.base_price,
       duration: service.estimated_duration,
       category: service.category,
+      washerCommissionPercentage: service.washer_commission_percentage,
+      companyCommissionPercentage: service.company_commission_percentage,
+      maxWashersPerService: service.max_washers_per_service,
+      commissionNotes: service.commission_notes || '',
       isActive: service.is_active,
       popularity: calculatePopularity(service), // This would need to be calculated based on usage
       createdAt: service.created_at,
@@ -86,13 +90,39 @@ export async function POST(request: NextRequest) {
       description, 
       price, 
       category, 
-      duration 
+      duration,
+      washerCommissionPercentage = 40,
+      companyCommissionPercentage = 60,
+      maxWashersPerService = 2,
+      commissionNotes = ''
     } = await request.json();
 
     // Validate required input
     if (!name || !price || !category || !duration) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: name, price, category, and duration are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate commission percentages
+    if (washerCommissionPercentage + companyCommissionPercentage !== 100) {
+      return NextResponse.json(
+        { success: false, error: 'Washer and company commission percentages must equal 100%' },
+        { status: 400 }
+      );
+    }
+
+    if (washerCommissionPercentage < 0 || washerCommissionPercentage > 100) {
+      return NextResponse.json(
+        { success: false, error: 'Washer commission percentage must be between 0 and 100' },
+        { status: 400 }
+      );
+    }
+
+    if (maxWashersPerService < 1) {
+      return NextResponse.json(
+        { success: false, error: 'Maximum washers per service must be at least 1' },
         { status: 400 }
       );
     }
@@ -152,6 +182,10 @@ export async function POST(request: NextRequest) {
         base_price: price,
         category,
         estimated_duration: duration,
+        washer_commission_percentage: washerCommissionPercentage,
+        company_commission_percentage: companyCommissionPercentage,
+        max_washers_per_service: maxWashersPerService,
+        commission_notes: commissionNotes || null,
         is_active: true
       })
       .select()
@@ -174,6 +208,10 @@ export async function POST(request: NextRequest) {
         price: service.base_price,
         duration: service.estimated_duration,
         category: service.category,
+        washerCommissionPercentage: service.washer_commission_percentage,
+        companyCommissionPercentage: service.company_commission_percentage,
+        maxWashersPerService: service.max_washers_per_service,
+        commissionNotes: service.commission_notes || '',
         isActive: service.is_active,
         createdAt: service.created_at,
         updatedAt: service.updated_at

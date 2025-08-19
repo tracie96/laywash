@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
 
 interface Tool {
   id: string;
@@ -10,10 +11,8 @@ interface Tool {
   category: string;
   isReturnable: boolean;
   replacementCost: number;
-  totalQuantity: number;
-  availableQuantity: number;
+  amount: number;
   isActive: boolean;
-  amount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,8 +23,7 @@ interface CreateToolForm {
   category: string;
   isReturnable: boolean;
   replacementCost: number;
-  totalQuantity: number;
-  availableQuantity: number;
+  amount: number;
 }
 
 const ToolsManagementPage: React.FC = () => {
@@ -35,7 +33,7 @@ const ToolsManagementPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Equipment' | 'Tools' | 'Supplies'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'low_availability' | 'out_of_stock'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'category' | 'replacementCost' | 'availableQuantity' | 'totalQuantity' | 'createdAt'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'category' | 'replacementCost' | 'amount' | 'createdAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateToolForm>({
@@ -44,8 +42,7 @@ const ToolsManagementPage: React.FC = () => {
     category: 'Equipment',
     isReturnable: true,
     replacementCost: 0,
-    totalQuantity: 1,
-    availableQuantity: 1
+    amount: 1
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,13 +87,8 @@ const ToolsManagementPage: React.FC = () => {
       return;
     }
 
-    if (createForm.replacementCost < 0 || createForm.totalQuantity < 0 || createForm.availableQuantity < 0) {
+    if (createForm.replacementCost < 0 || createForm.amount < 0) {
       setError('Please enter valid numeric values');
-      return;
-    }
-
-    if (createForm.availableQuantity > createForm.totalQuantity) {
-      setError('Available quantity cannot exceed total quantity');
       return;
     }
 
@@ -122,8 +114,7 @@ const ToolsManagementPage: React.FC = () => {
           category: 'Equipment',
           isReturnable: true,
           replacementCost: 0,
-          totalQuantity: 1,
-          availableQuantity: 1
+          amount: 1
         });
         fetchTools(); // Refresh the list
       } else {
@@ -172,35 +163,27 @@ const ToolsManagementPage: React.FC = () => {
           setError(data.error || 'Failed to update tool');
         }
       } else if (action === 'update') {
-        // Quick update for available quantity
         const currentTool = tools.find(t => t.id === toolId);
         if (!currentTool) return;
 
         // Validate tool data before proceeding
-        if (currentTool.totalQuantity < 0) {
-          setError('Tool has invalid total quantity. Please fix the tool data first.');
+        if (currentTool.amount < 0) {
+          setError('Tool has invalid amount. Please fix the tool data first.');
           return;
         }
 
-        if (currentTool.totalQuantity === 0) {
-          setError('This tool has 0 total quantity. Please update the total quantity first before setting available quantity.');
-          return;
-        }
-
-        const maxQuantity = Math.max(currentTool.totalQuantity, 1);
-        const promptMessage = `Tool: ${currentTool.name}\nCurrent Available: ${currentTool.availableQuantity}\nTotal Quantity: ${currentTool.totalQuantity}\n\nEnter new available quantity (0-${maxQuantity}):`;
-        const newQuantity = prompt(promptMessage, currentTool.availableQuantity.toString());
-        if (newQuantity !== null) {
-          const quantity = parseInt(newQuantity);
-          if (!isNaN(quantity) && quantity >= 0 && quantity <= maxQuantity) {
+        const promptMessage = `Tool: ${currentTool.name}\nCurrent Amount: ${currentTool.amount}\n\nEnter new amount:`;
+        const newAmount = prompt(promptMessage, currentTool.amount.toString());
+        if (newAmount !== null) {
+          const amount = parseInt(newAmount);
+          if (!isNaN(amount) && amount >= 0) {
             const response = await fetch(`/api/admin/tools/${toolId}`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                availableQuantity: quantity,
-                amount: Math.abs(quantity - currentTool.availableQuantity) // Track the change amount
+                amount: amount
               }),
             });
 
@@ -212,8 +195,7 @@ const ToolsManagementPage: React.FC = () => {
               setError(data.error || 'Failed to update tool');
             }
           } else {
-            const maxQuantity = Math.max(currentTool.totalQuantity, 1);
-            setError(`Please enter a valid quantity between 0 and ${maxQuantity}`);
+            setError('Please enter a valid amount (0 or greater)');
           }
         }
       }
@@ -241,24 +223,12 @@ const ToolsManagementPage: React.FC = () => {
     }
   };
 
-  const getAvailabilityColor = (available: number, total: number) => {
-    const percentage = (available / total) * 100;
-    if (percentage >= 70) return "text-green-600 dark:text-green-400";
-    if (percentage >= 30) return "text-orange-600 dark:text-orange-400";
-    return "text-error-600 dark:text-error-400";
-  };
-
-  const getAvailabilityStatus = (available: number, total: number) => {
-    if (available === 0) return 'out_of_stock';
-    if ((available / total) < 0.3) return 'low_availability';
-    return 'good';
-  };
 
   const totalTools = tools.length;
   const activeTools = tools.filter(t => t.isActive).length;
-  const totalValue = tools.reduce((sum, tool) => sum + (tool.replacementCost * tool.totalQuantity), 0);
-  const lowAvailabilityTools = tools.filter(t => getAvailabilityStatus(t.availableQuantity, t.totalQuantity) === 'low_availability').length;
-  const outOfStockTools = tools.filter(t => getAvailabilityStatus(t.availableQuantity, t.totalQuantity) === 'out_of_stock').length;
+  const totalValue = tools.reduce((sum, tool) => sum + (tool.replacementCost * tool.amount), 0);
+  const lowAvailabilityTools = tools.filter(t => t.amount < 3).length;
+  const outOfStockTools = tools.filter(t => t.amount === 0).length;
 
   if (loading) {
     return (
@@ -518,13 +488,13 @@ const ToolsManagementPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <button
                       onClick={() => {
-                        setSortBy('availableQuantity');
-                        setSortOrder(sortBy === 'availableQuantity' && sortOrder === 'asc' ? 'desc' : 'asc');
+                        setSortBy('amount');
+                        setSortOrder(sortBy === 'amount' && sortOrder === 'asc' ? 'desc' : 'asc');
                       }}
                       className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
                     >
-                      <span>Availability</span>
-                      {sortBy === 'availableQuantity' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      <span>Amount</span>
+                      {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Returnable</th>
@@ -549,8 +519,8 @@ const ToolsManagementPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       ${tool.replacementCost.toFixed(2)}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getAvailabilityColor(tool.availableQuantity, tool.totalQuantity)}`}>
-                      {tool.availableQuantity}/{tool.totalQuantity}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {tool.amount}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {tool.isReturnable ? "Yes" : "No"}
@@ -595,9 +565,11 @@ const ToolsManagementPage: React.FC = () => {
       </div>
 
       {/* Create Tool Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        className="max-w-3xl p-6"
+      >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Tool</h3>
               <button
@@ -674,34 +646,18 @@ const ToolsManagementPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Total Quantity
+                    Amount
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    value={createForm.totalQuantity}
-                    onChange={(e) => setCreateForm({...createForm, totalQuantity: parseInt(e.target.value) || 1})}
+                    min="0"
+                    value={createForm.amount}
+                    onChange={(e) => setCreateForm({...createForm, amount: parseInt(e.target.value) || 0})}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="1"
+                    placeholder="0"
                     required
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Available Quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={createForm.totalQuantity}
-                  value={createForm.availableQuantity}
-                  onChange={(e) => setCreateForm({...createForm, availableQuantity: parseInt(e.target.value) || 0})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                  required
-                />
               </div>
 
               <div className="flex items-center">
@@ -734,9 +690,8 @@ const ToolsManagementPage: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+       
+      </Modal>
     </div>
   );
 };

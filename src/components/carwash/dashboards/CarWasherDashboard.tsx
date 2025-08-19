@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../../context/AuthContext';
 
 interface Assignment {
   id: string;
@@ -36,24 +37,24 @@ interface DashboardData {
 }
 
 const CarWasherDashboard: React.FC = () => {
+  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get current user ID from auth context
-  // TODO: Replace with actual auth integration
-  const getCurrentUserId = () => {
-    // Example: const { user } = useAuth(); return user?.id;
-    // For testing, you can use a real washer ID from your database
-    return 'current-user-id'; // Replace with actual implementation
-  };
+
 
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const washerId = getCurrentUserId();
+      if (!user?.id) {
+        setError('User not authenticated');
+        return;
+      }
+      
+      const washerId = user.id;
       const response = await fetch(`/api/admin/carwasher-dashboard?washerId=${washerId}`);
       
       if (!response.ok) {
@@ -86,7 +87,7 @@ const CarWasherDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchDashboardData();

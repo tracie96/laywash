@@ -91,13 +91,13 @@ export async function GET() {
 
     // 5. Fetch low stock items count
     const { data: inventoryData, error: inventoryError } = await supabaseAdmin
-      .from('inventory')
-      .select('id, quantity, min_stock_level')
-      .lt('quantity', 'min_stock_level');
+      .from('stock_items')
+      .select('id, current_stock, minimum_stock')
+      .lt('current_stock', 'minimum_stock')
+      .eq('is_active', true);
 
     if (inventoryError) {
       console.error('Error fetching inventory data:', inventoryError);
-      // Don't throw error for inventory as it might not be critical
     }
 
     const lowStockItems = inventoryData?.length || 0;

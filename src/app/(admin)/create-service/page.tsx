@@ -13,7 +13,11 @@ const CreateServicePage: React.FC = () => {
     description: '',
     basePrice: '',
     category: 'exterior',
-    estimatedDuration: ''
+    estimatedDuration: '',
+    washerCommissionPercentage: 40,
+    companyCommissionPercentage: 60,
+    maxWashersPerService: 2,
+    commissionNotes: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +25,7 @@ const CreateServicePage: React.FC = () => {
 
   const router = useRouter();
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -36,24 +40,64 @@ const CreateServicePage: React.FC = () => {
       return;
     }
 
+    // Validate commission percentages
+    if (formData.washerCommissionPercentage + formData.companyCommissionPercentage !== 100) {
+      setError('Washer and company commission percentages must equal 100%');
+      return;
+    }
+
+    if (formData.maxWashersPerService < 1) {
+      setError('Maximum washers per service must be at least 1');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      // TODO: Implement service creation API call
-      // For now, simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSuccess('Service created successfully!');
-      setFormData({ 
-        name: '', 
-        description: '', 
-        basePrice: '', 
-        category: 'exterior', 
-        estimatedDuration: '' 
+      const response = await fetch('/api/admin/services', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          price: parseFloat(formData.basePrice),
+          category: formData.category,
+          duration: parseInt(formData.estimatedDuration),
+          washerCommissionPercentage: formData.washerCommissionPercentage,
+          companyCommissionPercentage: formData.companyCommissionPercentage,
+          maxWashersPerService: formData.maxWashersPerService,
+          commissionNotes: formData.commissionNotes
+        }),
       });
-    } catch {
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Service created successfully!');
+        setFormData({ 
+          name: '', 
+          description: '', 
+          basePrice: '', 
+          category: 'exterior', 
+          estimatedDuration: '',
+          washerCommissionPercentage: 40,
+          companyCommissionPercentage: 60,
+          maxWashersPerService: 2,
+          commissionNotes: ''
+        });
+        // Redirect to services page after creation
+        setTimeout(() => {
+          router.push('/(admin)/operations/services');
+        }, 1500);
+      } else {
+        setError(data.error || 'Failed to create service');
+      }
+    } catch (error) {
+      console.error('Error creating service:', error);
       setError('An error occurred while creating the service.');
     } finally {
       setIsLoading(false);
@@ -183,6 +227,88 @@ const CreateServicePage: React.FC = () => {
               defaultValue={formData.estimatedDuration}
               onChange={(e) => handleInputChange('estimatedDuration', e.target.value)}
             />
+          </div>
+
+          {/* Commission Settings */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Commission Settings
+            </h3>
+            
+            {/* Washer Commission Percentage */}
+            <div className="mb-4">
+              <Label>
+                Washer Commission (%) <span className="text-error-500">*</span>
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step={0.01}
+                placeholder="Enter washer commission percentage"
+                defaultValue={formData.washerCommissionPercentage.toString()}
+                onChange={(e) => {
+                  const washerPercentage = parseFloat(e.target.value) || 0;
+                  handleInputChange('washerCommissionPercentage', washerPercentage);
+                  handleInputChange('companyCommissionPercentage', 100 - washerPercentage);
+                }}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Company commission will automatically be set to {100 - formData.washerCommissionPercentage}%
+              </p>
+            </div>
+
+            {/* Company Commission Percentage */}
+            <div className="mb-4">
+              <Label>
+                Company Commission (%) <span className="text-error-500">*</span>
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step={0.01}
+                placeholder="Enter company commission percentage"
+                defaultValue={formData.companyCommissionPercentage.toString()}
+                onChange={(e) => {
+                  const companyPercentage = parseFloat(e.target.value) || 0;
+                  handleInputChange('companyCommissionPercentage', companyPercentage);
+                  handleInputChange('washerCommissionPercentage', 100 - companyPercentage);
+                }}
+              />
+            </div>
+
+            {/* Max Washers Per Service */}
+            <div className="mb-4">
+              <Label>
+                Maximum Washers Per Service <span className="text-error-500">*</span>
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                max="10"
+                placeholder="Enter maximum number of washers"
+                defaultValue={formData.maxWashersPerService.toString()}
+                onChange={(e) => handleInputChange('maxWashersPerService', parseInt(e.target.value) || 1)}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Maximum number of washers that can work on this service simultaneously
+              </p>
+            </div>
+
+            {/* Commission Notes */}
+            <div className="mb-4">
+              <Label>
+                Commission Notes
+              </Label>
+              <textarea
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                rows={3}
+                placeholder="Any special notes about commission structure for this service..."
+                defaultValue={formData.commissionNotes}
+                onChange={(e) => handleInputChange('commissionNotes', e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Submit Button */}

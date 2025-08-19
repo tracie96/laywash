@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this customer-vehicle relationship already exists
     const { data: existingRelationship } = await supabaseAdmin
       .from('customer_vehicles')
       .select('id')

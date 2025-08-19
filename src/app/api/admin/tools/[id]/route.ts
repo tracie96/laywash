@@ -17,10 +17,8 @@ interface ToolUpdateData {
   category?: string;
   isReturnable?: boolean;
   replacementCost?: number;
-  totalQuantity?: number;
-  availableQuantity?: number;
-  isActive?: boolean;
   amount?: number;
+  isActive?: boolean;
 }
 
 interface DatabaseUpdateFields {
@@ -29,10 +27,8 @@ interface DatabaseUpdateFields {
   category?: string;
   is_returnable?: boolean;
   replacement_cost?: number;
-  total_quantity?: number;
-  available_quantity?: number;
-  is_active?: boolean;
   amount?: number;
+  is_active?: boolean;
   updated_at?: string;
 }
 
@@ -53,27 +49,11 @@ export async function PATCH(
       );
     }
 
-    if (updateData.totalQuantity !== undefined && updateData.totalQuantity < 0) {
+    if (updateData.amount !== undefined && updateData.amount < 0) {
       return NextResponse.json(
-        { success: false, error: 'Total quantity cannot be negative' },
+        { success: false, error: 'Amount cannot be negative' },
         { status: 400 }
       );
-    }
-
-    if (updateData.availableQuantity !== undefined && updateData.availableQuantity < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Available quantity cannot be negative' },
-        { status: 400 }
-      );
-    }
-
-    if (updateData.availableQuantity !== undefined && updateData.totalQuantity !== undefined) {
-      if (updateData.availableQuantity > updateData.totalQuantity) {
-        return NextResponse.json(
-          { success: false, error: 'Available quantity cannot exceed total quantity' },
-          { status: 400 }
-        );
-      }
     }
 
     if (updateData.category !== undefined) {
@@ -94,10 +74,8 @@ export async function PATCH(
     if (updateData.category !== undefined) updateFields.category = updateData.category;
     if (updateData.isReturnable !== undefined) updateFields.is_returnable = updateData.isReturnable;
     if (updateData.replacementCost !== undefined) updateFields.replacement_cost = updateData.replacementCost;
-    if (updateData.totalQuantity !== undefined) updateFields.total_quantity = updateData.totalQuantity;
-    if (updateData.availableQuantity !== undefined) updateFields.available_quantity = updateData.availableQuantity;
-    if (updateData.isActive !== undefined) updateFields.is_active = updateData.isActive;
     if (updateData.amount !== undefined) updateFields.amount = updateData.amount;
+    if (updateData.isActive !== undefined) updateFields.is_active = updateData.isActive;
     
     // Always update the updated_at timestamp
     updateFields.updated_at = new Date().toISOString();
@@ -125,10 +103,8 @@ export async function PATCH(
       category: updatedTool.category || 'General',
       isReturnable: updatedTool.is_returnable || false,
       replacementCost: updatedTool.replacement_cost || 0,
-      totalQuantity: updatedTool.total_quantity || 0,
-      availableQuantity: updatedTool.available_quantity || 0,
-      isActive: updatedTool.is_active || false,
       amount: updatedTool.amount || 0,
+      isActive: updatedTool.is_active || false,
       createdAt: updatedTool.created_at,
       updatedAt: updatedTool.updated_at
     };

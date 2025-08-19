@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { PlusIcon, TrashBinIcon } from "@/icons";
+import { Modal } from "@/components/ui/modal";
+import { useModal } from "@/hooks/useModal";
 
 interface Service {
   id: string;
@@ -10,6 +12,10 @@ interface Service {
   price: number;
   duration: number;
   category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
+  washerCommissionPercentage: number;
+  companyCommissionPercentage: number;
+  maxWashersPerService: number;
+  commissionNotes: string;
   isActive: boolean;
   popularity: number;
   createdAt: string;
@@ -22,6 +28,10 @@ interface CreateServiceForm {
   price: number;
   category: 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary';
   duration: number;
+  washerCommissionPercentage: number;
+  companyCommissionPercentage: number;
+  maxWashersPerService: number;
+  commissionNotes: string;
 }
 
 const OperationsServicesPage: React.FC = () => {
@@ -31,13 +41,17 @@ const OperationsServicesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'exterior' | 'interior' | 'engine' | 'vacuum' | 'complementary'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { isOpen: showCreateModal, openModal, closeModal } = useModal();
   const [createForm, setCreateForm] = useState<CreateServiceForm>({
     name: '',
     description: '',
     price: 0,
     category: 'exterior',
-    duration: 30
+    duration: 30,
+    washerCommissionPercentage: 40,
+    companyCommissionPercentage: 60,
+    maxWashersPerService: 2,
+    commissionNotes: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,6 +104,17 @@ const OperationsServicesPage: React.FC = () => {
       return;
     }
 
+    // Validate commission percentages
+    if (createForm.washerCommissionPercentage + createForm.companyCommissionPercentage !== 100) {
+      setError('Washer and company commission percentages must equal 100%');
+      return;
+    }
+
+    if (createForm.maxWashersPerService < 1) {
+      setError('Maximum washers per service must be at least 1');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -105,13 +130,17 @@ const OperationsServicesPage: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        setShowCreateModal(false);
+        closeModal();
         setCreateForm({
           name: '',
           description: '',
           price: 0,
           category: 'exterior',
-          duration: 30
+          duration: 30,
+          washerCommissionPercentage: 40,
+          companyCommissionPercentage: 60,
+          maxWashersPerService: 2,
+          commissionNotes: ''
         });
         fetchServices(); 
       } else {
@@ -309,7 +338,7 @@ const OperationsServicesPage: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openModal}
             className="inline-flex items-center px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
@@ -356,6 +385,8 @@ const OperationsServicesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Commission</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Max Washers</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -386,6 +417,17 @@ const OperationsServicesPage: React.FC = () => {
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(service.category)}`}>
                         {getCategoryLabel(service.category)}
                       </span>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-xs">
+                        <div>Washer: {service.washerCommissionPercentage}%</div>
+                        <div>Company: {service.companyCommissionPercentage}%</div>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {service.maxWashersPerService}
                     </td>
                 
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -424,22 +466,19 @@ const OperationsServicesPage: React.FC = () => {
       </div>
 
       {/* Create Service Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Service</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={closeModal}
+        className="max-w-3xl p-6"
+      >
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Service</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Create a new car wash service with custom commission settings
+          </p>
+        </div>
 
-            <form onSubmit={handleCreateService} className="space-y-4">
+        <form onSubmit={handleCreateService} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Service Name
@@ -518,10 +557,98 @@ const OperationsServicesPage: React.FC = () => {
                 </select>
               </div>
 
+              {/* Commission Settings */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Commission Settings
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Washer Commission (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={createForm.washerCommissionPercentage}
+                      onChange={(e) => {
+                        const washerPercentage = parseFloat(e.target.value) || 0;
+                        setCreateForm({
+                          ...createForm,
+                          washerCommissionPercentage: washerPercentage,
+                          companyCommissionPercentage: 100 - washerPercentage
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="40"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Company Commission (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={createForm.companyCommissionPercentage}
+                      onChange={(e) => {
+                        const companyPercentage = parseFloat(e.target.value) || 0;
+                        setCreateForm({
+                          ...createForm,
+                          companyCommissionPercentage: companyPercentage,
+                          washerCommissionPercentage: 100 - companyPercentage
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="60"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Max Washers Per Service
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={createForm.maxWashersPerService}
+                      onChange={(e) => setCreateForm({...createForm, maxWashersPerService: parseInt(e.target.value) || 1})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="2"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Commission Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={createForm.commissionNotes}
+                      onChange={(e) => setCreateForm({...createForm, commissionNotes: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Optional notes"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   Cancel
@@ -535,9 +662,7 @@ const OperationsServicesPage: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </Modal>
     </div>
   );
 };

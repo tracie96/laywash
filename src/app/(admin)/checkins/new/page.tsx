@@ -26,6 +26,12 @@ interface CheckInFormData {
   }>;
   specialInstructions: string;
   estimatedDuration: number;
+  // Security fields
+  customerType: 'instant' | 'registered';
+  valuableItems: string;
+  securityCode: string;
+  userCode: string;
+  checkInProcess: string;
 }
 
 // Form Field Wrapper Component
@@ -64,6 +70,12 @@ const NewCheckInPage: React.FC = () => {
     assignedMaterials: [],
     specialInstructions: '',
     estimatedDuration: 30,
+    // Security fields
+    customerType: 'instant',
+    valuableItems: '',
+    securityCode: '',
+    userCode: '',
+    checkInProcess: '',
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -239,9 +251,16 @@ const NewCheckInPage: React.FC = () => {
       licensePlate: primaryVehicle?.license_plate || '',
       vehicleType: primaryVehicle?.vehicle_type || '',
       vehicleColor: primaryVehicle?.vehicle_color || '',
+      // Set customer type to registered for existing customers
+      customerType: 'registered',
+      // Clear security fields to be filled by user
+      securityCode: '',
+      userCode: '',
+      pareCode: '',
+      checkInProcess: '',
     }));
     setShowCustomerResults(false);
-    setSuccess(`Selected customer: ${customer.name} with vehicle: ${primaryVehicle?.vehicle_color || ''} ${primaryVehicle?.vehicle_type || ''} (${primaryVehicle?.license_plate || ''})`);
+    setSuccess(`Selected customer: ${customer.name} with vehicle: ${primaryVehicle?.vehicle_color || ''} ${primaryVehicle?.vehicle_type || ''} (${primaryVehicle?.license_plate || ''}) - Security codes required`);
   };
 
   const calculateTotalPrice = () => {
@@ -262,6 +281,26 @@ const NewCheckInPage: React.FC = () => {
     setIsSubmitting(true);
     setError('');
     setSuccess('');
+
+    // Security validation
+    if (!formData.valuableItems.trim()) {
+      setError('Valuable items documentation is required for all customers');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.customerType === 'registered') {
+      if (!formData.securityCode.trim() || !formData.userCode.trim()) {
+        setError('Security code and user code are required for registered customers');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.checkInProcess.trim()) {
+        setError('Check-in process details are required for registered customers');
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     try {
       // TODO: Implement API call to create check-in
@@ -615,6 +654,97 @@ const NewCheckInPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Security & Check-in Process */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Security & Check-in Process
+          </h2>
+          
+          {/* Customer Type Selection */}
+          <div className="mb-6">
+            <FormField label="Customer Type" required>
+              <div className="flex space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="instant"
+                    checked={formData.customerType === 'instant'}
+                    onChange={(e) => handleInputChange('customerType', e.target.value as 'instant' | 'registered')}
+                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Instant Customer (Walk-in)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="registered"
+                    checked={formData.customerType === 'registered'}
+                    onChange={(e) => handleInputChange('customerType', e.target.value as 'instant' | 'registered')}
+                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Registered Customer</span>
+                </label>
+              </div>
+            </FormField>
+          </div>
+
+          {/* Valuable Items Documentation */}
+          <div className="mb-6">
+            <FormField label="Valuable Items Documentation" required>
+              <TextArea
+                value={formData.valuableItems}
+                onChange={(value) => handleInputChange('valuableItems', value)}
+                placeholder={formData.customerType === 'instant' 
+                  ? "Note of valuable items for instant customer..." 
+                  : "Note of valuable items and check-in process for registered customer..."
+                }
+                rows={3}
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                {formData.customerType === 'instant' 
+                  ? "For instant customers: Take note of valuable items only"
+                  : "For registered customers: Take note of valuable items AND complete check-in process"
+                }
+              </p>
+            </FormField>
+          </div>
+
+          {/* Security Codes - Only for Registered Customers */}
+          {formData.customerType === 'registered' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField label="Security Code" required>
+                  <InputField
+                    type="text"
+                    value={formData.securityCode}
+                    onChange={(e) => handleInputChange('securityCode', e.target.value)}
+                    placeholder="Enter security code"
+                  />
+                </FormField>
+                <FormField label="User Code" required>
+                  <InputField
+                    type="text"
+                    value={formData.userCode}
+                    onChange={(e) => handleInputChange('userCode', e.target.value)}
+                    placeholder="Enter user code"
+                  />
+                </FormField>
+              </div>
+              
+              <FormField label="Check-in Process Details" required>
+                <TextArea
+                  value={formData.checkInProcess}
+                  onChange={(value) => handleInputChange('checkInProcess', value)}
+                  placeholder="Document the complete check-in process including verification steps..."
+                  rows={3}
+                />
+              </FormField>
             </div>
           )}
         </div>

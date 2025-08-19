@@ -44,14 +44,49 @@ export async function PATCH(
       }
     }
 
+    // Validate commission percentages if provided
+    if (updateData.washerCommissionPercentage !== undefined || updateData.companyCommissionPercentage !== undefined) {
+      const washerPercentage = updateData.washerCommissionPercentage ?? 0;
+      const companyPercentage = updateData.companyCommissionPercentage ?? 0;
+      
+      if (washerPercentage + companyPercentage !== 100) {
+        return NextResponse.json(
+          { success: false, error: 'Washer and company commission percentages must equal 100%' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (updateData.maxWashersPerService !== undefined && updateData.maxWashersPerService < 1) {
+      return NextResponse.json(
+        { success: false, error: 'Maximum washers per service must be at least 1' },
+        { status: 400 }
+      );
+    }
+
     // Transform frontend field names to database field names
-    const dbUpdateData: { name?: string; description?: string; base_price?: number; estimated_duration?: number; category?: string; is_active?: boolean } = {};
+    const dbUpdateData: { 
+      name?: string; 
+      description?: string; 
+      base_price?: number; 
+      estimated_duration?: number; 
+      category?: string; 
+      is_active?: boolean;
+      washer_commission_percentage?: number;
+      company_commission_percentage?: number;
+      max_washers_per_service?: number;
+      commission_notes?: string;
+    } = {};
     if (updateData.name !== undefined) dbUpdateData.name = updateData.name;
     if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
     if (updateData.price !== undefined) dbUpdateData.base_price = updateData.price;
     if (updateData.duration !== undefined) dbUpdateData.estimated_duration = updateData.duration;
     if (updateData.category !== undefined) dbUpdateData.category = updateData.category;
     if (updateData.isActive !== undefined) dbUpdateData.is_active = updateData.isActive;
+    if (updateData.washerCommissionPercentage !== undefined) dbUpdateData.washer_commission_percentage = updateData.washerCommissionPercentage;
+    if (updateData.companyCommissionPercentage !== undefined) dbUpdateData.company_commission_percentage = updateData.companyCommissionPercentage;
+    if (updateData.maxWashersPerService !== undefined) dbUpdateData.max_washers_per_service = updateData.maxWashersPerService;
+    if (updateData.commissionNotes !== undefined) dbUpdateData.commission_notes = updateData.commissionNotes;
 
     // Update the service
     const { data: service, error } = await supabaseAdmin
@@ -85,6 +120,10 @@ export async function PATCH(
         price: service.base_price,
         duration: service.estimated_duration,
         category: service.category,
+        washerCommissionPercentage: service.washer_commission_percentage,
+        companyCommissionPercentage: service.company_commission_percentage,
+        maxWashersPerService: service.max_washers_per_service,
+        commissionNotes: service.commission_notes || '',
         isActive: service.is_active,
         createdAt: service.created_at,
         updatedAt: service.updated_at

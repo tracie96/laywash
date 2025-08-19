@@ -60,8 +60,7 @@ export async function GET(request: NextRequest) {
       category: tool.category || 'General',
       isReturnable: tool.is_returnable || false,
       replacementCost: tool.replacement_cost || 0,
-      totalQuantity: tool.total_quantity || 0,
-      availableQuantity: tool.available_quantity || 0,
+      amount: tool.amount || 0,
       isActive: tool.is_active || false,
       createdAt: tool.created_at,
       updatedAt: tool.updated_at
@@ -71,9 +70,9 @@ export async function GET(request: NextRequest) {
     let filteredTools = transformedTools;
     console.log({filteredTools});
     if (status === 'low_availability') {
-      filteredTools = filteredTools.filter(tool => (tool.availableQuantity / tool.totalQuantity) < 0.3);
+      filteredTools = filteredTools.filter(tool => tool.amount < 3);
     } else if (status === 'out_of_stock') {
-      filteredTools = filteredTools.filter(tool => tool.availableQuantity === 0);
+      filteredTools = filteredTools.filter(tool => tool.amount === 0);
     }
 
     return NextResponse.json({
@@ -98,12 +97,11 @@ export async function POST(request: NextRequest) {
       category, 
       isReturnable, 
       replacementCost, 
-      totalQuantity, 
-      availableQuantity 
+      amount 
     } = await request.json();
 
     // Validate required input
-    if (!name || !description || !category || replacementCost === undefined || totalQuantity === undefined || availableQuantity === undefined) {
+    if (!name || !description || !category || replacementCost === undefined || amount === undefined) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
@@ -111,16 +109,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate numeric values
-    if (replacementCost < 0 || totalQuantity < 0 || availableQuantity < 0) {
+    if (replacementCost < 0 || amount < 0) {
       return NextResponse.json(
         { success: false, error: 'Invalid numeric values' },
-        { status: 400 }
-      );
-    }
-
-    if (availableQuantity > totalQuantity) {
-      return NextResponse.json(
-        { success: false, error: 'Available quantity cannot exceed total quantity' },
         { status: 400 }
       );
     }
@@ -143,8 +134,7 @@ export async function POST(request: NextRequest) {
         category,
         is_returnable: isReturnable || false,
         replacement_cost: replacementCost,
-        total_quantity: totalQuantity,
-        available_quantity: availableQuantity,
+        amount: amount,
         is_active: true
       })
       .select()
@@ -166,8 +156,7 @@ export async function POST(request: NextRequest) {
       category: newTool.category || 'General',
       isReturnable: newTool.is_returnable || false,
       replacementCost: newTool.replacement_cost || 0,
-      totalQuantity: newTool.total_quantity || 0,
-      availableQuantity: newTool.available_quantity || 0,
+      amount: newTool.amount || 0,
       isActive: newTool.is_active || false,
       createdAt: newTool.created_at,
       updatedAt: newTool.updated_at

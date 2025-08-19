@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface CheckIn {
   id: string;
@@ -33,19 +34,19 @@ const MyCheckInsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Get current user ID (car washer)
-  // TODO: Replace with actual auth integration
-  const getCurrentUserId = () => {
-    // Example: const { user } = useAuth(); return user?.id;
-    return 'current-user-id'; // Replace with actual implementation
-  };
+  const { user } = useAuth();
 
   const fetchMyCheckIns = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const washerId = getCurrentUserId();
+      if (!user?.id) {
+        setError('User not authenticated');
+        return;
+      }
+      
+      const washerId = user.id;
       const searchParams = new URLSearchParams({
         washerId,
         status: filter === 'all' ? '' : filter,
@@ -86,7 +87,7 @@ const MyCheckInsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filter, searchQuery]);
+  }, [filter, searchQuery, user?.id]);
 
   useEffect(() => {
     fetchMyCheckIns();

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import { useAuth } from '../../../context/AuthContext';
 
 interface PaymentRequest {
   id: string;
@@ -44,19 +45,19 @@ const PaymentRequestsPage: React.FC = () => {
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Get current user ID (car washer)
-  // TODO: Replace with actual auth integration
-  const getCurrentUserId = () => {
-    // Example: const { user } = useAuth(); return user?.id;
-    return 'current-user-id'; // Replace with actual implementation
-  };
+  const { user } = useAuth();
 
   const fetchPaymentRequests = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const washerId = getCurrentUserId();
+      if (!user?.id) {
+        setError('User not authenticated');
+        return;
+      }
+      
+      const washerId = user.id;
       const response = await fetch(`/api/admin/payment-requests?washerId=${washerId}&sortBy=request_date&sortOrder=desc`);
       
       if (!response.ok) {
@@ -76,7 +77,7 @@ const PaymentRequestsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPaymentRequests();
@@ -93,7 +94,12 @@ const PaymentRequestsPage: React.FC = () => {
     try {
       setFormSubmitting(true);
       
-      const washerId = getCurrentUserId();
+      if (!user?.id) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      const washerId = user.id;
       const response = await fetch('/api/admin/payment-requests', {
         method: 'POST',
         headers: {
