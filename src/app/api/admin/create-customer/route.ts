@@ -18,53 +18,57 @@ export async function POST(request: NextRequest) {
       name, 
       email, 
       phone, 
-      licensePlate, 
-      vehicleType, 
-      vehicleModel, 
-      vehicleColor,
-      dateOfBirth
+      dateOfBirth,
+      vehicles
     } = await request.json();
 
     // Validate required input
-    if (!name || !phone || !licensePlate || !vehicleType || !vehicleColor) {
+    if (!name || !phone || !vehicles || vehicles.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: name, phone, license plate, vehicle type, and vehicle color are required' },
+        { success: false, error: 'Missing required fields: name, phone, and at least one vehicle are required' },
         { status: 400 }
       );
     }
 
-    // Check if customer with same license plate already exists
-    const { data: existingCustomer, error: checkError } = await supabaseAdmin
-      .from('customers')
-      .select('id, name')
-      .eq('license_plate', licensePlate)
-      .single();
+    // Validate vehicles
+    for (const vehicle of vehicles) {
+      if (!vehicle.licensePlate || !vehicle.vehicleType || !vehicle.vehicleColor) {
+        return NextResponse.json(
+          { success: false, error: 'All vehicles must have license plate, vehicle type, and vehicle color' },
+          { status: 400 }
+        );
+      }
+    }
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+    // Check if any license plate already exists
+    const licensePlates = vehicles.map((v: { licensePlate: string }) => v.licensePlate);
+    const { data: existingVehicles, error: checkError } = await supabaseAdmin
+      .from('vehicles')
+      .select('license_plate')
+      .in('license_plate', licensePlates);
+
+    if (checkError) {
       return NextResponse.json(
-        { success: false, error: 'Error checking for existing customer' },
+        { success: false, error: 'Error checking for existing vehicles' },
         { status: 500 }
       );
     }
 
-    if (existingCustomer) {
+    if (existingVehicles && existingVehicles.length > 0) {
+      const existingPlates = existingVehicles.map(v => v.license_plate).join(', ');
       return NextResponse.json(
-        { success: false, error: `Customer with license plate ${licensePlate} already exists` },
+        { success: false, error: `Vehicles with license plates ${existingPlates} already exist` },
         { status: 400 }
       );
     }
-console.log('Creating customer',  dateOfBirth)
-    // Create customer in the database
+
+    // Create customer in the database (without vehicle fields)
     const { data: customer, error: insertError } = await supabaseAdmin
       .from('customers')
       .insert({
         name,
         email: email || null,
         phone,
-        license_plate: licensePlate,
-        vehicle_type: vehicleType,
-        vehicle_model: vehicleModel || null,
-        vehicle_color: vehicleColor,
         date_of_birth: dateOfBirth || null,
         is_registered: true,
         registration_date: new Date().toISOString(),
@@ -82,6 +86,58 @@ console.log('Creating customer',  dateOfBirth)
       );
     }
 
+    // Insert vehicles into the vehicles table
+    const vehiclesToInsert = vehicles.map((vehicle: { licensePlate: string; vehicleType: string; vehicleModel: string | null; vehicleColor: string; isPrimary: boolean | undefined; }, index: number) => ({
+      customer_id: customer.id,
+      license_plate: vehicle.licensePlate,
+      vehicle_type: vehicle.vehicleType,
+      vehicle_model: vehicle.vehicleModel || null,
+      vehicle_color: vehicle.vehicleColor,
+      is_primary: vehicle.isPrimary || index === 0, // First vehicle is primary by default
+    }));
+
+    const { data: insertedVehicles, error: vehiclesError } = await supabaseAdmin
+      .from('vehicles')
+      .insert(vehiclesToInsert)
+      .select();
+
+    if (vehiclesError) {
+      console.error('Create vehicles error:', vehiclesError);
+      // Rollback customer creation if vehicle creation fails
+      await supabaseAdmin
+        .from('customers')
+        .delete()
+        .eq('id', customer.id);
+      
+      return NextResponse.json(
+        { success: false, error: 'Failed to create vehicles ' + vehiclesError.message },
+        { status: 500 }
+      );
+    }
+
+    // Fetch the complete customer data with vehicles (for future use)
+    const { error: fetchError } = await supabaseAdmin
+      .from('customers')
+      .select(`
+        *,
+        vehicles:vehicles (
+          id,
+          license_plate,
+          vehicle_type,
+          vehicle_model,
+          vehicle_color,
+          is_primary,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('id', customer.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Fetch complete customer error:', fetchError);
+    }
+
     return NextResponse.json({
       success: true,
       customer: {
@@ -89,15 +145,24 @@ console.log('Creating customer',  dateOfBirth)
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
-        licensePlate: customer.license_plate,
-        vehicleType: customer.vehicle_type,
-        vehicleModel: customer.vehicle_model,
-        vehicleColor: customer.vehicle_color,
         dateOfBirth: customer.date_of_birth,
         isRegistered: customer.is_registered,
         registrationDate: customer.registration_date,
         totalVisits: customer.total_visits,
         totalSpent: customer.total_spent,
+        createdAt: customer.created_at,
+        updatedAt: customer.updated_at,
+        vehicles: insertedVehicles?.map(v => ({
+          id: v.id,
+          customerId: v.customer_id,
+          licensePlate: v.license_plate,
+          vehicleType: v.vehicle_type,
+          vehicleModel: v.vehicle_model,
+          vehicleColor: v.vehicle_color,
+          isPrimary: v.is_primary,
+          createdAt: v.created_at,
+          updatedAt: v.updated_at
+        })) || []
       }
     });
 

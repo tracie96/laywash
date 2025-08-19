@@ -23,7 +23,19 @@ export async function GET(request: NextRequest) {
     // Build the base query
     let query = supabaseAdmin
       .from('customers')
-      .select('*')
+      .select(`
+        *,
+        vehicles:vehicles (
+          id,
+          license_plate,
+          vehicle_type,
+          vehicle_model,
+          vehicle_color,
+          is_primary,
+          created_at,
+          updated_at
+        )
+      `)
       .order('name', { ascending: true })
       .limit(limit);
 

@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Build the base query - simplified to avoid complex joins initially
+    // Build the base query with proper relationships through sales_items
     let query = supabaseAdmin
       .from('sales_transactions')
       .select(`
@@ -246,7 +246,12 @@ export async function GET(request: NextRequest) {
         sales_items (
           quantity,
           unit_price,
-          total_price
+          total_price,
+          inventory_item_id (
+            name,
+            category,
+            current_stock
+          )
         ),
         admins:users!sales_transactions_admin_id_fkey (
           id,
@@ -285,9 +290,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Raw sales data:', sales); // Debug: log the raw data
-
-    // Transform the data - simplified since we don't have item details from join
     const transformedSales = sales?.map(sale => ({
       id: sale.id,
       customerName: sale.customers?.name || 'Walk-in Customer',
@@ -298,9 +300,14 @@ export async function GET(request: NextRequest) {
       status: sale.status,
       adminName: sale.admins?.name || 'Unknown',
       createdAt: sale.created_at,
-      items: sale.sales_items?.map((item: { quantity: number; unit_price: number; total_price: number; }) => ({
-        name: 'Item Details Not Available', // Placeholder since we removed the join
-        category: 'General',
+      items: sale.sales_items?.map((item: { 
+        quantity: number; 
+        unit_price: number; 
+        total_price: number; 
+        inventory_item_id: { name: string; category: string; current_stock: number; } | null;
+      }) => ({
+        name: item.inventory_item_id?.name || 'Item Details Not Available',
+        category: item.inventory_item_id?.category || 'General',
         quantity: item.quantity,
         unitPrice: item.unit_price,
         totalPrice: item.total_price

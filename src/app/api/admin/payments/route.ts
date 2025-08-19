@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     // Apply search filter
     if (search) {
-      query = query.or(`customers.name.ilike.%${search}%,customers.license_plate.ilike.%${search}%,customers.phone.ilike.%${search}%`);
+      query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%`);
     }
 
     // Apply status filter

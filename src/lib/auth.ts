@@ -2,7 +2,8 @@ import { supabase } from './supabase';
 import { User, UserRole } from '../types/carwash';
 
 export interface LoginCredentials {
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
 }
 
@@ -20,13 +21,48 @@ export interface AuthResponse {
 }
 
 export class AuthService {
-  // Login with email and password
+  // Login with email/phone and password
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: credentials.email,
-        password: credentials.password,
-      });
+      // Determine if we're using email or phone
+      if (!credentials.email && !credentials.phone) {
+        return {
+          success: false,
+          error: 'Email or phone number is required',
+        };
+      }
+
+      let authData;
+      if (credentials.email) {
+        // Login with email
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: credentials.email,
+          password: credentials.password,
+        });
+        authData = { data, error };
+      } else {
+        // Login with phone - we'll need to find the user first
+        const { data: userProfile, error: profileError } = await supabase
+          .from('users')
+          .select('email')
+          .eq('phone', credentials.phone)
+          .single();
+
+        if (profileError || !userProfile) {
+          return {
+            success: false,
+            error: 'Phone number not found',
+          };
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: userProfile.email,
+          password: credentials.password,
+        });
+        authData = { data, error };
+      }
+
+      const { data, error } = authData;
 
       if (error) {
         return {

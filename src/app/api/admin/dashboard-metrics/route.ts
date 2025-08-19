@@ -173,9 +173,9 @@ export async function GET() {
         status,
         total_amount,
         check_in_time,
+        vehicle_model,
         customers (
-          name,
-          vehicle_model
+          name
         )
       `)
       .order('check_in_time', { ascending: false })
@@ -189,7 +189,7 @@ export async function GET() {
     // Format recent activities
     const recentActivities = recentCheckIns?.slice(0, 5).map(checkIn => {
       const customerName = checkIn.customers?.[0]?.name || 'Unknown Customer';
-      const vehicleModel = checkIn.customers?.[0]?.vehicle_model || 'Vehicle';
+              const vehicleModel = checkIn.vehicle_model || 'Vehicle';
       
       let description = '';
       let type = '';

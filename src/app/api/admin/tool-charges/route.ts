@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-// import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-//   auth: {
-//     autoRefreshToken: false,
-//     persistSession: false
-//   }
-// });
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,100 +20,82 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'date';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
-    // For now, return mock data since we don't have a tool_charges table yet
-    // In a real implementation, you would query the tool_charges table
-    const mockCharges = [
-      {
-        id: "1",
-        toolName: "Pressure Washer",
-        workerName: "John Smith",
-        workerId: "worker_1",
-        chargeAmount: 500.00,
-        reason: "Lost during shift",
-        date: "2024-01-15",
-        status: "pending",
-        replacementCost: 500.00,
-        notes: "Worker claims it was stolen from the work area",
-        createdAt: new Date("2024-01-15").toISOString(),
-        updatedAt: new Date("2024-01-15").toISOString()
-      },
-      {
-        id: "2",
-        toolName: "Scrub Brushes",
-        workerName: "Sarah Johnson",
-        workerId: "worker_2",
-        chargeAmount: 15.00,
-        reason: "Damaged beyond repair",
-        date: "2024-01-14",
-        status: "paid",
-        replacementCost: 15.00,
-        notes: "Brushes worn out from heavy use",
-        createdAt: new Date("2024-01-14").toISOString(),
-        updatedAt: new Date("2024-01-14").toISOString()
-      },
-      {
-        id: "3",
-        toolName: "Vacuum Cleaner",
-        workerName: "Mike Davis",
-        workerId: "worker_3",
-        chargeAmount: 300.00,
-        reason: "Lost tool",
-        date: "2024-01-10",
-        status: "disputed",
-        replacementCost: 300.00,
-        notes: "Worker disputes the charge, claims it was returned",
-        createdAt: new Date("2024-01-10").toISOString(),
-        updatedAt: new Date("2024-01-10").toISOString()
-      },
-      {
-        id: "4",
-        toolName: "Steam Cleaner",
-        workerName: "Alex Wilson",
-        workerId: "worker_4",
-        chargeAmount: 800.00,
-        reason: "Damaged during use",
-        date: "2024-01-08",
-        status: "pending",
-        replacementCost: 800.00,
-        notes: "Equipment malfunctioned during operation",
-        createdAt: new Date("2024-01-08").toISOString(),
-        updatedAt: new Date("2024-01-08").toISOString()
-      },
-      {
-        id: "5",
-        toolName: "Detailing Kit",
-        workerName: "Emma Brown",
-        workerId: "worker_5",
-        chargeAmount: 150.00,
-        reason: "Lost during transport",
-        date: "2024-01-05",
-        status: "paid",
-        replacementCost: 150.00,
-        notes: "Kit was left behind at customer location",
-        createdAt: new Date("2024-01-05").toISOString(),
-        updatedAt: new Date("2024-01-05").toISOString()
-      }
-    ];
+    // Query tool charges from the tool_return_items table
+    let query = supabaseAdmin
+      .from('tool_return_items')
+      .select(`
+        *,
+        return:daily_material_returns!tool_return_items_return_id_fkey (
+          id,
+          return_date,
+          status,
+          admin_notes,
+          washer:users!daily_material_returns_washer_id_fkey (
+            id,
+            name,
+            email,
+            phone
+          )
+        )
+      `)
+      .order(sortBy === 'date' ? 'created_at' : 'deduction_amount', { ascending: sortOrder === 'asc' });
 
-    // Apply search filter
-    let filteredCharges = mockCharges;
+    // Apply filters
+    if (search) {
+      query = query.ilike('tool_name', `%${search}%`);
+    }
+
+    if (status && status !== 'all') {
+      if (status === 'pending') {
+        query = query.eq('return.status', 'pending');
+      } else if (status === 'paid') {
+        query = query.eq('return.status', 'completed');
+      } else if (status === 'disputed') {
+        query = query.eq('return.status', 'pending');
+      }
+    }
+
+    if (workerId && workerId !== 'all') {
+      query = query.eq('return.washer_id', workerId);
+    }
+
+    const { data: toolReturns, error } = await query;
+
+    if (error) {
+      console.error('Error fetching tool charges:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch tool charges' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the data to match the frontend interface
+    const transformedCharges = toolReturns?.map(item => ({
+      id: item.id,
+      toolName: item.tool_name,
+      workerName: item.return?.washer?.name || 'Unknown Worker',
+      workerId: item.return?.washer?.id || '',
+      chargeAmount: item.deduction_amount || 0,
+      reason: item.missing_quantity > 0 ? 'Missing tool' : 'Damaged tool',
+      date: item.return?.return_date || item.created_at,
+      status: item.return?.status === 'completed' ? 'paid' : 
+              item.return?.status === 'pending' ? 'pending' : 'disputed',
+      replacementCost: item.deduction_amount || 0,
+      notes: item.notes || item.return?.admin_notes || 'No notes',
+      createdAt: item.created_at,
+      updatedAt: item.created_at
+    })) || [];
+
+    // Apply additional filters that can't be done at database level
+    let filteredCharges = transformedCharges;
+    
+    // Apply search filter for fields not covered by database query
     if (search) {
       filteredCharges = filteredCharges.filter(charge => 
-        charge.toolName.toLowerCase().includes(search.toLowerCase()) ||
         charge.workerName.toLowerCase().includes(search.toLowerCase()) ||
         charge.reason.toLowerCase().includes(search.toLowerCase()) ||
         charge.notes.toLowerCase().includes(search.toLowerCase())
       );
-    }
-
-    // Apply status filter
-    if (status !== 'all') {
-      filteredCharges = filteredCharges.filter(charge => charge.status === status);
-    }
-
-    // Apply worker filter
-    if (workerId !== 'all') {
-      filteredCharges = filteredCharges.filter(charge => charge.workerId === workerId);
     }
 
     // Apply sorting
@@ -200,26 +182,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, return success with mock data
-    // In a real implementation, you would insert into the tool_charges table
-    const newCharge = {
-      id: Date.now().toString(),
-      toolName,
-      workerId,
-      workerName,
-      chargeAmount,
-      reason,
-      date: new Date().toISOString().split('T')[0],
+    // Create a new daily material return for the tool charge
+    const { data: newReturn, error: returnError } = await supabaseAdmin
+      .from('daily_material_returns')
+      .insert({
+        washer_id: workerId,
+        admin_id: 'admin', // This should come from the authenticated user
+        return_date: new Date().toISOString().split('T')[0],
+        total_items_returned: 0,
+        total_materials_returned: 0,
+        deductions_amount: chargeAmount,
+        status: 'pending',
+        admin_notes: `Tool charge: ${reason} - ${notes || ''}`
+      })
+      .select()
+      .single();
+
+    if (returnError) {
+      console.error('Error creating daily return:', returnError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create tool charge' },
+        { status: 500 }
+      );
+    }
+
+    // Create the tool return item
+    const { data: newToolReturn, error: toolError } = await supabaseAdmin
+      .from('tool_return_items')
+      .insert({
+        return_id: newReturn.id,
+        tool_id: 'tool_id', // This should come from the request
+        tool_name: toolName,
+        assigned_quantity: 1,
+        returned_quantity: 0,
+        missing_quantity: 1,
+        deduction_amount: chargeAmount,
+        notes: notes || ''
+      })
+      .select()
+      .single();
+
+    if (toolError) {
+      console.error('Error creating tool return item:', toolError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create tool charge item' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the response to match the frontend interface
+    const transformedCharge = {
+      id: newToolReturn.id,
+      toolName: newToolReturn.tool_name,
+      workerName: workerName,
+      workerId: workerId,
+      chargeAmount: newToolReturn.deduction_amount,
+      reason: reason,
+      date: newReturn.return_date,
       status: 'pending',
-      replacementCost,
-      notes: notes || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      replacementCost: newToolReturn.deduction_amount,
+      notes: newToolReturn.notes,
+      createdAt: newToolReturn.created_at,
+      updatedAt: newToolReturn.created_at
     };
 
     return NextResponse.json({
       success: true,
-      charge: newCharge
+      charge: transformedCharge,
+      message: 'Tool charge created successfully'
     });
 
   } catch (error) {

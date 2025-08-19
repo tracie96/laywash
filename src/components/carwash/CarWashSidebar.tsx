@@ -48,7 +48,8 @@ const superAdminItems: NavItem[] = [
     subItems: [
       { name: "Payment History", path: "/financial/payments", pro: false },
       { name: "Financial Reports", path: "/financial/reports", pro: false },
-      { name: "Bonuses", path: "/financial/bonuses", pro: false }
+      { name: "Bonuses", path: "/financial/bonuses", pro: false },
+      { name: "Commission Setting", path: "/financial/commission-settings", pro: false }
     ],
     roles: ["super_admin"]
   },
@@ -136,6 +137,16 @@ const adminItems: NavItem[] = [
     subItems: [
       { name: "Payment History", path: "/payments/history", pro: false },
       { name: "Payment Reports", path: "/payments/reports", pro: false }
+    ],
+    roles: ["admin"]
+  },
+  {
+    icon: <ToolIcon />,
+    name: "Tools & Equipment",
+    subItems: [
+      { name: "Tool Management", path: "/tools/management", pro: false },
+      { name: "Tool Assignments", path: "/tools/assignments", pro: false },
+      { name: "Lost Tool Charges", path: "/tools/charges", pro: false }
     ],
     roles: ["admin"]
   },

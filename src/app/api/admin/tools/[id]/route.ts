@@ -1,15 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-// import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-//   auth: {
-//     autoRefreshToken: false,
-//     persistSession: false
-//   }
-// });
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+interface ToolUpdateData {
+  name?: string;
+  description?: string;
+  category?: string;
+  isReturnable?: boolean;
+  replacementCost?: number;
+  totalQuantity?: number;
+  availableQuantity?: number;
+  isActive?: boolean;
+  amount?: number;
+}
+
+interface DatabaseUpdateFields {
+  name?: string;
+  description?: string;
+  category?: string;
+  is_returnable?: boolean;
+  replacement_cost?: number;
+  total_quantity?: number;
+  available_quantity?: number;
+  is_active?: boolean;
+  amount?: number;
+  updated_at?: string;
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -18,7 +43,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const updateData = await request.json();
+    const updateData: ToolUpdateData = await request.json();
 
     // Validate the update data
     if (updateData.replacementCost !== undefined && updateData.replacementCost < 0) {
@@ -61,25 +86,57 @@ export async function PATCH(
       }
     }
 
-    // For now, return success with mock data
-    // In a real implementation, you would update the tools table
-    const updatedTool = {
-      id,
-      name: updateData.name || 'Pressure Washer',
-      description: updateData.description || 'High-pressure water cleaning equipment',
-      category: updateData.category || 'Equipment',
-      isReturnable: updateData.isReturnable !== undefined ? updateData.isReturnable : true,
-      replacementCost: updateData.replacementCost !== undefined ? updateData.replacementCost : 500.00,
-      totalQuantity: updateData.totalQuantity !== undefined ? updateData.totalQuantity : 5,
-      availableQuantity: updateData.availableQuantity !== undefined ? updateData.availableQuantity : 3,
-      isActive: updateData.isActive !== undefined ? updateData.isActive : true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      updatedAt: new Date().toISOString()
+    // Update the tool in the worker_tools table
+    const updateFields: DatabaseUpdateFields = {};
+    
+    if (updateData.name !== undefined) updateFields.name = updateData.name;
+    if (updateData.description !== undefined) updateFields.description = updateData.description;
+    if (updateData.category !== undefined) updateFields.category = updateData.category;
+    if (updateData.isReturnable !== undefined) updateFields.is_returnable = updateData.isReturnable;
+    if (updateData.replacementCost !== undefined) updateFields.replacement_cost = updateData.replacementCost;
+    if (updateData.totalQuantity !== undefined) updateFields.total_quantity = updateData.totalQuantity;
+    if (updateData.availableQuantity !== undefined) updateFields.available_quantity = updateData.availableQuantity;
+    if (updateData.isActive !== undefined) updateFields.is_active = updateData.isActive;
+    if (updateData.amount !== undefined) updateFields.amount = updateData.amount;
+    
+    // Always update the updated_at timestamp
+    updateFields.updated_at = new Date().toISOString();
+
+    const { data: updatedTool, error } = await supabaseAdmin
+      .from('worker_tools')
+      .update(updateFields)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating tool:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to update tool' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the response to match the frontend interface
+    const transformedTool = {
+      id: updatedTool.id,
+      name: updatedTool.name,
+      description: updatedTool.description || '',
+      category: updatedTool.category || 'General',
+      isReturnable: updatedTool.is_returnable || false,
+      replacementCost: updatedTool.replacement_cost || 0,
+      totalQuantity: updatedTool.total_quantity || 0,
+      availableQuantity: updatedTool.available_quantity || 0,
+      isActive: updatedTool.is_active || false,
+      amount: updatedTool.amount || 0,
+      createdAt: updatedTool.created_at,
+      updatedAt: updatedTool.updated_at
     };
 
     return NextResponse.json({
       success: true,
-      tool: updatedTool
+      tool: transformedTool,
+      message: 'Tool updated successfully'
     });
 
   } catch (error) {

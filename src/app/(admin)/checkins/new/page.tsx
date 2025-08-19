@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
@@ -16,7 +16,14 @@ interface CheckInFormData {
   licensePlate: string;
   vehicleType: string;
   vehicleColor: string;
-  services: string[];
+  services: string[]; // Now stores service IDs
+  assignedWasherId: string;
+  assignedMaterials: Array<{
+    materialId: string;
+    materialName: string;
+    quantity: number;
+    unit: string;
+  }>;
   specialInstructions: string;
   estimatedDuration: number;
 }
@@ -53,11 +60,41 @@ const NewCheckInPage: React.FC = () => {
     vehicleType: '',
     vehicleColor: '',
     services: [],
+    assignedWasherId: '',
+    assignedMaterials: [],
     specialInstructions: '',
     estimatedDuration: 30,
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [availableServices, setAvailableServices] = useState<Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    duration: number;
+    category: string;
+    isActive: boolean;
+  }>>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
+  
+  // Washer and materials state
+  const [availableWashers, setAvailableWashers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  }>>([]);
+  const [isLoadingWashers, setIsLoadingWashers] = useState(true);
+  
+  const [washerMaterials, setWasherMaterials] = useState<Array<{
+    id: string;
+    materialName: string;
+    materialType: string;
+    quantity: number;
+    unit: string;
+  }>>([]);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
 
   const vehicleTypes = [
     { value: 'sedan', label: 'Sedan' },
@@ -68,36 +105,96 @@ const NewCheckInPage: React.FC = () => {
     { value: 'other', label: 'Other' },
   ];
 
-  const availableServices = [
-    { value: 'exterior_wash', label: 'Exterior Wash', price: 15 },
-    { value: 'interior_clean', label: 'Interior Clean', price: 20 },
-    { value: 'full_service', label: 'Full Service Wash', price: 35 },
-    { value: 'wax', label: 'Wax Treatment', price: 25 },
-    { value: 'tire_shine', label: 'Tire Shine', price: 10 },
-    { value: 'engine_clean', label: 'Engine Clean', price: 30 },
-  ];
-
-  const handleInputChange = (field: keyof CheckInFormData, value: string | string[] | number) => {
+  const handleInputChange = (field: keyof CheckInFormData, value: string | string[] | number | Array<{
+    materialId: string;
+    materialName: string;
+    quantity: number;
+    unit: string;
+  }>) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleServiceToggle = (serviceValue: string) => {
+  const handleServiceToggle = (serviceId: string) => {
     setFormData(prev => ({
       ...prev,
-      services: prev.services.includes(serviceValue)
-        ? prev.services.filter(s => s !== serviceValue)
-        : [...prev.services, serviceValue]
+      services: prev.services.includes(serviceId)
+        ? prev.services.filter(s => s !== serviceId)
+        : [...prev.services, serviceId]
     }));
   };
+
+  const fetchServices = async () => {
+    try {
+      setIsLoadingServices(true);
+      const response = await fetch('/api/admin/services?status=active');
+      const result = await response.json();
+      
+      if (result.success) {
+        setAvailableServices(result.services);
+      } else {
+        console.error('Failed to fetch services:', result.error);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    } finally {
+      setIsLoadingServices(false);
+    }
+  };
+
+  // Fetch washers from database
+  const fetchWashers = async () => {
+    try {
+      setIsLoadingWashers(true);
+      const response = await fetch('/api/admin/washers');
+      const result = await response.json();
+      
+      if (result.success) {
+        setAvailableWashers(result.washers);
+      } else {
+        console.error('Failed to fetch washers:', result.error);
+      }
+    } catch (error) {
+      console.error('Error fetching washers:', error);
+    } finally {
+      setIsLoadingWashers(false);
+    }
+  };
+
+  // Fetch washer materials
+  const fetchWasherMaterials = async (washerId: string) => {
+    if (!washerId) return;
+    
+    try {
+      setIsLoadingMaterials(true);
+      const response = await fetch(`/api/admin/washer-materials?washerId=${washerId}&isReturned=false`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setWasherMaterials(result.materials);
+      } else {
+        console.error('Failed to fetch washer materials:', result.error);
+      }
+    } catch (error) {
+      console.error('Error fetching washer materials:', error);
+    } finally {
+      setIsLoadingMaterials(false);
+    }
+  };
+
+  // Load services and washers on component mount
+  useEffect(() => {
+    fetchServices();
+    fetchWashers();
+  }, []);
 
   const searchCustomer = async () => {
     const query = searchQuery.trim();
     
     if (!query) {
-      setError('Please enter an email address or license plate to search');
+      setError('Please enter a name, phone number, plate number, or email address to search');
       return;
     }
 
@@ -107,13 +204,8 @@ const NewCheckInPage: React.FC = () => {
     setShowCustomerResults(false);
 
     try {
-      // Determine if the query looks like an email or license plate
-      const isEmail = query.includes('@');
-      const searchParams = isEmail 
-        ? { email: query, licensePlate: undefined }
-        : { email: undefined, licensePlate: query };
-
-      const result = await searchCustomers(searchParams);
+      // Use the general query parameter for flexible search
+      const result = await searchCustomers({ query });
       
       if (!result.success) {
         setError(result.error || 'Failed to search for customer');
@@ -123,7 +215,7 @@ const NewCheckInPage: React.FC = () => {
       if (result.found && result.customers) {
         setFoundCustomers(result.customers);
         setShowCustomerResults(true);
-        setSuccess(`Found ${result.customers.length} vehicle(s) matching your search`);
+        setSuccess(`Found ${result.customers.length} customer(s) matching your search`);
       } else {
         setError('No existing customer found with this information. You can proceed to register a new customer.');
         setShowCustomerResults(false);
@@ -136,28 +228,32 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const selectExistingCustomer = (customer: Customer) => {
+    // Get the primary vehicle or first vehicle
+    const primaryVehicle = customer.vehicles?.find(v => v.is_primary) || customer.vehicles?.[0];
+    
     setFormData(prev => ({
       ...prev,
       customerName: customer.name,
       customerPhone: customer.phone,
       customerEmail: customer.email || '',
-      licensePlate: customer.licensePlate,
-      vehicleType: customer.vehicleType,
-      vehicleColor: customer.vehicleColor || '',
+      licensePlate: primaryVehicle?.license_plate || '',
+      vehicleType: primaryVehicle?.vehicle_type || '',
+      vehicleColor: primaryVehicle?.vehicle_color || '',
     }));
     setShowCustomerResults(false);
-    setSuccess(`Selected vehicle: ${customer.vehicleColor} ${customer.vehicleType} (${customer.licensePlate})`);
+    setSuccess(`Selected customer: ${customer.name} with vehicle: ${primaryVehicle?.vehicle_color || ''} ${primaryVehicle?.vehicle_type || ''} (${primaryVehicle?.license_plate || ''})`);
   };
 
   const calculateTotalPrice = () => {
     return availableServices
-      .filter(service => formData.services.includes(service.value))
+      .filter(service => formData.services.includes(service.id))
       .reduce((total, service) => total + service.price, 0);
   };
 
   const calculateEstimatedDuration = () => {
     const baseDuration = 30; // Base 30 minutes
-    const serviceDuration = formData.services.length * 15; // 15 minutes per service
+    const selectedServices = availableServices.filter(service => formData.services.includes(service.id));
+    const serviceDuration = selectedServices.reduce((total, service) => total + service.duration, 0);
     return Math.min(baseDuration + serviceDuration, 120); // Max 2 hours
   };
 
@@ -223,7 +319,7 @@ const NewCheckInPage: React.FC = () => {
               Search for Existing Customer
             </h3>
             <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-              Search by email address or license plate number
+              Search by name, phone number, plate number, or email address
             </p>
             <div className="mb-3">
               <Label htmlFor="search-customer" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
@@ -234,7 +330,7 @@ const NewCheckInPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter email address or license plate number"
+                placeholder="Enter name, phone, plate number, or email"
               />
             </div>
             <div className="flex justify-center">
@@ -268,7 +364,7 @@ const NewCheckInPage: React.FC = () => {
                           {customer.name} - {customer.phone}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {customer.vehicleColor} {customer.vehicleType} ({customer.licensePlate})
+                          {customer.vehicles?.length || 0} vehicle(s) - {customer.vehicles?.find(v => v.is_primary)?.vehicle_color || ''} {customer.vehicles?.find(v => v.is_primary)?.vehicle_type || ''} ({customer.vehicles?.find(v => v.is_primary)?.license_plate || ''})
                         </p>
                       </div>
                       <Button
@@ -347,46 +443,180 @@ const NewCheckInPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Washer Assignment */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Washer Assignment
+          </h2>
+          <FormField label="Assign Washer" required>
+            {isLoadingWashers ? (
+              <div className="text-center py-4">
+                <p className="text-gray-600 dark:text-gray-400">Loading washers...</p>
+              </div>
+            ) : availableWashers.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-gray-600 dark:text-gray-400">No washers available</p>
+              </div>
+            ) : (
+              <Select
+                value={formData.assignedWasherId}
+                onChange={(value) => {
+                  handleInputChange('assignedWasherId', value);
+                  if (value) {
+                    fetchWasherMaterials(value);
+                  }
+                }}
+                options={availableWashers.map(washer => ({
+                  value: washer.id,
+                  label: `${washer.name} (${washer.phone})`
+                }))}
+                placeholder="Select a washer"
+              />
+            )}
+          </FormField>
+        </div>
+
+        {/* Material Assignment */}
+        {formData.assignedWasherId && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Material Assignment
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Select materials to assign for this car wash
+            </p>
+            {isLoadingMaterials ? (
+              <div className="text-center py-4">
+                <p className="text-gray-600 dark:text-gray-400">Loading materials...</p>
+              </div>
+            ) : washerMaterials.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-gray-600 dark:text-gray-400">No materials available for this washer</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {washerMaterials.map((material) => (
+                  <div
+                    key={material.id}
+                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium text-gray-900 dark:text-white">
+                        {material.materialName}
+                      </h3>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {material.quantity} {material.unit}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm text-gray-600 dark:text-gray-400">
+                        Quantity to use:
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={material.quantity}
+                        step="0.1"
+                        className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                        onChange={(e) => {
+                          const quantity = parseFloat(e.target.value) || 0;
+                          const existingIndex = formData.assignedMaterials.findIndex(m => m.materialId === material.id);
+                          
+                          if (quantity > 0) {
+                            if (existingIndex >= 0) {
+                              // Update existing material
+                              const updatedMaterials = [...formData.assignedMaterials];
+                              updatedMaterials[existingIndex] = {
+                                ...updatedMaterials[existingIndex],
+                                quantity
+                              };
+                              handleInputChange('assignedMaterials', updatedMaterials);
+                            } else {
+                              // Add new material
+                              const newMaterial = {
+                                materialId: material.id,
+                                materialName: material.materialName,
+                                quantity,
+                                unit: material.unit
+                              };
+                              handleInputChange('assignedMaterials', [...formData.assignedMaterials, newMaterial]);
+                            }
+                          } else {
+                            // Remove material if quantity is 0
+                            if (existingIndex >= 0) {
+                              const updatedMaterials = formData.assignedMaterials.filter(m => m.materialId !== material.id);
+                              handleInputChange('assignedMaterials', updatedMaterials);
+                            }
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {material.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Services Selection */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             Services
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {availableServices.map((service) => (
-              <div
-                key={service.value}
-                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                  formData.services.includes(service.value)
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-                onClick={() => handleServiceToggle(service.value)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">
-                      {service.label}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      ${service.price}
-                    </p>
-                  </div>
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                    formData.services.includes(service.value)
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}>
-                    {formData.services.includes(service.value) && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
+          {isLoadingServices ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600 dark:text-gray-400">Loading services...</p>
+            </div>
+          ) : availableServices.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600 dark:text-gray-400">No services available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableServices.map((service) => (
+                <div
+                  key={service.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                    formData.services.includes(service.id)
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                  onClick={() => handleServiceToggle(service.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">
+                        {service.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        ${service.price} • {service.duration} min
+                      </p>
+                      {service.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          {service.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                      formData.services.includes(service.id)
+                        ? 'border-blue-500 bg-blue-500'
+                        : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                      {formData.services.includes(service.id) && (
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Special Instructions */}

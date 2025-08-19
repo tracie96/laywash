@@ -64,7 +64,7 @@ export default function SignInForm() {
               Sign In
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
+              Enter your email or phone and password to sign in!
             </p>
           </div>
           <div>
@@ -83,11 +83,11 @@ export default function SignInForm() {
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email <span className="text-error-500">*</span>{" "}
+                    Email or Phone <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input 
-                    placeholder="Enter your email" 
-                    type="email" 
+                    placeholder="Enter your email or phone" 
+                    type="text" 
                     defaultValue={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />

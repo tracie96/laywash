@@ -45,17 +45,28 @@ export interface SuperAdmin extends User {
   role: 'super_admin';
 }
 
-// Customer Types
+
 export interface Customer {
   id: string;
   name: string;
   email?: string;
   phone: string;
-  licensePlate: string;
-  vehicleType: string;
+  dateOfBirth?: string;
+  // Legacy fields for backward compatibility
+  licensePlate?: string;
+  vehicleType?: string;
   vehicleModel?: string;
   vehicleColor?: string;
-  isRegistered: boolean; 
+  // New vehicles array for multiple vehicles - using the actual API response structure
+  vehicles?: Array<{
+    id: string;
+    license_plate: string;
+    vehicle_type: string;
+    vehicle_model?: string;
+    vehicle_color: string;
+    is_primary: boolean;
+  }>;
+  isRegistered: boolean;
   registrationDate?: Date;
   totalVisits: number;
   totalSpent: number;
@@ -63,8 +74,127 @@ export interface Customer {
   updatedAt: Date;
 }
 
+export interface Vehicle {
+  id: string;
+  licensePlate: string;
+  vehicleType: string;
+  vehicleModel?: string;
+  vehicleColor: string;
+  vehicleYear?: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CustomerVehicle {
+  id: string;
+  customerId: string;
+  vehicleId: string;
+  vehicle: Vehicle;
+  isPrimary: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 // Car Check-in Types
 export type CheckInStatus = 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
+
+// Washer Tools and Materials Types
+export interface WasherTool {
+  id: string;
+  washerId: string;
+  toolName: string;
+  toolType: 'equipment' | 'protective_gear' | 'cleaning_tool';
+  quantity: number;
+  assignedDate: Date;
+  returnedDate?: Date;
+  isReturned: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WasherMaterial {
+  id: string;
+  washerId: string;
+  materialName: string;
+  materialType: 'soap' | 'chemical' | 'wax' | 'polish';
+  quantity: number;
+  unit: string;
+  assignedDate: Date;
+  returnedQuantity: number;
+  isReturned: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CheckInMaterial {
+  id: string;
+  checkInId: string;
+  washerId: string;
+  materialId: string;
+  materialName: string;
+  quantityUsed: number;
+  unit: string;
+  usageDate: Date;
+  createdAt: Date;
+}
+
+export interface DailyMaterialReturn {
+  id: string;
+  washerId: string;
+  adminId: string;
+  returnDate: Date;
+  totalItemsReturned: number;
+  totalMaterialsReturned: number;
+  deductionsAmount: number;
+  status: 'pending' | 'confirmed' | 'completed';
+  adminNotes?: string;
+  washerNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MaterialReturnItem {
+  id: string;
+  returnId: string;
+  materialId: string;
+  materialName: string;
+  assignedQuantity: number;
+  returnedQuantity: number;
+  usedQuantity: number;
+  deductionAmount: number;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface ToolReturnItem {
+  id: string;
+  returnId: string;
+  toolId: string;
+  toolName: string;
+  assignedQuantity: number;
+  returnedQuantity: number;
+  missingQuantity: number;
+  deductionAmount: number;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface PaymentApproval {
+  id: string;
+  washerId: string;
+  adminId: string;
+  approvalDate: Date;
+  totalEarnings: number;
+  materialDeductions: number;
+  toolDeductions: number;
+  netPayment: number;
+  status: 'pending' | 'approved' | 'paid';
+  adminNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface CarCheckIn {
   id: string;

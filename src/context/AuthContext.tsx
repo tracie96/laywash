@@ -7,7 +7,7 @@ import { UploadService } from '../lib/upload';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (identifier: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: UserRole) => boolean;
@@ -49,7 +49,7 @@ interface AuthContextType {
     sortOrder?: 'asc' | 'desc';
   }) => Promise<{ success: boolean; customers?: Customer[]; error?: string }>;
   searchCustomersByEmail: (email: string) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
-  searchCustomers: (params: { email?: string; licensePlate?: string }) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
+  searchCustomers: (params: { email?: string; licensePlate?: string; name?: string; phone?: string; query?: string }) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,10 +88,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const response = await AuthService.login({ email, password });
+      // Determine if identifier is email or phone
+      const isEmail = identifier.includes('@');
+      const isPhone = /^\+?[\d\s\-\(\)]+$/.test(identifier);
+      
+      if (!isEmail && !isPhone) {
+        console.error('Invalid identifier format');
+        return false;
+      }
+      
+      const response = await AuthService.login({ 
+        email: isEmail ? identifier : undefined,
+        phone: isPhone ? identifier : undefined,
+        password
+      });
       
       if (response.success && response.user) {
         setUser(response.user);
@@ -106,6 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
     }
   };
+  
 
   const logout = async () => {
     try {
@@ -339,20 +353,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const searchCustomers = async (params: { email?: string; licensePlate?: string }): Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }> => {
+  const searchCustomers = async (params: { email?: string; licensePlate?: string; name?: string; phone?: string; query?: string }): Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }> => {
     if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
       console.error('Only Super Admins and Admins can search customers');
       return { success: false, error: 'Only Super Admins and Admins can search customers' };
     }
 
-    if (!params.email && !params.licensePlate) {
-      return { success: false, error: 'Email or license plate is required for search' };
+    if (!params.email && !params.licensePlate && !params.name && !params.phone && !params.query) {
+      return { success: false, error: 'Search parameter is required' };
     }
 
     try {
       const searchParams = new URLSearchParams();
       if (params.email) searchParams.append('email', params.email);
       if (params.licensePlate) searchParams.append('licensePlate', params.licensePlate);
+      if (params.name) searchParams.append('name', params.name);
+      if (params.phone) searchParams.append('phone', params.phone);
+      if (params.query) searchParams.append('query', params.query);
 
       const response = await fetch(`/api/admin/customers/search?${searchParams.toString()}`);
       const result = await response.json();

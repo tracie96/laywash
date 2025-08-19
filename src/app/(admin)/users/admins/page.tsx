@@ -294,7 +294,6 @@ const UsersAdminsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Join Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Login</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Permissions</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -324,15 +323,7 @@ const UsersAdminsPage: React.FC = () => {
                         {admin.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex flex-wrap gap-1">
-                        {admin.permissions.map((permission, index) => (
-                          <span key={index} className="inline-flex px-2 py-1 text-xs bg-blue-light-100 text-blue-light-800 rounded-full dark:bg-blue-light-900/30 dark:text-blue-light-300">
-                            {permission}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
+                    
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
                         <button 
@@ -341,9 +332,7 @@ const UsersAdminsPage: React.FC = () => {
                         >
                           Edit
                         </button>
-                        <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
-                          Permissions
-                        </button>
+                      
                         <button className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300">
                           Deactivate
                         </button>

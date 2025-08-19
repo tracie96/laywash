@@ -9,10 +9,6 @@ interface Customer {
   name: string;
   email?: string;
   phone: string;
-  licensePlate: string;
-  vehicleType: string;
-  vehicleModel?: string;
-  vehicleColor?: string;
   dateOfBirth?: string;
   isRegistered: boolean;
   registrationDate?: string;
@@ -20,6 +16,17 @@ interface Customer {
   totalSpent: number;
   createdAt: string;
   updatedAt: string;
+  vehicles?: Array<{
+    id: string;
+    customer_id: string;
+    license_plate: string;
+    vehicle_type: string;
+    vehicle_model?: string;
+    vehicle_color: string;
+    is_primary: boolean;
+    created_at: string;
+    updated_at: string;
+  }>;
 }
 
 const OperationsCustomersPage: React.FC = () => {
@@ -36,18 +43,29 @@ const OperationsCustomersPage: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     dob: '',
     phone: '',
+    dateOfBirth: ''
+  });
+
+  const [vehicles, setVehicles] = useState<Array<{
+    licensePlate: string;
+    vehicleType: string;
+    vehicleModel: string;
+    vehicleColor: string;
+    isPrimary: boolean;
+  }>>([{
     licensePlate: '',
     vehicleType: '',
     vehicleModel: '',
     vehicleColor: '',
-    dateOfBirth: ''
-  });
+    isPrimary: true
+  }]);
 console.log(customers);
   const fetchCustomers = useCallback(async () => {
     try {
@@ -85,19 +103,52 @@ console.log(customers);
     }));
   };
 
+  const handleVehicleChange = (index: number, field: string, value: string | boolean) => {
+    setVehicles(prev => prev.map((vehicle, i) => 
+      i === index ? { ...vehicle, [field]: value } : vehicle
+    ));
+  };
+
+  const addVehicle = () => {
+    setVehicles(prev => [...prev, {
+      licensePlate: '',
+      vehicleType: '',
+      vehicleModel: '',
+      vehicleColor: '',
+      isPrimary: false
+    }]);
+  };
+
+  const removeVehicle = (index: number) => {
+    if (vehicles.length > 1) {
+      setVehicles(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const setPrimaryVehicle = (index: number) => {
+    setVehicles(prev => prev.map((vehicle, i) => ({
+      ...vehicle,
+      isPrimary: i === index
+    })));
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
       email: '',
       phone: '',
       dob: '',
+      dateOfBirth: ''
+    });
+    setVehicles([{
       licensePlate: '',
       vehicleType: '',
       vehicleModel: '',
       vehicleColor: '',
-      dateOfBirth: ''
-    });
+      isPrimary: true
+    }]);
     setCreateError(null);
+    setSuccessMessage(null);
   };
 
   const handleCloseModal = () => {
@@ -118,12 +169,28 @@ console.log(customers);
       email: customer.email || '',
       phone: customer.phone,
       dob: '', 
-      licensePlate: customer.licensePlate,
-      vehicleType: customer.vehicleType,
-      vehicleModel: customer.vehicleModel || '',
-      vehicleColor: customer.vehicleColor || '',
       dateOfBirth: customer.dateOfBirth || ''
     });
+    
+    // Set vehicles from customer data
+    if (customer.vehicles && customer.vehicles.length > 0) {
+      setVehicles(customer.vehicles.map(v => ({
+        licensePlate: v.license_plate,
+        vehicleType: v.vehicle_type,
+        vehicleModel: v.vehicle_model || '',
+        vehicleColor: v.vehicle_color,
+        isPrimary: v.is_primary
+      })));
+    } else {
+      // Fallback to empty vehicle if no vehicles array
+      setVehicles([{
+        licensePlate: '',
+        vehicleType: '',
+        vehicleModel: '',
+        vehicleColor: '',
+        isPrimary: true
+      }]);
+    }
     setShowEditModal(true);
   };
 
@@ -146,18 +213,24 @@ console.log(customers);
     setCreateError(null);
 
     try {
+      const customerData = {
+        ...formData,
+        vehicles: vehicles
+      };
+
       const response = await fetch('/api/admin/create-customer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(customerData),
       });
 
       const result = await response.json();
 
       if (result.success) {
         setCustomers(prev => [result.customer, ...prev]);
+        setSuccessMessage(`Customer "${result.customer.name}" created successfully with ${result.customer.vehicles?.length || 0} vehicle(s)!`);
         handleCloseModal();
       } else {
         setCreateError(result.error || 'Failed to create customer');
@@ -178,12 +251,17 @@ console.log(customers);
     setEditError(null);
 
     try {
+      const customerData = {
+        ...formData,
+        vehicles: vehicles
+      };
+
       const response = await fetch(`/api/admin/customers/${selectedCustomer.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(customerData),
       });
 
       const result = await response.json();
@@ -206,12 +284,15 @@ console.log(customers);
   };
 
   
-  const isFormValid = () => {
-    return formData.name.trim() && 
-           formData.phone.trim() && 
-           formData.licensePlate.trim() && 
-           formData.vehicleType.trim() && 
-           formData.vehicleColor.trim();
+    const isFormValid = () => {
+    return formData.name.trim() &&
+           formData.phone.trim() &&
+           vehicles.length > 0 &&
+           vehicles.every(vehicle => 
+             vehicle.licensePlate.trim() &&
+             vehicle.vehicleType.trim() &&
+             vehicle.vehicleColor.trim()
+           );
   };
 
   const getStatusColor = (isRegistered: boolean) => {
@@ -283,7 +364,7 @@ console.log(customers);
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue?.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalRevenue?.toFixed(2) || 0}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,6 +416,28 @@ console.log(customers);
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
             <span className="text-red-800 dark:text-red-200">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message Display */}
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-green-800 dark:text-green-200">{successMessage}</span>
+            </div>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -396,24 +499,38 @@ console.log(customers);
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {customer.licensePlate}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {customer.vehicleType} {customer.vehicleModel && `• ${customer.vehicleModel}`}
-                        </div>
-                        {customer.vehicleColor && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {customer.vehicleColor}
+                        {customer.vehicles && customer.vehicles.length > 0 ? (
+                          <>
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {customer.vehicles.find(v => v.is_primary)?.license_plate || customer.vehicles[0].license_plate}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {customer.vehicles.find(v => v.is_primary)?.vehicle_type || customer.vehicles[0].vehicle_type}
+                              {customer.vehicles.find(v => v.is_primary)?.vehicle_model && ` • ${customer.vehicles.find(v => v.is_primary)?.vehicle_model}`}
+                            </div>
+                            {customer.vehicles.find(v => v.is_primary)?.vehicle_color && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {customer.vehicles.find(v => v.is_primary)?.vehicle_color}
+                              </div>
+                            )}
+                            {customer.vehicles.length > 1 && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                +{customer.vehicles.length - 1} more vehicles
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            No vehicles
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {customer.totalVisits}
+                      {customer.totalVisits || 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      ${customer?.totalSpent?.toFixed(2)}
+                      {customer?.totalSpent?.toFixed(2) || 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(customer.isRegistered)}`}>
@@ -537,76 +654,127 @@ console.log(customers);
                   />
                 </div>
 
-                {/* License Plate */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    License Plate <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="licensePlate"
-                    value={formData.licensePlate}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter license plate"
-                  />
-                </div>
+                {/* Vehicles Section */}
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Vehicles <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addVehicle}
+                      className="px-3 py-1 text-sm bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 transition-colors"
+                    >
+                      + Add Vehicle
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {vehicles.map((vehicle, index) => (
+                      <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Vehicle {index + 1}
+                            {vehicle.isPrimary && (
+                              <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded">
+                                Primary
+                              </span>
+                            )}
+                          </h4>
+                          <div className="flex items-center space-x-2">
+                            {!vehicle.isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => setPrimaryVehicle(index)}
+                                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                Set Primary
+                              </button>
+                            )}
+                            {vehicles.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeVehicle(index)}
+                                className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* License Plate */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              License Plate <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.licensePlate}
+                              onChange={(e) => handleVehicleChange(index, 'licensePlate', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter license plate"
+                            />
+                          </div>
 
-                {/* Vehicle Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="vehicleType"
-                    value={formData.vehicleType}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                  >
-                    <option value="">Select vehicle type</option>
-                    <option value="Sedan">Sedan</option>
-                    <option value="SUV">SUV</option>
-                    <option value="Truck">Truck</option>
-                    <option value="Hatchback">Hatchback</option>
-                    <option value="Coupe">Coupe</option>
-                    <option value="Convertible">Convertible</option>
-                    <option value="Van">Van</option>
-                    <option value="Motorcycle">Motorcycle</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
+                          {/* Vehicle Type */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Type <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={vehicle.vehicleType}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleType', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                            >
+                              <option value="">Select vehicle type</option>
+                              <option value="Sedan">Sedan</option>
+                              <option value="SUV">SUV</option>
+                              <option value="Truck">Truck</option>
+                              <option value="Hatchback">Hatchback</option>
+                              <option value="Coupe">Coupe</option>
+                              <option value="Convertible">Convertible</option>
+                              <option value="Van">Van</option>
+                              <option value="Motorcycle">Motorcycle</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
 
-                {/* Vehicle Model (Optional) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Model
-                  </label>
-                  <input
-                    type="text"
-                    name="vehicleModel"
-                    value={formData.vehicleModel}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter vehicle model (optional)"
-                  />
-                </div>
+                          {/* Vehicle Model */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Model
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleModel}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleModel', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle model (optional)"
+                            />
+                          </div>
 
-                {/* Vehicle Color */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Color <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="vehicleColor"
-                    value={formData.vehicleColor}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter vehicle color"
-                  />
+                          {/* Vehicle Color */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Color <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleColor}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleColor', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle color"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
             </div>
 
@@ -684,28 +852,48 @@ console.log(customers);
                 {/* Vehicle Info Section */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                   <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Vehicle Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">License Plate</label>
-                      <p className="text-gray-900 dark:text-white font-mono">{selectedCustomer.licensePlate}</p>
+                  {selectedCustomer.vehicles && selectedCustomer.vehicles.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedCustomer.vehicles.map((vehicle, index) => (
+                        <div key={vehicle.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h5 className="text-sm font-medium text-gray-900 dark:text-white">
+                              Vehicle {index + 1}
+                              {vehicle.is_primary && (
+                                <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded">
+                                  Primary
+                                </span>
+                              )}
+                            </h5>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">License Plate</label>
+                              <p className="text-sm text-gray-900 dark:text-white font-mono">{vehicle.license_plate}</p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Vehicle Type</label>
+                              <p className="text-sm text-gray-900 dark:text-white">{vehicle.vehicle_type}</p>
+                            </div>
+                            {vehicle.vehicle_model && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Model</label>
+                                <p className="text-sm text-gray-900 dark:text-white">{vehicle.vehicle_model}</p>
+                              </div>
+                            )}
+                            {vehicle.vehicle_color && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Color</label>
+                                <p className="text-sm text-gray-900 dark:text-white">{vehicle.vehicle_color}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vehicle Type</label>
-                      <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleType}</p>
-                    </div>
-                    {selectedCustomer.vehicleModel && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Model</label>
-                        <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleModel}</p>
-                      </div>
-                    )}
-                    {selectedCustomer.vehicleColor && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
-                        <p className="text-gray-900 dark:text-white">{selectedCustomer.vehicleColor}</p>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400">No vehicles registered</p>
+                  )}
                 </div>
 
                 {/* Account Status Section */}
@@ -861,76 +1049,127 @@ console.log(customers);
                   />
                 </div>
 
-                {/* License Plate */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    License Plate <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="licensePlate"
-                    value={formData.licensePlate}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter license plate"
-                  />
-                </div>
+                {/* Vehicles Section */}
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Vehicles <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addVehicle}
+                      className="px-3 py-1 text-sm bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 transition-colors"
+                    >
+                      + Add Vehicle
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {vehicles.map((vehicle, index) => (
+                      <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Vehicle {index + 1}
+                            {vehicle.isPrimary && (
+                              <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded">
+                                Primary
+                              </span>
+                            )}
+                          </h4>
+                          <div className="flex items-center space-x-2">
+                            {!vehicle.isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => setPrimaryVehicle(index)}
+                                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                Set Primary
+                              </button>
+                            )}
+                            {vehicles.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeVehicle(index)}
+                                className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* License Plate */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              License Plate <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.licensePlate}
+                              onChange={(e) => handleVehicleChange(index, 'licensePlate', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter license plate"
+                            />
+                          </div>
 
-                {/* Vehicle Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="vehicleType"
-                    value={formData.vehicleType}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                  >
-                    <option value="">Select vehicle type</option>
-                    <option value="Sedan">Sedan</option>
-                    <option value="SUV">SUV</option>
-                    <option value="Truck">Truck</option>
-                    <option value="Hatchback">Hatchback</option>
-                    <option value="Coupe">Coupe</option>
-                    <option value="Convertible">Convertible</option>
-                    <option value="Van">Van</option>
-                    <option value="Motorcycle">Motorcycle</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
+                          {/* Vehicle Type */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Type <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={vehicle.vehicleType}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleType', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                            >
+                              <option value="">Select vehicle type</option>
+                              <option value="Sedan">Sedan</option>
+                              <option value="SUV">SUV</option>
+                              <option value="Truck">Truck</option>
+                              <option value="Hatchback">Hatchback</option>
+                              <option value="Coupe">Coupe</option>
+                              <option value="Convertible">Convertible</option>
+                              <option value="Van">Van</option>
+                              <option value="Motorcycle">Motorcycle</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
 
-                {/* Vehicle Model (Optional) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Model
-                  </label>
-                  <input
-                    type="text"
-                    name="vehicleModel"
-                    value={formData.vehicleModel}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter vehicle model (optional)"
-                  />
-                </div>
+                          {/* Vehicle Model */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Model
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleModel}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleModel', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle model (optional)"
+                            />
+                          </div>
 
-                {/* Vehicle Color */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vehicle Color <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="vehicleColor"
-                    value={formData.vehicleColor}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
-                    placeholder="Enter vehicle color"
-                  />
+                          {/* Vehicle Color */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Color <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleColor}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleColor', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle color"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
             </div>
 

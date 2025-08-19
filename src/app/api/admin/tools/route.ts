@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-// import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-//   auth: {
-//     autoRefreshToken: false,
-//     persistSession: false
-//   }
-// });
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,156 +20,61 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortOrder = searchParams.get('sortOrder') || 'asc';
 
-    // For now, return mock data since we don't have a tools table yet
-    // In a real implementation, you would query the tools table
-    const mockTools = [
-      {
-        id: "1",
-        name: "Pressure Washer",
-        description: "High-pressure water cleaning equipment",
-        category: "Equipment",
-        isReturnable: true,
-        replacementCost: 500.00,
-        totalQuantity: 5,
-        availableQuantity: 3,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: "2",
-        name: "Scrub Brushes",
-        description: "Various cleaning brushes for different surfaces",
-        category: "Tools",
-        isReturnable: false,
-        replacementCost: 15.00,
-        totalQuantity: 20,
-        availableQuantity: 18,
-        isActive: true,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-      },
-      {
-        id: "3",
-        name: "Vacuum Cleaner",
-        description: "Industrial vacuum for interior cleaning",
-        category: "Equipment",
-        isReturnable: true,
-        replacementCost: 300.00,
-        totalQuantity: 3,
-        availableQuantity: 2,
-        isActive: true,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString()
-      },
-      {
-        id: "4",
-        name: "Microfiber Cloths",
-        description: "High-quality cleaning cloths",
-        category: "Supplies",
-        isReturnable: false,
-        replacementCost: 5.00,
-        totalQuantity: 100,
-        availableQuantity: 75,
-        isActive: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString()
-      },
-      {
-        id: "5",
-        name: "Steam Cleaner",
-        description: "Professional steam cleaning equipment",
-        category: "Equipment",
-        isReturnable: true,
-        replacementCost: 800.00,
-        totalQuantity: 2,
-        availableQuantity: 1,
-        isActive: true,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
-      },
-      {
-        id: "6",
-        name: "Detailing Kit",
-        description: "Complete car detailing kit with various tools",
-        category: "Tools",
-        isReturnable: true,
-        replacementCost: 150.00,
-        totalQuantity: 8,
-        availableQuantity: 6,
-        isActive: true,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
-      }
-    ];
+    // Query the worker_tools table
+    let query = supabaseAdmin
+      .from('worker_tools')
+      .select('*')
+      .order(sortBy, { ascending: sortOrder === 'asc' });
 
-    // Apply search filter
-    let filteredTools = mockTools;
+    // Apply filters
     if (search) {
-      filteredTools = filteredTools.filter(tool => 
-        tool.name.toLowerCase().includes(search.toLowerCase()) ||
-        tool.description.toLowerCase().includes(search.toLowerCase()) ||
-        tool.category.toLowerCase().includes(search.toLowerCase())
+      query = query.ilike('name', `%${search}%`);
+    }
+
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
+    }
+
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        query = query.eq('is_active', true);
+      } else if (status === 'inactive') {
+        query = query.eq('is_active', false);
+      }
+    }
+
+    const { data: tools, error } = await query;
+
+    if (error) {
+      console.error('Error fetching tools:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch tools' },
+        { status: 500 }
       );
     }
+    // Transform the data to match the frontend interface
+    const transformedTools = tools?.map(tool => ({
+      id: tool.id,
+      name: tool.name,
+      description: tool.description || '',
+      category: tool.category || 'General',
+      isReturnable: tool.is_returnable || false,
+      replacementCost: tool.replacement_cost || 0,
+      totalQuantity: tool.total_quantity || 0,
+      availableQuantity: tool.available_quantity || 0,
+      isActive: tool.is_active || false,
+      createdAt: tool.created_at,
+      updatedAt: tool.updated_at
+    })) || [];
 
-    // Apply category filter
-    if (category !== 'all') {
-      filteredTools = filteredTools.filter(tool => tool.category === category);
+    // Apply additional filters that can't be done at database level
+    let filteredTools = transformedTools;
+    console.log({filteredTools});
+    if (status === 'low_availability') {
+      filteredTools = filteredTools.filter(tool => (tool.availableQuantity / tool.totalQuantity) < 0.3);
+    } else if (status === 'out_of_stock') {
+      filteredTools = filteredTools.filter(tool => tool.availableQuantity === 0);
     }
-
-    // Apply status filter
-    if (status !== 'all') {
-      filteredTools = filteredTools.filter(tool => {
-        if (status === 'active') return tool.isActive;
-        if (status === 'inactive') return !tool.isActive;
-        if (status === 'low_availability') return (tool.availableQuantity / tool.totalQuantity) < 0.3;
-        if (status === 'out_of_stock') return tool.availableQuantity === 0;
-        return true;
-      });
-    }
-
-    // Apply sorting
-    filteredTools.sort((a, b) => {
-      let aValue;
-      let bValue;
-      
-      switch (sortBy) {
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'category':
-          aValue = a.category.toLowerCase();
-          bValue = b.category.toLowerCase();
-          break;
-        case 'replacementCost':
-          aValue = a.replacementCost;
-          bValue = b.replacementCost;
-          break;
-        case 'availableQuantity':
-          aValue = a.availableQuantity;
-          bValue = b.availableQuantity;
-          break;
-        case 'totalQuantity':
-          aValue = a.totalQuantity;
-          bValue = b.totalQuantity;
-          break;
-        case 'createdAt':
-          aValue = new Date(a.createdAt);
-          bValue = new Date(b.createdAt);
-          break;
-        default:
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
 
     return NextResponse.json({
       success: true,
@@ -229,25 +134,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, return success with mock data
-    // In a real implementation, you would insert into the tools table
-    const newTool = {
-      id: Date.now().toString(),
-      name,
-      description,
-      category,
-      isReturnable: isReturnable || false,
-      replacementCost,
-      totalQuantity,
-      availableQuantity,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    // Insert new tool into the worker_tools table
+    const { data: newTool, error } = await supabaseAdmin
+      .from('worker_tools')
+      .insert({
+        name,
+        description,
+        category,
+        is_returnable: isReturnable || false,
+        replacement_cost: replacementCost,
+        total_quantity: totalQuantity,
+        available_quantity: availableQuantity,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating tool:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create tool' },
+        { status: 500 }
+      );
+    }
+
+    // Transform the response to match the frontend interface
+    const transformedTool = {
+      id: newTool.id,
+      name: newTool.name,
+      description: newTool.description || '',
+      category: newTool.category || 'General',
+      isReturnable: newTool.is_returnable || false,
+      replacementCost: newTool.replacement_cost || 0,
+      totalQuantity: newTool.total_quantity || 0,
+      availableQuantity: newTool.available_quantity || 0,
+      isActive: newTool.is_active || false,
+      createdAt: newTool.created_at,
+      updatedAt: newTool.updated_at
     };
 
     return NextResponse.json({
       success: true,
-      tool: newTool
+      tool: transformedTool,
+      message: 'Tool created successfully'
     });
 
   } catch (error) {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
 
@@ -13,6 +13,7 @@ interface Tool {
   totalQuantity: number;
   availableQuantity: number;
   isActive: boolean;
+  amount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +76,11 @@ const ToolsManagementPage: React.FC = () => {
       setLoading(false);
     }
   }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder]);
+
+  // Load tools on component mount
+  useEffect(() => {
+    fetchTools();
+  }, [fetchTools]);
 
   const handleCreateTool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,17 +176,31 @@ const ToolsManagementPage: React.FC = () => {
         const currentTool = tools.find(t => t.id === toolId);
         if (!currentTool) return;
 
-        const newQuantity = prompt(`Enter new available quantity for ${currentTool.name} (max: ${currentTool.totalQuantity}):`, currentTool.availableQuantity.toString());
+        // Validate tool data before proceeding
+        if (currentTool.totalQuantity < 0) {
+          setError('Tool has invalid total quantity. Please fix the tool data first.');
+          return;
+        }
+
+        if (currentTool.totalQuantity === 0) {
+          setError('This tool has 0 total quantity. Please update the total quantity first before setting available quantity.');
+          return;
+        }
+
+        const maxQuantity = Math.max(currentTool.totalQuantity, 1);
+        const promptMessage = `Tool: ${currentTool.name}\nCurrent Available: ${currentTool.availableQuantity}\nTotal Quantity: ${currentTool.totalQuantity}\n\nEnter new available quantity (0-${maxQuantity}):`;
+        const newQuantity = prompt(promptMessage, currentTool.availableQuantity.toString());
         if (newQuantity !== null) {
           const quantity = parseInt(newQuantity);
-          if (!isNaN(quantity) && quantity >= 0 && quantity <= currentTool.totalQuantity) {
+          if (!isNaN(quantity) && quantity >= 0 && quantity <= maxQuantity) {
             const response = await fetch(`/api/admin/tools/${toolId}`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                availableQuantity: quantity
+                availableQuantity: quantity,
+                amount: Math.abs(quantity - currentTool.availableQuantity) // Track the change amount
               }),
             });
 
@@ -192,7 +212,8 @@ const ToolsManagementPage: React.FC = () => {
               setError(data.error || 'Failed to update tool');
             }
           } else {
-            setError('Please enter a valid quantity');
+            const maxQuantity = Math.max(currentTool.totalQuantity, 1);
+            setError(`Please enter a valid quantity between 0 and ${maxQuantity}`);
           }
         }
       }

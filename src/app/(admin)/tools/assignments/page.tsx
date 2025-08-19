@@ -43,6 +43,26 @@ interface AssignmentForm {
   notes: string;
 }
 
+interface WasherToolWithWorker {
+  id: string;
+  washerId: string;
+  toolName: string;
+  toolType: string;
+  quantity: number;
+  assignedDate: string;
+  returnedDate?: string;
+  isReturned: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  washer?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  };
+}
+
 const ToolsAssignmentsPage: React.FC = () => {
   const [assignments, setAssignments] = useState<ToolAssignment[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
@@ -69,55 +89,42 @@ const ToolsAssignmentsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch assignments (mock data for now)
-      const mockAssignments: ToolAssignment[] = [
-        {
-          id: "1",
-          toolName: "Pressure Washer",
-          workerName: "John Smith",
-          assignedDate: "2024-01-15",
-          status: "assigned",
-          notes: "Assigned for morning shift"
-        },
-        {
-          id: "2",
-          toolName: "Vacuum Cleaner",
-          workerName: "Sarah Johnson",
-          assignedDate: "2024-01-14",
-          returnDate: "2024-01-15",
-          status: "returned",
-          notes: "Returned in good condition"
-        },
-        {
-          id: "3",
-          toolName: "Scrub Brushes",
-          workerName: "Mike Davis",
-          assignedDate: "2024-01-10",
-          status: "overdue",
-          notes: "Should have been returned yesterday"
-        }
-      ];
-
+      // Fetch assignments from API
+      const assignmentsResponse = await fetch('/api/admin/washer-tools');
+      const assignmentsData = await assignmentsResponse.json();
+      
       // Fetch tools
       const toolsResponse = await fetch('/api/admin/tools');
       const toolsData = await toolsResponse.json();
-      
       // Fetch workers
       const workersResponse = await fetch('/api/admin/washers');
       const workersData = await workersResponse.json();
 
-      setTimeout(() => {
-        setAssignments(mockAssignments);
-        setTools(toolsData.success ? toolsData.tools : []);
-        setWorkers(workersData.success ? workersData.washers : []);
-        setLoading(false);
-      }, 1000);
+      // Transform API data to match our interface
+      const transformedAssignments: ToolAssignment[] = assignmentsData.success 
+        ? assignmentsData.tools.map((tool: WasherToolWithWorker) => ({
+            id: tool.id,
+            toolName: tool.toolName,
+            workerName: tool.washer?.name || 'Unknown Worker',
+            assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
+            returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
+            status: tool.isReturned ? "returned" : 
+                   new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000) ? "overdue" : "assigned",
+            notes: tool.notes || 'No notes'
+          }))
+        : [];
+
+      setAssignments(transformedAssignments);
+      setTools(toolsData.success ? toolsData.tools : []);
+      setWorkers(workersData.success ? workersData.washers : []);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setError('Failed to load data');
       setLoading(false);
     }
   };
+  console.log({tools});
 
   const handleAssignTool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +138,6 @@ const ToolsAssignmentsPage: React.FC = () => {
     setError(null);
 
     try {
-      // Get tool and worker details
       const selectedTool = tools.find(t => t.id === assignmentForm.toolId);
       const selectedWorker = workers.find(w => w.id === assignmentForm.workerId);
 
@@ -140,24 +146,34 @@ const ToolsAssignmentsPage: React.FC = () => {
         return;
       }
 
-      // Check if tool is available
       if (selectedTool.availableQuantity <= 0) {
         setError('This tool is not available for assignment');
         return;
       }
 
-      // Create new assignment (mock for now - would integrate with API)
-      const newAssignment: ToolAssignment = {
-        id: Date.now().toString(),
-        toolName: selectedTool.name,
-        workerName: selectedWorker.name,
-        assignedDate: assignmentForm.assignedDate,
-        status: "assigned",
-        notes: assignmentForm.notes
-      };
+      // Create new assignment using API
+      const response = await fetch('/api/admin/washer-tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          washerId: assignmentForm.workerId,
+          toolName: selectedTool.name,
+          toolType: 'equipment', // Default type, could be made configurable
+          quantity: 1,
+          notes: assignmentForm.notes
+        })
+      });
 
-      // Add to assignments list
-      setAssignments(prev => [newAssignment, ...prev]);
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to assign tool');
+      }
+
+      // Refresh the assignments list
+      await fetchData();
 
       // Reset form and close modal
       setAssignmentForm({
@@ -169,12 +185,13 @@ const ToolsAssignmentsPage: React.FC = () => {
       });
       closeModal();
 
-      // Show success message (you could add a toast notification here)
+      // Show success message
+      setError(null);
       console.log('Tool assigned successfully!');
       
     } catch (error) {
       console.error('Error assigning tool:', error);
-      setError('Failed to assign tool');
+      setError(error instanceof Error ? error.message : 'Failed to assign tool');
     } finally {
       setSubmitting(false);
     }
@@ -351,7 +368,7 @@ const ToolsAssignmentsPage: React.FC = () => {
               >
                 <option value="">Select a tool</option>
                 {tools
-                  .filter(tool => tool.isActive && tool.availableQuantity > 0)
+                  .filter(tool => tool.isActive )
                   .map(tool => (
                     <option key={tool.id} value={tool.id}>
                       {tool.name} ({tool.availableQuantity} available)

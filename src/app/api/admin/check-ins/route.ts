@@ -30,11 +30,7 @@ export async function GET(request: NextRequest) {
           id,
           name,
           email,
-          phone,
-          license_plate,
-          vehicle_type,
-          vehicle_model,
-          vehicle_color
+          phone
         ),
         check_in_services (
           services (
@@ -63,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Apply search filter
     if (search) {
-      query = query.or(`customers.name.ilike.%${search}%,customers.license_plate.ilike.%${search}%,customers.phone.ilike.%${search}%,license_plate.ilike.%${search}%`);
+      query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%,license_plate.ilike.%${search}%`);
     }
 
     // Apply status filter
