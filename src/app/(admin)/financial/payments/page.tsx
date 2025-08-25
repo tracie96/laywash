@@ -82,12 +82,17 @@ const FinancialPaymentsPage: React.FC = () => {
         const salesData = await salesResponse.json();
         
         if (carWashData.success && salesData.success) {
+          console.log('Car wash data received:', carWashData);
+          console.log('Sales data received:', salesData);
+          
           // Transform car wash data
           const carWashPayments = carWashData.payments?.map((payment: CarWashPayment) => ({
             ...payment,
             type: 'car_wash' as const,
             transactionType: 'Car Wash Service'
           })) || [];
+          
+          console.log('Transformed car wash payments:', carWashPayments);
           
           // Transform sales data
           const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => ({
@@ -105,25 +110,32 @@ const FinancialPaymentsPage: React.FC = () => {
             transactionType: 'Product Sale'
           })) || [];
           
+          console.log('Transformed sales payments:', salesPayments);
+          
           // Combine and sort by date
           const allPayments = [...carWashPayments, ...salesPayments]
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           
+          console.log('Combined payments:', allPayments);
           setPayments(allPayments);
         } else {
           // Handle partial success - if one API fails, still show data from the other
+          console.log('Partial API success - car wash:', carWashData.success, 'sales:', salesData.success);
           let allPayments: PaymentRecord[] = [];
           
           if (carWashData.success) {
+            console.log('Car wash API succeeded, processing data...');
             const carWashPayments = carWashData.payments?.map((payment: CarWashPayment) => ({
               ...payment,
               type: 'car_wash' as const,
               transactionType: 'Car Wash Service'
             })) || [];
+            console.log('Car wash payments from partial success:', carWashPayments);
             allPayments = [...allPayments, ...carWashPayments];
           }
           
           if (salesData.success) {
+            console.log('Sales API succeeded, processing data...');
             const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => ({
               id: transaction.id,
               type: 'sales_transaction' as const,
@@ -138,18 +150,25 @@ const FinancialPaymentsPage: React.FC = () => {
               remarks: transaction.remarks,
               transactionType: 'Product Sale'
             })) || [];
+            console.log('Sales payments from partial success:', salesPayments);
             allPayments = [...allPayments, ...salesPayments];
           }
           
           if (allPayments.length > 0) {
             allPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            console.log('Final combined payments from partial success:', allPayments);
             setPayments(allPayments);
           } else {
+            console.log('No payments data available from either API');
             setError('Failed to fetch payment data from both sources');
           }
         }
       } catch (err) {
         console.error('Error fetching payments:', err);
+        console.log('Error details:', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : undefined
+        });
         setError('Failed to fetch payments from server');
       } finally {
         setLoading(false);
@@ -226,52 +245,58 @@ const FinancialPaymentsPage: React.FC = () => {
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Payment History" />
 
-      {/* Filter Tabs */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex space-x-1">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterType === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            All Transactions
-          </button>
-          <button
-            onClick={() => setFilterType('car_wash')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterType === 'car_wash'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Car Wash Services
-          </button>
-          <button
-            onClick={() => setFilterType('sales_transaction')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterType === 'sales_transaction'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Product Sales
-          </button>
+      {/* Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Transactions</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                filterType === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterType('car_wash')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                filterType === 'car_wash'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Car Wash Only
+            </button>
+            <button
+              onClick={() => setFilterType('sales_transaction')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                filterType === 'sales_transaction'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Sales Only
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {filteredPayments.length} transactions
+              </p>
             </div>
-            <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
               </svg>
             </div>
@@ -283,9 +308,12 @@ const FinancialPaymentsPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{completedPayments}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {filteredPayments.length > 0 ? ((completedPayments / filteredPayments.length) * 100).toFixed(1) : 0}% success rate
+              </p>
             </div>
-            <div className="p-3 bg-blue-light-100 dark:bg-blue-light-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-blue-light-600 dark:text-blue-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -297,6 +325,9 @@ const FinancialPaymentsPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{pendingPayments}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {filteredPayments.length > 0 ? ((pendingPayments / filteredPayments.length) * 100).toFixed(1) : 0}% pending
+              </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
               <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,6 +342,9 @@ const FinancialPaymentsPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Car Washes</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{carWashCount}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {filteredPayments.length > 0 ? ((carWashCount / filteredPayments.length) * 100).toFixed(1) : 0}% of total
+              </p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,21 +353,69 @@ const FinancialPaymentsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Product Sales</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{salesCount}</p>
+      {/* Additional Car Wash Metrics */}
+      {filterType === 'car_wash' && carWashCount > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-6">
+          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">
+            Car Wash Summary
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Car Wash Value</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    ${(filteredPayments.filter(p => p.type === 'car_wash').reduce((sum, p) => sum + p.amount, 0) / carWashCount).toFixed(2)}
+                  </p>
+                </div>
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Product Sales</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{salesCount}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {filteredPayments.length > 0 ? ((salesCount / filteredPayments.length) * 100).toFixed(1) : 0}% of total
+                  </p>
+                </div>
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Today&apos;s Revenue</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    ${filteredPayments
+                      .filter(p => new Date(p.date).toDateString() === new Date().toDateString())
+                      .reduce((sum, p) => sum + p.amount, 0)
+                      .toFixed(2)}
+                  </p>
+                </div>
+                <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Payments Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -353,11 +435,13 @@ const FinancialPaymentsPage: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vehicle</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Services</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment Method</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service/Product</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Washer</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -368,14 +452,53 @@ const FinancialPaymentsPage: React.FC = () => {
                         {payment.type === 'car_wash' ? 'Car Wash' : 'Product Sale'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {payment.customerName}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {payment.customerName}
+                      </div>
+                      {payment.customerId && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          ID: {payment.customerId}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {payment.type === 'car_wash' && payment.licensePlate ? (
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {payment.licensePlate}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {payment.vehicleColor} {payment.vehicleType}
+                            {payment.vehicleModel && ` • ${payment.vehicleModel}`}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {payment.serviceType}
+                      </div>
+                      {payment.type === 'car_wash' && payment.remarks && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {payment.remarks}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       ${payment.amount.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(payment.date).toLocaleDateString()}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {new Date(payment.date).toLocaleDateString()}
+                      </div>
+                      {payment.type === 'car_wash' && payment.checkInTime && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(payment.checkInTime).toLocaleTimeString()}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}>
@@ -385,8 +508,14 @@ const FinancialPaymentsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {payment.paymentMethod}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {payment.serviceType}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {payment.type === 'car_wash' && payment.assignedWasherId ? (
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          Washer #{payment.assignedWasherId.slice(0, 8)}...
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -31,11 +31,7 @@ export async function GET(request: NextRequest) {
           id,
           name,
           email,
-          phone,
-          license_plate,
-          vehicle_type,
-          vehicle_model,
-          vehicle_color
+          phone
         ),
         check_in_services (
           services (
