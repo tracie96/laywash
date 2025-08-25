@@ -33,6 +33,7 @@ const MyCheckInsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
 
   const { user } = useAuth();
 
@@ -95,6 +96,11 @@ const MyCheckInsPage: React.FC = () => {
 
   const handleMarkInProgress = async (checkInId: string) => {
     try {
+      setUpdatingStatus(checkInId);
+      setError(null);
+      
+      console.log('Updating check-in status to in_progress:', checkInId);
+      
       const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
         method: 'PATCH',
         headers: {
@@ -105,19 +111,42 @@ const MyCheckInsPage: React.FC = () => {
         }),
       });
 
-      if (response.ok) {
-        await fetchMyCheckIns(); // Refresh the list
+      const result = await response.json();
+      console.log('Update response:', result);
+
+      if (response.ok && result.success) {
+        // Update the local state immediately for better UX
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, status: 'in_progress' as const }
+            : checkIn
+        ));
+        
+        // Show success message
+        alert('Status updated successfully! Work started.');
+        
+        // Refresh the list to get any additional updates
+        await fetchMyCheckIns();
       } else {
-        throw new Error('Failed to update status');
+        throw new Error(result.error || 'Failed to update status');
       }
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Failed to update status');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update status';
+      setError(errorMessage);
+      alert(`Failed to update status: ${errorMessage}`);
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
   const handleMarkCompleted = async (checkInId: string) => {
     try {
+      setUpdatingStatus(checkInId);
+      setError(null);
+      
+      console.log('Marking check-in as completed:', checkInId);
+      
       const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
         method: 'PATCH',
         headers: {
@@ -129,14 +158,32 @@ const MyCheckInsPage: React.FC = () => {
         }),
       });
 
-      if (response.ok) {
-        await fetchMyCheckIns(); // Refresh the list
+      const result = await response.json();
+      console.log('Complete response:', result);
+
+      if (response.ok && result.success) {
+        // Update the local state immediately for better UX
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, status: 'completed' as const }
+            : checkIn
+        ));
+        
+        // Show success message
+        alert('Check-in marked as completed successfully!');
+        
+        // Refresh the list to get any additional updates
+        await fetchMyCheckIns();
       } else {
-        throw new Error('Failed to mark as completed');
+        throw new Error(result.error || 'Failed to mark as completed');
       }
     } catch (err) {
       console.error('Error marking as completed:', err);
-      alert('Failed to mark as completed');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to mark as completed';
+      setError(errorMessage);
+      alert(`Failed to mark as completed: ${errorMessage}`);
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -234,10 +281,10 @@ const MyCheckInsPage: React.FC = () => {
                       {checkIn.customerName}
                     </h3>
                     <Badge color={getStatusColor(checkIn.status)}>
-                      {checkIn.status.replace('_', ' ').toUpperCase()}
+                    Status:  {checkIn.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                     <Badge color={getPaymentStatusColor(checkIn.paymentStatus)}>
-                      {checkIn.paymentStatus.toUpperCase()}
+                    Payment Status:  {checkIn.paymentStatus.toUpperCase()}
                     </Badge>
                   </div>
                   
@@ -274,19 +321,27 @@ const MyCheckInsPage: React.FC = () => {
                 <div className="flex flex-col gap-2 lg:w-auto">
                   {checkIn.status === 'pending' && (
                     <Button
-                      onClick={() => handleMarkInProgress(checkIn.id)}
+                      onClick={() => {
+                        console.log('Start Work button clicked for check-in:', checkIn.id);
+                        handleMarkInProgress(checkIn.id);
+                      }}
                       className="bg-blue-600 hover:bg-blue-700"
+                      disabled={updatingStatus === checkIn.id}
                     >
-                      Start Work
+                      {updatingStatus === checkIn.id ? 'Starting...' : 'Start Work'}
                     </Button>
                   )}
                   
                   {checkIn.status === 'in_progress' && (
                     <Button
-                      onClick={() => handleMarkCompleted(checkIn.id)}
+                      onClick={() => {
+                        console.log('Mark Complete button clicked for check-in:', checkIn.id);
+                        handleMarkCompleted(checkIn.id);
+                      }}
                       className="bg-green-600 hover:bg-green-700"
+                      disabled={updatingStatus === checkIn.id}
                     >
-                      Mark Complete
+                      {updatingStatus === checkIn.id ? 'Completing...' : 'Mark Complete'}
                     </Button>
                   )}
                   

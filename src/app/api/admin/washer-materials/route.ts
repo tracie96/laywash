@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
     const isReturned = searchParams.get('isReturned');
 
     let query = supabaseAdmin
-      .from('washer_materials')
+      .from('washer_tools')
       .select(`
         *,
-        washer:users!washer_materials_washer_id_fkey (
+        washer:users!washer_tools_washer_id_fkey (
           id,
           name,
           email,
@@ -36,47 +36,45 @@ export async function GET(request: NextRequest) {
     }
 
     if (materialType) {
-      query = query.eq('material_type', materialType);
+      query = query.eq('tool_type', materialType);
     }
 
     if (isReturned !== null) {
       query = query.eq('is_returned', isReturned === 'true');
     }
 
-    const { data: materials, error } = await query;
-
+    const { data: tools, error } = await query;
     if (error) {
-      console.error('Error fetching washer materials:', error);
+      console.error('Error fetching washer tools:', error);
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch washer materials' },
+        { success: false, error: 'Failed to fetch washer tools' },
         { status: 500 }
       );
     }
-
-    // Transform the data to match the frontend interface
-    const transformedMaterials = materials?.map(material => ({
-      id: material.id,
-      washerId: material.washer_id,
-      washer: material.washer,
-      materialName: material.material_name,
-      materialType: material.material_type,
-      quantity: material.quantity,
-      unit: material.unit,
-      assignedDate: material.assigned_date,
-      returnedQuantity: material.returned_quantity,
-      isReturned: material.is_returned,
-      notes: material.notes,
-      createdAt: material.created_at,
-      updatedAt: material.updated_at
+    console.log({tools});
+    const transformedTools = tools?.map(tool => ({
+      id: tool.id,
+      washerId: tool.washer_id,
+      washer: tool.washer,
+      toolName: tool.tool_name,
+      toolType: tool.tool_type,
+      quantity: tool.quantity,
+      amount: tool.amount,
+      assignedDate: tool.assigned_date,
+      returnedDate: tool.returned_date,
+      isReturned: tool.is_returned,
+      notes: tool.notes,
+      createdAt: tool.created_at,
+      updatedAt: tool.updated_at
     })) || [];
 
     return NextResponse.json({
       success: true,
-      materials: transformedMaterials
+      tools: transformedTools
     });
 
   } catch (error) {
-    console.error('Fetch washer materials error:', error);
+    console.error('Fetch washer tools error:', error);
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred' },
       { status: 500 }
@@ -88,43 +86,43 @@ export async function POST(request: NextRequest) {
   try {
     const { 
       washerId, 
-      materialName, 
-      materialType, 
+      toolName, 
+      toolType, 
       quantity, 
-      unit, 
+      amount, 
       notes 
     } = await request.json();
 
     // Validate required input
-    if (!washerId || !materialName || !materialType || !quantity || !unit) {
+    if (!washerId || !toolName || !toolType || !quantity || amount === undefined) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: washerId, materialName, materialType, quantity, and unit are required' },
+        { success: false, error: 'Missing required fields: washerId, toolName, toolType, quantity, and amount are required' },
         { status: 400 }
       );
     }
 
-    // Validate quantity
-    if (quantity <= 0) {
+    // Validate quantity and amount
+    if (quantity <= 0 || amount <= 0) {
       return NextResponse.json(
-        { success: false, error: 'Quantity must be greater than 0' },
+        { success: false, error: 'Quantity and amount must be greater than 0' },
         { status: 400 }
       );
     }
 
-    // Insert new washer material
-    const { data: material, error } = await supabaseAdmin
-      .from('washer_materials')
+    // Insert new washer tool
+    const { data: tool, error } = await supabaseAdmin
+      .from('washer_tools')
       .insert({
         washer_id: washerId,
-        material_name: materialName,
-        material_type: materialType,
+        tool_name: toolName,
+        tool_type: toolType,
         quantity: quantity,
-        unit: unit,
+        amount: amount,
         notes: notes || null
       })
       .select(`
         *,
-        washer:users!washer_materials_washer_id_fkey (
+        washer:users!washer_tools_washer_id_fkey (
           id,
           name,
           email,
@@ -142,34 +140,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform the response
-    const transformedMaterial = {
-      id: material.id,
-      washerId: material.washer_id,
-      washer: material.washer,
-      materialName: material.material_name,
-      materialType: material.material_type,
-      quantity: material.quantity,
-      unit: material.unit,
-      assignedDate: material.assigned_date,
-      returnedQuantity: material.returned_quantity,
-      isReturned: material.is_returned,
-      notes: material.notes,
-      createdAt: material.created_at,
-      updatedAt: material.updated_at
+    const transformedTool = {
+      id: tool.id,
+      washerId: tool.washer_id,
+      washer: tool.washer,
+      toolName: tool.tool_name,
+      toolType: tool.tool_type,
+      quantity: tool.quantity,
+      amount: tool.amount,
+      assignedDate: tool.assigned_date,
+      returnedDate: tool.returned_date,
+      isReturned: tool.is_returned,
+      notes: tool.notes,
+      createdAt: tool.created_at,
+      updatedAt: tool.updated_at
     };
 
     return NextResponse.json({
       success: true,
-      material: transformedMaterial,
-      message: 'Washer material assigned successfully'
+      tool: transformedTool,
+      message: 'Washer tool assigned successfully'
     });
 
   } catch (error) {
-    console.error('Create washer material error:', error);
+    console.error('Create washer tool error:', error);
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred' },
       { status: 500 }
-    );
+      );
   }
 }
 

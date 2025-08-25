@@ -14,6 +14,33 @@ interface CheckIn {
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
+  completedTime?: Date;
+  assignedWasher?: string;
+  assignedWasherId?: string;
+  estimatedDuration: number;
+  actualDuration?: number;
+  totalPrice: number;
+  specialInstructions?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  customerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Raw API data interface (dates come as strings)
+interface RawCheckIn {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  licensePlate: string;
+  vehicleType: string;
+  vehicleColor: string;
+  vehicleModel?: string;
+  services: string[];
+  status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
+  checkInTime: string; // API returns as string
+  completedTime?: string; // API returns as string
   assignedWasher?: string;
   assignedWasherId?: string;
   estimatedDuration: number;
@@ -66,10 +93,25 @@ const ActiveCheckInsPage: React.FC = () => {
       
       if (result.success) {
         // Filter only active check-ins (pending and in_progress)
-        const activeCheckIns = result.checkIns.filter((checkIn: CheckIn) => 
+        const activeCheckIns = result.checkIns.filter((checkIn: RawCheckIn) => 
           checkIn.status === 'pending' || checkIn.status === 'in_progress'
         );
-        setCheckIns(activeCheckIns);
+        
+        // Convert string dates back to Date objects
+        const processedCheckIns = activeCheckIns.map((checkIn: RawCheckIn) => ({
+          ...checkIn,
+          checkInTime: new Date(checkIn.checkInTime),
+          completedTime: checkIn.completedTime ? new Date(checkIn.completedTime) : undefined,
+          createdAt: new Date(checkIn.createdAt),
+          updatedAt: new Date(checkIn.updatedAt)
+        })).filter((checkIn: CheckIn) => {
+          // Filter out check-ins with invalid dates
+          return !isNaN(checkIn.checkInTime.getTime()) && 
+                 !isNaN(checkIn.createdAt.getTime()) && 
+                 !isNaN(checkIn.updatedAt.getTime());
+        });
+        
+        setCheckIns(processedCheckIns);
       } else {
         throw new Error(result.error || 'Failed to fetch check-ins');
       }
@@ -471,7 +513,17 @@ const ActiveCheckInsPage: React.FC = () => {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Check-in Time</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {checkIn.checkInTime.toLocaleTimeString()}
+                        {(() => {
+                          try {
+                            if (checkIn.checkInTime instanceof Date) {
+                              return checkIn.checkInTime.toLocaleTimeString();
+                            }
+                            const date = new Date(checkIn.checkInTime);
+                            return isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
+                          } catch {
+                            return 'Invalid time';
+                          }
+                        })()}
                       </p>
                     </div>
                     <div>

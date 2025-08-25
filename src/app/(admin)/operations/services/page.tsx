@@ -81,7 +81,6 @@ const OperationsServicesPage: React.FC = () => {
     }
   }, [searchTerm, filterCategory, filterStatus]);
 
-  // Fetch services on component mount and when filters change
   useEffect(() => {
     fetchServices();
   }, [fetchServices]);
@@ -89,22 +88,17 @@ const OperationsServicesPage: React.FC = () => {
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!createForm.name || !createForm.price || !createForm.duration) {
+    if (!createForm.name || !createForm.duration) {
       setError('Please fill in all required fields');
       return;
     }
 
-    if (createForm.price <= 0) {
-      setError('Price must be greater than 0');
-      return;
-    }
 
     if (createForm.duration <= 0) {
       setError('Duration must be greater than 0');
       return;
     }
 
-    // Validate commission percentages
     if (createForm.washerCommissionPercentage + createForm.companyCommissionPercentage !== 100) {
       setError('Washer and company commission percentages must equal 100%');
       return;
@@ -162,12 +156,11 @@ const OperationsServicesPage: React.FC = () => {
         const data = await response.json();
         
         if (data.success) {
-          fetchServices(); // Refresh the list
+          fetchServices();
         } else {
           setError(data.error || 'Failed to delete service');
         }
       } else if (action === 'toggle') {
-        // Find the current service to toggle its status
         const currentService = services.find(s => s.id === serviceId);
         if (!currentService) return;
 
@@ -184,7 +177,7 @@ const OperationsServicesPage: React.FC = () => {
         const data = await response.json();
 
         if (data.success) {
-          fetchServices(); // Refresh the list
+          fetchServices(); 
         } else {
           setError(data.error || 'Failed to update service');
         }

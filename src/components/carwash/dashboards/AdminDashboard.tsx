@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-
+import { useRouter } from 'next/navigation';
 interface DashboardMetrics {
   totalIncome: {
     daily: number;
@@ -63,7 +63,7 @@ const AdminDashboard: React.FC = () => {
   const [recentCheckIns, setRecentCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const router = useRouter();
   // Fetch dashboard metrics
   const fetchDashboardMetrics = async () => {
     try {
@@ -257,7 +257,7 @@ const AdminDashboard: React.FC = () => {
             Quick Actions
           </h3>
           <div className="space-y-3">
-            <button className="w-full p-3 bg-green-light-50 dark:bg-green-light-900/30 rounded-lg hover:bg-green-light-100 dark:hover:bg-green-light-900/50 transition-colors text-left">
+            <button onClick={() => router.push('/checkins/new')} className="w-full p-3 bg-green-light-50 dark:bg-green-light-900/30 rounded-lg hover:bg-green-light-100 dark:hover:bg-green-light-900/50 transition-colors text-left">
               <div className="flex items-center space-x-3">
                 <svg className="w-5 h-5 text-green-light-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -265,7 +265,7 @@ const AdminDashboard: React.FC = () => {
                 <span className="font-medium text-gray-900 dark:text-white">New Car Check-in</span>
               </div>
             </button>
-            <button className="w-full p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-left">
+            <button onClick={() => router.push('/operations/customers')} className="w-full p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-left">
               <div className="flex items-center space-x-3">
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -273,7 +273,7 @@ const AdminDashboard: React.FC = () => {
                 <span className="font-medium text-gray-900 dark:text-white">Register Customer</span>
               </div>
             </button>
-            <button className="w-full p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors text-left">
+            <button onClick={() => router.push('/stock/update')} className="w-full p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors text-left">
               <div className="flex items-center space-x-3">
                 <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -281,7 +281,7 @@ const AdminDashboard: React.FC = () => {
                 <span className="font-medium text-gray-900 dark:text-white">Update Stock</span>
               </div>
             </button>
-            <button className="w-full p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors text-left">
+            <button onClick={() => router.push('/reports')} className="w-full p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors text-left">
               <div className="flex items-center space-x-3">
                 <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

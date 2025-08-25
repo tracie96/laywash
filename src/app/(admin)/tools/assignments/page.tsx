@@ -287,7 +287,7 @@ const ToolsAssignmentsPage: React.FC = () => {
       {/* Assignments Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tool Assignments</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Map tools</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -390,7 +390,6 @@ const ToolsAssignmentsPage: React.FC = () => {
               >
                 <option value="">Select a worker</option>
                 {workers
-                  .filter(worker => worker.status === 'active' && worker.isAvailable)
                   .map(worker => (
                     <option key={worker.id} value={worker.id}>
                       {worker.name} ({worker.email})

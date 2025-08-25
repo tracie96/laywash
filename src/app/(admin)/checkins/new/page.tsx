@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
@@ -15,14 +15,18 @@ interface CheckInFormData {
   customerEmail: string;
   licensePlate: string;
   vehicleType: string;
+  vehicleModel: string;
   vehicleColor: string;
-  services: string[]; // Now stores service IDs
-  assignedWasherId: string;
-  assignedMaterials: Array<{
-    materialId: string;
-    materialName: string;
-    quantity: number;
-    unit: string;
+  services: Array<{
+    serviceId: string;
+    workerId: string;
+    customPrice?: number;
+    materials: Array<{
+      materialId: string;
+      materialName: string;
+      quantity: number;
+      unit: string;
+    }>;
   }>;
   specialInstructions: string;
   estimatedDuration: number;
@@ -50,7 +54,7 @@ const FormField: React.FC<{
 
 const NewCheckInPage: React.FC = () => {
   const router = useRouter();
-  const { searchCustomers } = useAuth();
+  const { searchCustomers, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [success, setSuccess] = useState('');
@@ -64,10 +68,9 @@ const NewCheckInPage: React.FC = () => {
     customerEmail: '',
     licensePlate: '',
     vehicleType: '',
+    vehicleModel: '',
     vehicleColor: '',
     services: [],
-    assignedWasherId: '',
-    assignedMaterials: [],
     specialInstructions: '',
     estimatedDuration: 30,
     // Security fields
@@ -97,16 +100,15 @@ const NewCheckInPage: React.FC = () => {
     email: string;
     phone: string;
   }>>([]);
-  const [isLoadingWashers, setIsLoadingWashers] = useState(true);
-  
   const [washerMaterials, setWasherMaterials] = useState<Array<{
     id: string;
-    materialName: string;
+    toolName: string;
     materialType: string;
     quantity: number;
     unit: string;
   }>>([]);
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
+  const [currentWasherId, setCurrentWasherId] = useState<string>('');
 
   const vehicleTypes = [
     { value: 'sedan', label: 'Sedan' },
@@ -132,9 +134,69 @@ const NewCheckInPage: React.FC = () => {
   const handleServiceToggle = (serviceId: string) => {
     setFormData(prev => ({
       ...prev,
-      services: prev.services.includes(serviceId)
-        ? prev.services.filter(s => s !== serviceId)
-        : [...prev.services, serviceId]
+      services: prev.services.some(s => s.serviceId === serviceId)
+        ? prev.services.filter(s => s.serviceId !== serviceId)
+        : [...prev.services, { serviceId, workerId: '', customPrice: undefined, materials: [] }]
+    }));
+  };
+
+  const handleWorkerAssignment = (serviceId: string, workerId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.map(service => 
+        service.serviceId === serviceId 
+          ? { ...service, workerId }
+          : service
+      )
+    }));
+  };
+
+  const handleCustomPriceChange = (serviceId: string, customPrice: number) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.map(service => 
+        service.serviceId === serviceId 
+          ? { ...service, customPrice }
+          : service
+      )
+    }));
+  };
+
+  const handleMaterialAssignment = (serviceId: string, materialId: string, quantity: number) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.map(service => {
+        if (service.serviceId !== serviceId) return service;
+        
+        const existingIndex = service.materials.findIndex(m => m.materialId === materialId);
+        let updatedMaterials = [...service.materials];
+        
+        if (quantity > 0) {
+          if (existingIndex >= 0) {
+            // Update existing material
+            updatedMaterials[existingIndex] = {
+              ...updatedMaterials[existingIndex],
+              quantity
+            };
+          } else {
+            // Add new material
+            const material = washerMaterials.find(m => m.id === materialId);
+            if (material) {
+              updatedMaterials.push({
+                materialId: material.id,
+                materialName: material.toolName,
+                quantity,
+                unit: material.unit
+              });
+            }
+          }
+        } else {
+          // Remove material if quantity is 0
+          updatedMaterials = updatedMaterials.filter(m => m.materialId !== materialId);
+        }
+        
+        return { ...service, materials: updatedMaterials };
+      })
     }));
   };
 
@@ -159,7 +221,6 @@ const NewCheckInPage: React.FC = () => {
   // Fetch washers from database
   const fetchWashers = async () => {
     try {
-      setIsLoadingWashers(true);
       const response = await fetch('/api/admin/washers');
       const result = await response.json();
       
@@ -170,14 +231,15 @@ const NewCheckInPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching washers:', error);
-    } finally {
-      setIsLoadingWashers(false);
     }
   };
 
   // Fetch washer materials
-  const fetchWasherMaterials = async (washerId: string) => {
+  const fetchWasherMaterials = useCallback(async (washerId: string) => {
     if (!washerId) return;
+    
+    // Don't fetch if we already have materials for this washer
+    if (currentWasherId === washerId && washerMaterials.length > 0) return;
     
     try {
       setIsLoadingMaterials(true);
@@ -185,7 +247,8 @@ const NewCheckInPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        setWasherMaterials(result.materials);
+        setWasherMaterials(result.tools);
+        setCurrentWasherId(washerId);
       } else {
         console.error('Failed to fetch washer materials:', result.error);
       }
@@ -194,13 +257,21 @@ const NewCheckInPage: React.FC = () => {
     } finally {
       setIsLoadingMaterials(false);
     }
-  };
+  }, [currentWasherId, washerMaterials.length]);
 
+  console.log({washerMaterials});
   // Load services and washers on component mount
   useEffect(() => {
     fetchServices();
     fetchWashers();
   }, []);
+
+  // Effect to fetch materials when washer is assigned
+  useEffect(() => {
+    if (formData.services.some(s => s.workerId) && washerMaterials.length === 0 && !isLoadingMaterials && currentWasherId !== formData.services.find(s => s.workerId)?.workerId) {
+      fetchWasherMaterials(formData.services.find(s => s.workerId)?.workerId || '');
+    }
+  }, [formData.services, washerMaterials.length, isLoadingMaterials, currentWasherId, fetchWasherMaterials]);
 
   const searchCustomer = async () => {
     const query = searchQuery.trim();
@@ -250,13 +321,13 @@ const NewCheckInPage: React.FC = () => {
       customerEmail: customer.email || '',
       licensePlate: primaryVehicle?.license_plate || '',
       vehicleType: primaryVehicle?.vehicle_type || '',
+      vehicleModel: primaryVehicle?.vehicle_model || '',
       vehicleColor: primaryVehicle?.vehicle_color || '',
       // Set customer type to registered for existing customers
       customerType: 'registered',
       // Clear security fields to be filled by user
       securityCode: '',
       userCode: '',
-      pareCode: '',
       checkInProcess: '',
     }));
     setShowCustomerResults(false);
@@ -264,14 +335,20 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const calculateTotalPrice = () => {
-    return availableServices
-      .filter(service => formData.services.includes(service.id))
-      .reduce((total, service) => total + service.price, 0);
+    return formData.services.reduce((total, serviceItem) => {
+      const service = availableServices.find(s => s.id === serviceItem.serviceId);
+      if (!service) return total;
+      
+      const price = serviceItem.customPrice !== undefined ? serviceItem.customPrice : service.price;
+      return total + price;
+    }, 0);
   };
 
   const calculateEstimatedDuration = () => {
     const baseDuration = 30; // Base 30 minutes
-    const selectedServices = availableServices.filter(service => formData.services.includes(service.id));
+    const selectedServices = availableServices.filter(service => 
+      formData.services.some(s => s.serviceId === service.id)
+    );
     const serviceDuration = selectedServices.reduce((total, service) => total + service.duration, 0);
     return Math.min(baseDuration + serviceDuration, 120); // Max 2 hours
   };
@@ -302,19 +379,140 @@ const NewCheckInPage: React.FC = () => {
       }
     }
 
+    // Services validation
+    if (formData.services.length === 0) {
+      setError('At least one service must be selected');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate each selected service has required fields
+    for (const serviceItem of formData.services) {
+      if (!serviceItem.workerId) {
+        setError(`Worker must be assigned for service: ${availableServices.find(s => s.id === serviceItem.serviceId)?.name}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const service = availableServices.find(s => s.id === serviceItem.serviceId);
+      if (!service) {
+        setError('Invalid service selected');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // For $0 services, custom price is required
+      if (service.price === 0 && (!serviceItem.customPrice || serviceItem.customPrice <= 0)) {
+        setError(`Custom price is required for service: ${service.name} (base price is $0)`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // For services with base price > 0, custom price cannot be less than base price
+      if (service.price > 0 && serviceItem.customPrice !== undefined && serviceItem.customPrice < service.price) {
+        setError(`Price for service "${service.name}" cannot be decreased below base price of $${service.price}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate materials for each service
+      if (serviceItem.materials.length === 0) {
+        setError(`Materials must be assigned for service: ${service.name}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const material of serviceItem.materials) {
+        if (material.quantity <= 0) {
+          setError(`Quantity must be greater than 0 for material: ${material.materialName} for service: ${service.name}`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
     try {
-      // TODO: Implement API call to create check-in
-      console.log('Creating check-in:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSuccess('Check-in created successfully!');
-      setTimeout(() => {
-        router.push('/checkins/active');
-      }, 2000);
-    } catch {
-      setError('Failed to create check-in. Please try again.');
+      // Prepare services data with service information
+      const servicesWithData = formData.services.map(serviceItem => {
+        const service = availableServices.find(s => s.id === serviceItem.serviceId);
+        if (!service) {
+          throw new Error(`Service not found: ${serviceItem.serviceId}`);
+        }
+        return {
+          ...serviceItem,
+          serviceData: {
+            id: service.id,
+            name: service.name,
+            price: service.price,
+            duration: service.duration
+          }
+        };
+      });
+
+      // Validate services data
+      if (servicesWithData.length === 0) {
+        throw new Error('No services selected');
+      }
+
+      for (const service of servicesWithData) {
+        if (!service.workerId) {
+          throw new Error(`Worker not assigned for service: ${service.serviceData.name}`);
+        }
+        if (service.materials.length === 0) {
+          throw new Error(`No materials assigned for service: ${service.serviceData.name}`);
+        }
+      }
+
+      // Prepare submission data
+      const submissionData = {
+        customerName: formData.customerName,
+        customerPhone: formData.customerPhone,
+        customerEmail: formData.customerEmail,
+        licensePlate: formData.licensePlate,
+        vehicleType: formData.vehicleType,
+        vehicleColor: formData.vehicleColor,
+        vehicleModel: formData.vehicleModel,
+        services: servicesWithData,
+        specialInstructions: formData.specialInstructions,
+        estimatedDuration: calculateEstimatedDuration(),
+        customerType: formData.customerType,
+        valuableItems: formData.valuableItems,
+        userCode: formData.userCode,
+        passcode: formData.securityCode,
+        remarks: formData.checkInProcess
+      };
+
+      console.log('Submitting check-in:', submissionData);
+
+      // Call the API
+      const response = await fetch('/api/admin/check-ins', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '', // Pass current admin ID
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      console.log('Response status:', response.status);
+      const result = await response.json();
+      console.log('Response result:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}: Failed to create check-in`);
+      }
+
+      if (result.success) {
+        setSuccess('Check-in created successfully!');
+        setTimeout(() => {
+          router.push('/checkins/active');
+        }, 2000);
+      } else {
+        throw new Error(result.error || 'Failed to create check-in');
+      }
+    } catch (error) {
+      console.error('Error creating check-in:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create check-in. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -454,7 +652,7 @@ const NewCheckInPage: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             Vehicle Information
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="License Plate" required>
               <InputField
                 type="text"
@@ -463,141 +661,70 @@ const NewCheckInPage: React.FC = () => {
                 placeholder="Enter license plate"
               />
             </FormField>
-            <FormField label="Vehicle Type" required>
-              <Select
-                value={formData.vehicleType}
-                onChange={(value) => handleInputChange('vehicleType', value)}
-                options={vehicleTypes}
-                placeholder="Select vehicle type"
-              />
-            </FormField>
-            <FormField label="Vehicle Color">
-              <InputField
-                type="text"
-                value={formData.vehicleColor}
-                onChange={(e) => handleInputChange('vehicleColor', e.target.value)}
-                placeholder="Enter vehicle color"
-              />
-            </FormField>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField label="Vehicle Type" required>
+                <Select
+                  options={vehicleTypes}
+                  placeholder="Select vehicle type"
+                  value={formData.vehicleType}
+                  onChange={(value) => handleInputChange('vehicleType', value)}
+                />
+              </FormField>
+              
+              <FormField label="Vehicle Model">
+                <InputField
+                  value={formData.vehicleModel}
+                  onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
+                  placeholder="Enter vehicle model (optional)"
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField label="Vehicle Color" required>
+                <InputField
+                  value={formData.vehicleColor}
+                  onChange={(e) => handleInputChange('vehicleColor', e.target.value)}
+                  placeholder="Enter vehicle color"
+                />
+              </FormField>
+            </div>
           </div>
         </div>
 
-        {/* Washer Assignment */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Washer Assignment
-          </h2>
-          <FormField label="Assign Washer" required>
-            {isLoadingWashers ? (
-              <div className="text-center py-4">
-                <p className="text-gray-600 dark:text-gray-400">Loading washers...</p>
-              </div>
-            ) : availableWashers.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-gray-600 dark:text-gray-400">No washers available</p>
-              </div>
-            ) : (
-              <Select
-                value={formData.assignedWasherId}
-                onChange={(value) => {
-                  handleInputChange('assignedWasherId', value);
-                  if (value) {
-                    fetchWasherMaterials(value);
-                  }
-                }}
-                options={availableWashers.map(washer => ({
-                  value: washer.id,
-                  label: `${washer.name} (${washer.phone})`
-                }))}
-                placeholder="Select a washer"
-              />
-            )}
-          </FormField>
-        </div>
-
         {/* Material Assignment */}
-        {formData.assignedWasherId && (
+        {formData.services.some(s => s.workerId) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Material Assignment
+              Service Materials Summary
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Select materials to assign for this car wash
+              Overview of materials assigned to each service
             </p>
-            {isLoadingMaterials ? (
-              <div className="text-center py-4">
-                <p className="text-gray-600 dark:text-gray-400">Loading materials...</p>
-              </div>
-            ) : washerMaterials.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-gray-600 dark:text-gray-400">No materials available for this washer</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {washerMaterials.map((material) => (
-                  <div
-                    key={material.id}
-                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-gray-900 dark:text-white">
-                        {material.materialName}
-                      </h3>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {material.quantity} {material.unit}
-                      </span>
+            {formData.services.filter(s => s.workerId).map((serviceItem) => {
+              const service = availableServices.find(s => s.id === serviceItem.serviceId);
+              const worker = availableWashers.find(w => w.id === serviceItem.workerId);
+              
+              return (
+                <div key={serviceItem.serviceId} className="mb-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                    {service?.name} - {worker?.name}
+                  </h3>
+                  {serviceItem.materials.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No materials assigned</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {serviceItem.materials.map((material) => (
+                        <div key={material.materialId} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">{material.materialName}</span>
+                          <span className="text-gray-900 dark:text-white">{material.quantity} {material.unit}</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600 dark:text-gray-400">
-                        Quantity to use:
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={material.quantity}
-                        step="0.1"
-                        className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                        onChange={(e) => {
-                          const quantity = parseFloat(e.target.value) || 0;
-                          const existingIndex = formData.assignedMaterials.findIndex(m => m.materialId === material.id);
-                          
-                          if (quantity > 0) {
-                            if (existingIndex >= 0) {
-                              // Update existing material
-                              const updatedMaterials = [...formData.assignedMaterials];
-                              updatedMaterials[existingIndex] = {
-                                ...updatedMaterials[existingIndex],
-                                quantity
-                              };
-                              handleInputChange('assignedMaterials', updatedMaterials);
-                            } else {
-                              // Add new material
-                              const newMaterial = {
-                                materialId: material.id,
-                                materialName: material.materialName,
-                                quantity,
-                                unit: material.unit
-                              };
-                              handleInputChange('assignedMaterials', [...formData.assignedMaterials, newMaterial]);
-                            }
-                          } else {
-                            // Remove material if quantity is 0
-                            if (existingIndex >= 0) {
-                              const updatedMaterials = formData.assignedMaterials.filter(m => m.materialId !== material.id);
-                              handleInputChange('assignedMaterials', updatedMaterials);
-                            }
-                          }
-                        }}
-                      />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {material.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -615,45 +742,200 @@ const NewCheckInPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">No services available</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableServices.map((service) => (
-                <div
-                  key={service.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.services.includes(service.id)
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                  onClick={() => handleServiceToggle(service.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">
-                        {service.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        ${service.price} • {service.duration} min
-                      </p>
-                      {service.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                          {service.description}
+            <div className="space-y-4">
+              {availableServices.map((service) => {
+                const isSelected = formData.services.some(s => s.serviceId === service.id);
+                const selectedService = formData.services.find(s => s.serviceId === service.id);
+                
+                return (
+                  <div
+                    key={service.id}
+                    className={`p-4 border rounded-lg transition-colors ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    {/* Service Header */}
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => handleServiceToggle(service.id)}
+                    >
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900 dark:text-white">
+                          {service.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          ${service.price} • {service.duration} min
                         </p>
-                      )}
+                        {service.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {service.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}>
+                        {isSelected && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                      formData.services.includes(service.id)
-                        ? 'border-blue-500 bg-blue-500'
-                        : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {formData.services.includes(service.id) && (
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
+
+                    {/* Service Configuration (shown when selected) */}
+                    {isSelected && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-4">
+                        {/* Worker Assignment */}
+                        <div>
+                          <Label htmlFor={`worker-${service.id}`}>
+                            Assign Worker *
+                          </Label>
+                          <Select
+                            options={availableWashers.map(washer => ({ value: washer.id, label: washer.name }))}
+                            placeholder="Select a worker"
+                            value={selectedService?.workerId || ''}
+                            onChange={(value) => {
+                              handleWorkerAssignment(service.id, value);
+                              if (value) {
+                                // Fetch materials for the newly assigned worker
+                                setTimeout(() => {
+                                  fetchWasherMaterials(value);
+                                }, 0);
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                        </div>
+
+                        {/* Materials Assignment - Only show when worker is assigned */}
+                        {selectedService?.workerId && (
+                          <div>
+                            <Label htmlFor={`materials-${service.id}`}>
+                              Materials Assignment
+                            </Label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Select materials for this service
+                            </p>
+                            {isLoadingMaterials ? (
+                              <div className="text-center py-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Loading materials...</p>
+                              </div>
+                            ) : washerMaterials.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">No materials available for this worker</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-3">
+                                {washerMaterials.map((material) => {
+                                  const assignedMaterial = selectedService.materials.find(m => m.materialId === material.id);
+                                  return (
+                                    <div
+                                      key={material.id}
+                                      className="p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {material.toolName}
+                                        </h4>
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                                          Available: {material.quantity} {material.unit}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <label className="text-xs text-gray-600 dark:text-gray-400">
+                                          Quantity to use:
+                                        </label>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={material.quantity}
+                                          step="0.1"
+                                          className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          placeholder="0"
+                                          value={assignedMaterial?.quantity || 0}
+                                          onChange={(e) => {
+                                            const quantity = parseFloat(e.target.value) || 0;
+                                            handleMaterialAssignment(service.id, material.id, quantity);
+                                          }}
+                                        />
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                                          {material.unit}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Custom Pricing (only for $0 services) */}
+                        {service.price === 0 && (
+                          <div>
+                            <Label htmlFor={`price-${service.id}`}>
+                              Custom Price (USD) *
+                            </Label>
+                            <InputField
+                              id={`price-${service.id}`}
+                              type="number"
+                              min="0"
+                        
+                              placeholder="Enter custom price"
+                              value={selectedService?.customPrice ?? 0}
+                              onChange={(e) => handleCustomPriceChange(service.id, parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Base price is $0. Set custom price for this service.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Price Increase (for all services) */}
+                        {service.price > 0 && (
+                          <div>
+                            <Label htmlFor={`price-increase-${service.id}`}>
+                              Price Increase (USD) - Optional
+                            </Label>
+                            <InputField
+                              id={`price-increase-${service.id}`}
+                              type="number"
+                              min="0"
+                              placeholder="Enter price increase"
+                              value={selectedService?.customPrice ? (selectedService.customPrice - service.price) : 0}
+                              onChange={(e) => {
+                                const increase = parseFloat(e.target.value) || 0;
+                                const newPrice = service.price + increase;
+                                handleCustomPriceChange(service.id, newPrice);
+                              }}
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Increase price for dirty vehicles. Cannot decrease below base price.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Display Final Price */}
+                        <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            Final Price: ${selectedService?.customPrice !== undefined ? selectedService.customPrice : service.price}
+                          </p>
+                          {selectedService?.customPrice !== undefined && selectedService.customPrice !== service.price && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {selectedService.customPrice > service.price ? 'Price increased' : 'Custom price set'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

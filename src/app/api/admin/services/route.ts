@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
     } = await request.json();
 
     // Validate required input
-    if (!name || !price || !category || !duration) {
+    if (!name || !category || !duration) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: name, price, category, and duration are required' },
+        { success: false, error: 'Missing required fields: name, category, and duration are required' },
         { status: 400 }
       );
     }
@@ -127,13 +127,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate price
-    if (price <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Price must be greater than 0' },
-        { status: 400 }
-      );
-    }
+    // // Validate price
+    // if (price <= 0) {
+    //   return NextResponse.json(
+    //     { success: false, error: 'Price must be greater than 0' },
+    //     { status: 400 }
+    //   );
+    // }
 
     // Validate duration
     if (duration <= 0) {

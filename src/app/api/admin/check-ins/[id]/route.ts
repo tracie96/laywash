@@ -19,8 +19,11 @@ export async function PATCH(
     const { id } = await params;
     const updateData = await request.json();
 
+    console.log('PATCH request for check-in:', id, 'with data:', updateData);
+
     // Validate the update data
     if (updateData.status && !['pending', 'in_progress', 'completed', 'paid', 'cancelled'].includes(updateData.status)) {
+      console.log('Invalid status value:', updateData.status);
       return NextResponse.json(
         { success: false, error: 'Invalid status value' },
         { status: 400 }
@@ -28,6 +31,7 @@ export async function PATCH(
     }
 
     if (updateData.paymentStatus && !['pending', 'paid'].includes(updateData.paymentStatus)) {
+      console.log('Invalid payment status value:', updateData.paymentStatus);
       return NextResponse.json(
         { success: false, error: 'Invalid payment status value' },
         { status: 400 }
@@ -35,6 +39,7 @@ export async function PATCH(
     }
 
     if (updateData.paymentMethod && !['cash', 'card', 'mobile_money'].includes(updateData.paymentMethod)) {
+      console.log('Invalid payment method value:', updateData.paymentMethod);
       return NextResponse.json(
         { success: false, error: 'Invalid payment method value' },
         { status: 400 }
@@ -61,6 +66,8 @@ export async function PATCH(
       dbUpdateData.payment_time = new Date().toISOString();
     }
 
+    console.log('Database update data:', dbUpdateData);
+
     // Update the check-in
     const { data: checkIn, error } = await supabaseAdmin
       .from('car_check_ins')
@@ -72,11 +79,7 @@ export async function PATCH(
           id,
           name,
           email,
-          phone,
-          license_plate,
-          vehicle_type,
-          vehicle_model,
-          vehicle_color
+          phone
         ),
         check_in_services (
           services (
@@ -105,17 +108,20 @@ export async function PATCH(
     if (error) {
       console.error('Update check-in error:', error);
       return NextResponse.json(
-        { success: false, error: 'Failed to update check-in' },
+        { success: false, error: `Failed to update check-in: ${error.message}` },
         { status: 500 }
       );
     }
 
     if (!checkIn) {
+      console.log('Check-in not found after update');
       return NextResponse.json(
         { success: false, error: 'Check-in not found' },
         { status: 404 }
       );
     }
+
+    console.log('Check-in updated successfully:', checkIn.id, 'New status:', checkIn.status);
 
     // If the check-in was just completed, trigger milestone checking for the customer
     if (updateData.status === 'completed' && checkIn.customers?.[0]?.id) {
