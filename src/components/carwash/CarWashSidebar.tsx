@@ -187,6 +187,12 @@ const washerItems: NavItem[] = [
     name: "My Performance",
     path: "/reports/my-performance",
     roles: ["car_washer"]
+  },
+  {
+    icon: <ReportIcon />,
+    name: "My Tools",
+    path: "/tools/my-tools",
+    roles: ["car_washer"]
   }
 ];
 
