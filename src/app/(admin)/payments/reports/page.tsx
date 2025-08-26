@@ -234,7 +234,7 @@ const PaymentReportsPage: React.FC = () => {
                 Total Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${totals.totalRevenue.toFixed(2)}
+                ₦ {totals.totalRevenue.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -270,7 +270,7 @@ const PaymentReportsPage: React.FC = () => {
                 Average Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${getAverageRevenue().toFixed(2)}
+                ₦ {getAverageRevenue().toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
@@ -288,7 +288,7 @@ const PaymentReportsPage: React.FC = () => {
                 Pending Amount
               </p>
               <p className="text-2xl font-bold text-orange-600">
-                ${totals.pendingAmount.toFixed(2)}
+                ₦ {totals.pendingAmount.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -403,7 +403,7 @@ const PaymentReportsPage: React.FC = () => {
                       {report.totalPayments}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      ${report.totalRevenue.toFixed(2)}
+                      ₦ {report.totalRevenue.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {report.cashPayments}

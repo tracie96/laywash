@@ -409,7 +409,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              ${record.price.toFixed(2)}
+                              ₦ {record.price.toFixed(2)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -464,7 +464,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
                       Total Revenue
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ${performanceStats.totalRevenue.toFixed(2)}
+                      ₦ {performanceStats.totalRevenue.toFixed(2)}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -536,7 +536,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Revenue/Car</span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        ${(performanceStats.totalRevenue / performanceStats.totalCars).toFixed(2)}
+                        ₦ {(performanceStats.totalRevenue / performanceStats.totalCars).toFixed(2)}
                       </span>
                     </div>
                   </div>

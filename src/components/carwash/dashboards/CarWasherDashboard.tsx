@@ -173,7 +173,7 @@ const CarWasherDashboard: React.FC = () => {
                 Today&apos;s Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${metrics.todayEarnings}
+                ₦ {metrics.todayEarnings}
               </p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
@@ -230,7 +230,7 @@ const CarWasherDashboard: React.FC = () => {
                 Total Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${metrics.totalEarnings.toLocaleString()}
+                ₦ {metrics.totalEarnings.toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
@@ -314,7 +314,7 @@ const CarWasherDashboard: React.FC = () => {
                   <p>License: {completed.licensePlate}</p>
                   <p>Completed: {completed.completedAt.toLocaleTimeString()}</p>
                   <p className="font-medium text-green-600 dark:text-green-400">
-                    Earnings: ${completed.earnings}
+                    Earnings: ₦ {completed.earnings}
                   </p>
                 </div>
               </div>

@@ -168,7 +168,7 @@ const CustomerListPage: React.FC = () => {
                 Total Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.totalRevenue.toFixed(2)}
+                ₦ {stats.totalRevenue.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -349,7 +349,7 @@ const CustomerListPage: React.FC = () => {
                       {customer.totalVisits}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      ${customer.totalSpent.toFixed(2)}
+                        ₦ {customer.totalSpent.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {customer.isRegistered ? (

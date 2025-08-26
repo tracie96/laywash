@@ -223,7 +223,7 @@ const PaymentHistoryPage: React.FC = () => {
                 Total Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.totalAmount.toFixed(2)}
+                ₦ {stats.totalAmount.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -241,7 +241,7 @@ const PaymentHistoryPage: React.FC = () => {
                 Pending Amount
               </p>
               <p className="text-2xl font-bold text-orange-600">
-                ${stats.pendingAmount.toFixed(2)}
+                ₦ {stats.pendingAmount.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -355,7 +355,7 @@ const PaymentHistoryPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Amount</p>
-                      <p className="font-medium text-gray-900 dark:text-white">${payment.amount.toFixed(2)}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">₦ {payment.amount.toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Payment Method</p>
