@@ -237,7 +237,7 @@ const AdminDashboard: React.FC = () => {
                 Today&apos;s Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${(metrics?.totalIncome?.daily || 0).toLocaleString()}
+                ₦ {(metrics?.totalIncome?.daily || 0).toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
@@ -325,7 +325,7 @@ const AdminDashboard: React.FC = () => {
                     )}
                     {checkIn.totalPrice && (
                       <p className="font-medium text-green-600 dark:text-green-400">
-                        ${checkIn.totalPrice.toLocaleString()}
+                        ₦ {checkIn.totalPrice.toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -368,7 +368,7 @@ const AdminDashboard: React.FC = () => {
               Weekly Earnings
             </p>
             <p className="text-xl font-bold text-gray-900 dark:text-white">
-              ${(metrics?.totalIncome?.weekly || 0).toLocaleString()}
+              ₦ {(metrics?.totalIncome?.weekly || 0).toLocaleString()}
             </p>
           </div>
         </div>
@@ -380,7 +380,7 @@ const AdminDashboard: React.FC = () => {
               Monthly Earnings
             </p>
             <p className="text-xl font-bold text-gray-900 dark:text-white">
-              ${(metrics?.totalIncome?.monthly || 0).toLocaleString()}
+              ₦ {(metrics?.totalIncome?.monthly || 0).toLocaleString()}
             </p>
           </div>
         </div>
