@@ -257,7 +257,7 @@ const OperationsCheckInsPage: React.FC = () => {
                 Total Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.totalEarnings.toFixed(2)}
+                ₦ {stats.totalEarnings.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -275,7 +275,7 @@ const OperationsCheckInsPage: React.FC = () => {
                 Pending Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.pendingEarnings.toFixed(2)}
+                ₦ {stats.pendingEarnings.toFixed(2)}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -459,7 +459,7 @@ const OperationsCheckInsPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Price</p>
-                      <p className="font-medium text-gray-900 dark:text-white">${checkIn.totalPrice.toFixed(2)}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">₦ {checkIn.totalPrice.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>

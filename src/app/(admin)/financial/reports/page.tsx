@@ -172,11 +172,11 @@ const FinancialReportsPage: React.FC = () => {
           <div className="mt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Car Wash:</span>
-              <span className="text-green-600 dark:text-green-400">${totals.carWashRevenue.toFixed(2)}</span>
+              <span className="text-green-600 dark:text-green-400">₦ {totals.carWashRevenue.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Product Sales:</span>
-              <span className="text-green-600 dark:text-green-400">${totals.productSalesRevenue.toFixed(2)}</span>
+              <span className="text-green-600 dark:text-green-400">₦ {totals.productSalesRevenue.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -185,7 +185,7 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totals.totalExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalExpenses.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-error-100 dark:bg-error-900/30 rounded-lg">
               <svg className="w-6 h-6 text-error-600 dark:text-error-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,11 +196,11 @@ const FinancialReportsPage: React.FC = () => {
           <div className="mt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Washer Salaries:</span>
-              <span className="text-error-600 dark:text-error-400">${totals.washerSalaries.toFixed(2)}</span>
+              <span className="text-error-600 dark:text-error-400">₦ {totals.washerSalaries.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Admin Salaries:</span>
-              <span className="text-error-600 dark:text-error-400">${totals.adminSalaries.toFixed(2)}</span>
+              <span className="text-error-600 dark:text-error-400">₦ {totals.adminSalaries.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -210,7 +210,7 @@ const FinancialReportsPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Net Profit</p>
               <p className={`text-2xl font-bold ${totals.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
-                ${totals.netProfit.toFixed(2)}
+                ₦ {totals.netProfit.toFixed(2)}
               </p>
             </div>
             <div className={`p-3 rounded-lg ${totals.netProfit >= 0 ? 'bg-blue-light-100 dark:bg-blue-light-900/30' : 'bg-error-100 dark:bg-error-900/30'}`}>
@@ -310,26 +310,26 @@ const FinancialReportsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="text-green-600 dark:text-green-400 font-medium">
-                          ${report.totalRevenue.toFixed(2)}
+                          ₦ {report.totalRevenue.toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          CW: ${report.carWashRevenue.toFixed(2)} | PS: ${report.productSalesRevenue.toFixed(2)}
+                          CW: ₦ {report.carWashRevenue.toFixed(2)} | PS: ₦ {report.productSalesRevenue.toFixed(2)}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="text-error-600 dark:text-error-400 font-medium">
-                          ${report.totalExpenses.toFixed(2)}
+                          ₦ {report.totalExpenses.toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          WS: ${report.washerSalaries.toFixed(2)} | AS: ${report.adminSalaries.toFixed(2)}
+                          WS: ₦ {report.washerSalaries.toFixed(2)} | AS: ₦ {report.adminSalaries.toFixed(2)}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`text-sm font-medium ${report.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
-                        ${report.netProfit.toFixed(2)}
+                            ₦ {report.netProfit.toFixed(2)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

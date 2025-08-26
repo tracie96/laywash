@@ -290,7 +290,7 @@ const FinancialPaymentsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totalRevenue.toFixed(2)}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {filteredPayments.length} transactions
               </p>
@@ -488,7 +488,7 @@ const FinancialPaymentsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      ${payment.amount.toFixed(2)}
+                      ₦ {payment.amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">

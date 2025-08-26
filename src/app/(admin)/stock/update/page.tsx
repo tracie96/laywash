@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
+import { Modal } from '@/components/ui/modal';
 
 interface StockItem {
   id: string;
@@ -15,6 +16,18 @@ interface StockItem {
   lastUpdated: Date;
 }
 
+interface InventoryApiResponse {
+  id: string;
+  name: string;
+  category: string;
+  currentStock: number;
+  minStockLevel: number;
+  unit: string;
+  price: number;
+  supplier: string;
+  lastUpdated: string;
+}
+
 const StockUpdatePage: React.FC = () => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,48 +35,42 @@ const StockUpdatePage: React.FC = () => {
   const [updateQuantity, setUpdateQuantity] = useState('');
   const [updateType, setUpdateType] = useState<'in' | 'out'>('in');
 
-  // Mock stock data
-  useEffect(() => {
-    const mockStockItems: StockItem[] = [
-      {
-        id: '1',
-        name: 'Car Wash Soap',
-        category: 'Cleaning Supplies',
-        currentStock: 25,
-        minStockLevel: 10,
-        unit: 'Liters',
-        price: 15.99,
-        supplier: 'ABC Supplies',
-        lastUpdated: new Date()
-      },
-      {
-        id: '2',
-        name: 'Microfiber Towels',
-        category: 'Cleaning Supplies',
-        currentStock: 8,
-        minStockLevel: 15,
-        unit: 'Pieces',
-        price: 2.50,
-        supplier: 'XYZ Textiles',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24) // 1 day ago
-      },
-      {
-        id: '3',
-        name: 'Wax Polish',
-        category: 'Finishing Products',
-        currentStock: 12,
-        minStockLevel: 5,
-        unit: 'Bottles',
-        price: 8.99,
-        supplier: 'Premium Products',
-        lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 48) // 2 days ago
+  // Fetch real stock data from API
+  const fetchStockItems = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/admin/inventory');
+      const result = await response.json();
+      
+      if (result.success) {
+        // Transform the API response to match our StockItem interface
+        const transformedItems: StockItem[] = result.inventory.map((item: InventoryApiResponse) => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          currentStock: item.currentStock,
+          minStockLevel: item.minStockLevel,
+          unit: item.unit,
+          price: item.price,
+          supplier: item.supplier,
+          lastUpdated: new Date(item.lastUpdated)
+        }));
+        
+        setStockItems(transformedItems);
+      } else {
+        console.error('Failed to fetch stock items:', result.error);
+        setStockItems([]);
       }
-    ];
-
-    setTimeout(() => {
-      setStockItems(mockStockItems);
+    } catch (error) {
+      console.error('Error fetching stock items:', error);
+      setStockItems([]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  useEffect(() => {
+    fetchStockItems();
   }, []);
 
   const handleUpdateStock = async () => {
@@ -81,16 +88,37 @@ const StockUpdatePage: React.FC = () => {
       return;
     }
 
-    // Update the stock item
-    setStockItems(prev => prev.map(item => 
-      item.id === selectedItem.id 
-        ? { ...item, currentStock: newStock, lastUpdated: new Date() }
-        : item
-    ));
+    try {
+      // Call API to update stock
+      const response = await fetch(`/api/admin/inventory/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentStock: newStock
+        }),
+      });
 
-    setSelectedItem(null);
-    setUpdateQuantity('');
-    setUpdateType('in');
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh data from API to ensure consistency
+        await fetchStockItems();
+        
+        setSelectedItem(null);
+        setUpdateQuantity('');
+        setUpdateType('in');
+        
+        // Show success message
+        alert('Stock updated successfully!');
+      } else {
+        alert(`Failed to update stock: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert('Failed to update stock. Please try again.');
+    }
   };
 
   const getStockStatus = (item: StockItem) => {
@@ -174,7 +202,7 @@ const StockUpdatePage: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Price:</span>
                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    ${item.price}
+                    ₦ {item.price}
                   </span>
                 </div>
               </div>
@@ -192,88 +220,94 @@ const StockUpdatePage: React.FC = () => {
       </div>
 
       {/* Update Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Update Stock: {selectedItem.name}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Update Type
-                </label>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setUpdateType('in')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      updateType === 'in'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    Stock In
-                  </button>
-                  <button
-                    onClick={() => setUpdateType('out')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      updateType === 'out'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    Stock Out
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Quantity ({selectedItem.unit})
-                </label>
-                <InputField
-                  type="number"
-                  value={updateQuantity}
-                  onChange={(e) => setUpdateQuantity(e.target.value)}
-                  placeholder="Enter quantity"
-                />
-              </div>
-
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Current: {selectedItem.currentStock} {selectedItem.unit}
-                {updateQuantity && (
-                  <span className="ml-2">
-                    → {updateType === 'in' 
-                      ? selectedItem.currentStock + parseInt(updateQuantity)
-                      : selectedItem.currentStock - parseInt(updateQuantity)
-                    } {selectedItem.unit}
-                  </span>
-                )}
+      <Modal
+        isOpen={!!selectedItem}
+        onClose={() => {
+          setSelectedItem(null);
+          setUpdateQuantity('');
+          setUpdateType('in');
+        }}
+        className="max-w-md w-full mx-4"
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Update Stock: {selectedItem?.name}
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Update Type
+              </label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setUpdateType('in')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    updateType === 'in'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  Stock In
+                </button>
+                <button
+                  onClick={() => setUpdateType('out')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    updateType === 'out'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  Stock Out
+                </button>
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedItem(null);
-                  setUpdateQuantity('');
-                  setUpdateType('in');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateStock}
-                disabled={!updateQuantity || parseInt(updateQuantity) <= 0}
-              >
-                Update
-              </Button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Quantity ({selectedItem?.unit})
+              </label>
+              <InputField
+                type="number"
+                value={updateQuantity}
+                onChange={(e) => setUpdateQuantity(e.target.value)}
+                placeholder="Enter quantity"
+              />
+            </div>
+
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Current: {selectedItem?.currentStock} {selectedItem?.unit}
+              {updateQuantity && (
+                <span className="ml-2">
+                  → {updateType === 'in' 
+                    ? (selectedItem?.currentStock || 0) + parseInt(updateQuantity)
+                    : (selectedItem?.currentStock || 0) - parseInt(updateQuantity)
+                  } {selectedItem?.unit}
+                </span>
+              )}
             </div>
           </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedItem(null);
+                setUpdateQuantity('');
+                setUpdateType('in');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateStock}
+              disabled={!updateQuantity || parseInt(updateQuantity) <= 0}
+            >
+              Update
+            </Button>
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

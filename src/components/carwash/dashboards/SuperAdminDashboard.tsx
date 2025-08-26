@@ -195,7 +195,7 @@ const SuperAdminDashboard: React.FC = () => {
                 Daily Income
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${metrics.totalIncome.daily.toLocaleString()}
+                ₦ {metrics.totalIncome.daily.toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
@@ -292,7 +292,7 @@ const SuperAdminDashboard: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      ${item.totalEarnings.toLocaleString()}
+                      ₦ {item.totalEarnings.toLocaleString()}
                     </p>
                   </div>
                 </div>
