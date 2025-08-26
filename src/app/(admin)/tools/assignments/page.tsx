@@ -41,6 +41,7 @@ interface AssignmentForm {
   assignedDate: string;
   expectedReturnDate: string;
   notes: string;
+  quantity: number;
 }
 
 interface WasherToolWithWorker {
@@ -78,7 +79,8 @@ const ToolsAssignmentsPage: React.FC = () => {
     workerId: '',
     assignedDate: new Date().toISOString().split('T')[0],
     expectedReturnDate: '',
-    notes: ''
+    notes: '',
+    quantity: 1
   });
 
   useEffect(() => {
@@ -160,8 +162,8 @@ const ToolsAssignmentsPage: React.FC = () => {
         body: JSON.stringify({
           washerId: assignmentForm.workerId,
           toolName: selectedTool.name,
-          toolType: 'equipment', // Default type, could be made configurable
-          quantity: 1,
+          toolType: 'equipment',
+          quantity: assignmentForm.quantity,
           notes: assignmentForm.notes
         })
       });
@@ -172,16 +174,15 @@ const ToolsAssignmentsPage: React.FC = () => {
         throw new Error(result.error || 'Failed to assign tool');
       }
 
-      // Refresh the assignments list
       await fetchData();
 
-      // Reset form and close modal
       setAssignmentForm({
         toolId: '',
         workerId: '',
         assignedDate: new Date().toISOString().split('T')[0],
         expectedReturnDate: '',
-        notes: ''
+        notes: '',
+        quantity: 1
       });
       closeModal();
 
@@ -327,9 +328,6 @@ const ToolsAssignmentsPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex space-x-2">
-                      <button className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300">
-                        Edit
-                      </button>
                       <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
                         Return
                       </button>
@@ -423,7 +421,21 @@ const ToolsAssignmentsPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Quantity
+              </label>
+              <input
+                type="number"
+                value={assignmentForm.quantity || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const quantity = value === '' ? 1 : parseInt(value) || 1;
+                  setAssignmentForm({...assignmentForm, quantity});
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Notes

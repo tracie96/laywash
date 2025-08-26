@@ -109,6 +109,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if tool exists and has sufficient quantity
+    const { data: existingTool, error: toolError } = await supabaseAdmin
+      .from('worker_tools')
+      .select('id, amount')
+      .eq('name', toolName)
+      .single();
+
+    if (toolError || !existingTool) {
+      return NextResponse.json(
+        { success: false, error: 'Tool not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingTool.amount < quantity) {
+      return NextResponse.json(
+        { success: false, error: `Insufficient quantity. Available: ${existingTool.amount}, Requested: ${quantity}` },
+        { status: 400 }
+      );
+    }
+
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin
       .from('washer_tools')
@@ -138,6 +159,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reduce the available quantity in worker_tools table
+    const { error: updateError } = await supabaseAdmin
+      .from('worker_tools')
+      .update({ amount: existingTool.amount - quantity })
+      .eq('id', existingTool.id);
+
+    if (updateError) {
+      console.error('Error updating tool quantity:', updateError);
+      return NextResponse.json(
+        { success: false, error: 'Tool assigned but failed to update inventory' },
+        { status: 500 }
+      );
+    }
+
     // Transform the response
     const transformedTool = {
       id: tool.id,
@@ -162,6 +197,99 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Create washer tool error:', error);
+    return NextResponse.json(
+      { success: false, error: 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { 
+      washerToolId, 
+      isReturned
+    } = await request.json();
+
+    // Validate required input
+    if (!washerToolId || isReturned === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields: washerToolId and isReturned are required' },
+        { status: 400 }
+      );
+    }
+
+    // Get the washer tool details
+    const { data: washerTool, error: fetchError } = await supabaseAdmin
+      .from('washer_tools')
+      .select('*')
+      .eq('id', washerToolId)
+      .single();
+
+    if (fetchError || !washerTool) {
+      return NextResponse.json(
+        { success: false, error: 'Washer tool not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update the washer tool status
+    const { error: updateError } = await supabaseAdmin
+      .from('washer_tools')
+      .update({ 
+        is_returned: isReturned,
+        returned_date: isReturned ? new Date().toISOString() : null
+      })
+      .eq('id', washerToolId);
+
+    if (updateError) {
+      console.error('Error updating washer tool:', updateError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to update washer tool' },
+        { status: 500 }
+      );
+    }
+
+    // If tool is being returned, increase the available quantity in worker_tools
+    if (isReturned) {
+      // First get current amount
+      const { data: currentTool, error: fetchToolError } = await supabaseAdmin
+        .from('worker_tools')
+        .select('amount')
+        .eq('name', washerTool.tool_name)
+        .single();
+
+      if (fetchToolError || !currentTool) {
+        console.error('Error fetching current tool quantity:', fetchToolError);
+        return NextResponse.json(
+          { success: false, error: 'Tool returned but failed to update inventory' },
+          { status: 500 }
+        );
+      }
+
+      const { error: quantityError } = await supabaseAdmin
+        .from('worker_tools')
+        .update({ 
+          amount: currentTool.amount + washerTool.quantity
+        })
+        .eq('name', washerTool.tool_name);
+
+      if (quantityError) {
+        console.error('Error updating tool quantity:', quantityError);
+        return NextResponse.json(
+          { success: false, error: 'Tool returned but failed to update inventory' },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Washer tool updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Update washer tool error:', error);
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred' },
       { status: 500 }
