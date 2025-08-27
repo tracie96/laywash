@@ -249,7 +249,6 @@ const ActiveCheckInsPage: React.FC = () => {
     try {
       const requestBody: { status: string; passcode?: string } = { status: newStatus };
       
-      // If marking as completed, include passcode
       if (newStatus === 'completed' && passcode) {
         requestBody.passcode = passcode;
       }
@@ -343,8 +342,7 @@ const ActiveCheckInsPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        // Update local state with the response data
-        setCheckIns(prev => prev.map(checkIn => 
+                setCheckIns(prev => prev.map(checkIn => 
           checkIn.id === checkInId 
             ? { ...checkIn, ...result.checkIn }
             : checkIn

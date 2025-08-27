@@ -164,7 +164,6 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const handleMaterialAssignment = (serviceId: string, materialId: string, quantity: number) => {
-    // Validate that quantity doesn't exceed available amount
     const material = washerMaterials.find(m => m.id === materialId);
     if (material && quantity > material.quantity) {
       setError(`Cannot allocate ${quantity} ${material.unit} - only ${material.quantity} ${material.unit} available`);
@@ -198,7 +197,6 @@ const NewCheckInPage: React.FC = () => {
             }
           }
         } else {
-          // Remove material if quantity is 0
           updatedMaterials = updatedMaterials.filter(m => m.materialId !== materialId);
         }
         
@@ -266,7 +264,6 @@ const NewCheckInPage: React.FC = () => {
     }
   }, [currentWasherId, washerMaterials.length]);
 
-  console.log({washerMaterials});
   // Load services and washers on component mount
   useEffect(() => {
     fetchServices();
@@ -499,7 +496,6 @@ const NewCheckInPage: React.FC = () => {
           throw new Error(`No materials assigned for service: ${service.serviceData.name}`);
         }
       }
-      console.log({servicesWithData});
       const submissionData = {
         customerName: formData.customerName,
         customerPhone: formData.customerPhone,
@@ -539,6 +535,37 @@ const NewCheckInPage: React.FC = () => {
       }
 
       if (result.success) {
+        // Update washer materials quantities by subtracting allocated amounts
+        try {
+          for (const serviceItem of servicesWithData) {
+            for (const material of serviceItem.materials) {
+              const washerMaterial = washerMaterials.find(wm => wm.id === material.materialId);
+              if (washerMaterial) {
+                const newQuantity = washerMaterial.quantity - material.quantity;
+                
+                // Update the washer material quantity in the database
+                const updateResponse = await fetch(`/api/admin/washer-materials/${washerMaterial.id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-ID': user?.id || '',
+                  },
+                  body: JSON.stringify({
+                    quantity: newQuantity
+                  }),
+                });
+
+                if (!updateResponse.ok) {
+                  console.warn(`Failed to update quantity for material ${material.materialName}`);
+                }
+              }
+            }
+          }
+        } catch (updateError) {
+          console.warn('Failed to update some material quantities:', updateError);
+          // Don't fail the check-in creation if quantity updates fail
+        }
+
         setSuccess('Check-in created successfully!');
         setTimeout(() => {
           router.push('/checkins/active');
