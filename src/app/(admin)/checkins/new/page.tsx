@@ -31,7 +31,7 @@ interface CheckInFormData {
   specialInstructions: string;
   estimatedDuration: number;
   // Security fields
-  customerType: 'instant' | 'registered';
+  washType: 'instant' | 'delayed';
   valuableItems: string;
   securityCode: string;
   userCode: string;
@@ -61,6 +61,7 @@ const NewCheckInPage: React.FC = () => {
   const [error, setError] = useState('');
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [showCustomerResults, setShowCustomerResults] = useState(false);
+  const [isCustomerSelected, setIsCustomerSelected] = useState(false);
 
   const [formData, setFormData] = useState<CheckInFormData>({
     customerName: '',
@@ -74,7 +75,7 @@ const NewCheckInPage: React.FC = () => {
     specialInstructions: '',
     estimatedDuration: 30,
     // Security fields
-    customerType: 'instant',
+    washType: 'instant',
     valuableItems: '',
     securityCode: '',
     userCode: '',
@@ -163,6 +164,13 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const handleMaterialAssignment = (serviceId: string, materialId: string, quantity: number) => {
+    // Validate that quantity doesn't exceed available amount
+    const material = washerMaterials.find(m => m.id === materialId);
+    if (material && quantity > material.quantity) {
+      setError(`Cannot allocate ${quantity} ${material.unit} - only ${material.quantity} ${material.unit} available`);
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       services: prev.services.map(service => {
@@ -180,7 +188,6 @@ const NewCheckInPage: React.FC = () => {
             };
           } else {
             // Add new material
-            const material = washerMaterials.find(m => m.id === materialId);
             if (material) {
               updatedMaterials.push({
                 materialId: material.id,
@@ -285,6 +292,7 @@ const NewCheckInPage: React.FC = () => {
     setError('');
     setFoundCustomers([]);
     setShowCustomerResults(false);
+    setIsCustomerSelected(false);
 
     try {
       // Use the general query parameter for flexible search
@@ -324,14 +332,35 @@ const NewCheckInPage: React.FC = () => {
       vehicleModel: primaryVehicle?.vehicle_model || '',
       vehicleColor: primaryVehicle?.vehicle_color || '',
       // Set customer type to registered for existing customers
-      customerType: 'registered',
+      washType: 'delayed',
       // Clear security fields to be filled by user
       securityCode: '',
       userCode: '',
       checkInProcess: '',
     }));
     setShowCustomerResults(false);
+    setIsCustomerSelected(true);
     setSuccess(`Selected customer: ${customer.name} with vehicle: ${primaryVehicle?.vehicle_color || ''} ${primaryVehicle?.vehicle_type || ''} (${primaryVehicle?.license_plate || ''}) - Security codes required`);
+  };
+
+  const clearSelectedCustomer = () => {
+    setFormData(prev => ({
+      ...prev,
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      licensePlate: '',
+      vehicleType: '',
+      vehicleModel: '',
+      vehicleColor: '',
+      washType: 'instant', // Reset wash type to instant
+      securityCode: '',
+      userCode: '',
+      checkInProcess: '',
+    }));
+    setIsCustomerSelected(false);
+    setSuccess('');
+    setError('');
   };
 
   const calculateTotalPrice = () => {
@@ -366,14 +395,14 @@ const NewCheckInPage: React.FC = () => {
       return;
     }
 
-    if (formData.customerType === 'registered') {
+    if (formData.washType === 'delayed') {
       if (!formData.securityCode.trim() || !formData.userCode.trim()) {
-        setError('Security code and user code are required for registered customers');
+        setError('Security code and user code are required for delayed wash customers');
         setIsSubmitting(false);
         return;
       }
       if (!formData.checkInProcess.trim()) {
-        setError('Check-in process details are required for registered customers');
+        setError('Check-in process details are required for delayed wash customers');
         setIsSubmitting(false);
         return;
       }
@@ -428,6 +457,14 @@ const NewCheckInPage: React.FC = () => {
           setIsSubmitting(false);
           return;
         }
+        
+        // Check if allocated quantity exceeds available quantity
+        const washerMaterial = washerMaterials.find(wm => wm.id === material.materialId);
+        if (washerMaterial && material.quantity > washerMaterial.quantity) {
+          setError(`Cannot allocate ${material.quantity} ${material.unit} of ${material.materialName} - only ${washerMaterial.quantity} ${washerMaterial.unit} available`);
+          setIsSubmitting(false);
+          return;
+        }
       }
     }
 
@@ -462,8 +499,7 @@ const NewCheckInPage: React.FC = () => {
           throw new Error(`No materials assigned for service: ${service.serviceData.name}`);
         }
       }
-
-      // Prepare submission data
+      console.log({servicesWithData});
       const submissionData = {
         customerName: formData.customerName,
         customerPhone: formData.customerPhone,
@@ -475,7 +511,7 @@ const NewCheckInPage: React.FC = () => {
         services: servicesWithData,
         specialInstructions: formData.specialInstructions,
         estimatedDuration: calculateEstimatedDuration(),
-        customerType: formData.customerType,
+        washType: formData.washType, 
         valuableItems: formData.valuableItems,
         userCode: formData.userCode,
         passcode: formData.securityCode,
@@ -551,15 +587,34 @@ const NewCheckInPage: React.FC = () => {
           </h2>
           
           {/* Customer Search Section */}
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-            <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-3">
-              Search for Existing Customer
+          <div className={`mb-6 p-4 rounded-lg border ${
+            isCustomerSelected 
+              ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
+              : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
+          }`}>
+            <h3 className={`text-lg font-medium mb-3 ${
+              isCustomerSelected 
+                ? 'text-green-900 dark:text-green-100' 
+                : 'text-blue-900 dark:text-blue-100'
+            }`}>
+              {isCustomerSelected ? 'Customer Selected' : 'Search for Existing Customer'}
             </h3>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-              Search by name, phone number, plate number, or email address
+            <p className={`text-sm mb-4 ${
+              isCustomerSelected 
+                ? 'text-green-700 dark:text-green-300' 
+                : 'text-blue-700 dark:text-blue-300'
+            }`}>
+              {isCustomerSelected 
+                ? 'Customer information has been populated from existing record. You can clear the selection to enter new customer details.'
+                : 'Search by name, phone number, plate number, or email address'
+              }
             </p>
             <div className="mb-3">
-              <Label htmlFor="search-customer" className="text-blue-900 dark:text-blue-100 text-sm font-medium">
+              <Label htmlFor="search-customer" className={`text-sm font-medium ${
+                isCustomerSelected 
+                  ? 'text-green-900 dark:text-green-100' 
+                  : 'text-blue-900 dark:text-blue-100'
+              }`}>
                 Search Customer
               </Label>
               <InputField
@@ -568,14 +623,19 @@ const NewCheckInPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Enter name, phone, plate number, or email"
+                disabled={isCustomerSelected}
               />
             </div>
             <div className="flex justify-center">
               <Button
                 type="button"
                 onClick={searchCustomer}
-                disabled={isSearching}
-                className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+                disabled={isSearching || isCustomerSelected}
+                className={`min-w-[120px] ${
+                  isCustomerSelected 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 {isSearching ? 'Searching...' : 'Search Customer'}
               </Button>
@@ -619,6 +679,27 @@ const NewCheckInPage: React.FC = () => {
             </div>
           )}
 
+          {/* Clear Customer Button */}
+          {isCustomerSelected && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-800 dark:text-yellow-200 text-sm">
+                    Customer information is locked - fields are populated from existing customer record
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={clearSelectedCustomer}
+                  className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  Clear Selected Customer
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField label="Customer Name" required>
               <InputField
@@ -626,6 +707,7 @@ const NewCheckInPage: React.FC = () => {
                 value={formData.customerName}
                 onChange={(e) => handleInputChange('customerName', e.target.value)}
                 placeholder="Enter customer's full name"
+                disabled={isCustomerSelected}
               />
             </FormField>
             <FormField label="Phone Number" required>
@@ -634,6 +716,7 @@ const NewCheckInPage: React.FC = () => {
                 value={formData.customerPhone}
                 onChange={(e) => handleInputChange('customerPhone', e.target.value)}
                 placeholder="Enter phone number"
+                disabled={isCustomerSelected}
               />
             </FormField>
             <FormField label="Email Address">
@@ -642,6 +725,7 @@ const NewCheckInPage: React.FC = () => {
                 value={formData.customerEmail}
                 onChange={(e) => handleInputChange('customerEmail', e.target.value)}
                 placeholder="Enter email address (optional)"
+                disabled={isCustomerSelected}
               />
             </FormField>
           </div>
@@ -659,6 +743,7 @@ const NewCheckInPage: React.FC = () => {
                 value={formData.licensePlate}
                 onChange={(e) => handleInputChange('licensePlate', e.target.value)}
                 placeholder="Enter license plate"
+                disabled={isCustomerSelected}
               />
             </FormField>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -668,6 +753,7 @@ const NewCheckInPage: React.FC = () => {
                   placeholder="Select vehicle type"
                   value={formData.vehicleType}
                   onChange={(value) => handleInputChange('vehicleType', value)}
+                  disabled={isCustomerSelected}
                 />
               </FormField>
               
@@ -676,6 +762,7 @@ const NewCheckInPage: React.FC = () => {
                   value={formData.vehicleModel}
                   onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
                   placeholder="Enter vehicle model (optional)"
+                  disabled={isCustomerSelected}
                 />
               </FormField>
             </div>
@@ -686,6 +773,7 @@ const NewCheckInPage: React.FC = () => {
                   value={formData.vehicleColor}
                   onChange={(e) => handleInputChange('vehicleColor', e.target.value)}
                   placeholder="Enter vehicle color"
+                  disabled={isCustomerSelected}
                 />
               </FormField>
             </div>
@@ -831,6 +919,7 @@ const NewCheckInPage: React.FC = () => {
                               <div className="grid grid-cols-1 gap-3">
                                 {washerMaterials.map((material) => {
                                   const assignedMaterial = selectedService.materials.find(m => m.materialId === material.id);
+                                  
                                   return (
                                     <div
                                       key={material.id}
@@ -852,7 +941,7 @@ const NewCheckInPage: React.FC = () => {
                                           type="number"
                                           min="0"
                                           max={material.quantity}
-                                          step="0.1"
+                                          step="0"
                                           className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                           placeholder="0"
                                           value={assignedMaterial?.quantity || 0}
@@ -865,11 +954,35 @@ const NewCheckInPage: React.FC = () => {
                                           {material.unit}
                                         </span>
                                       </div>
+                                      {assignedMaterial?.quantity && assignedMaterial.quantity > 0 && (
+                                        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                                          Allocated: {assignedMaterial.quantity} {material.unit} for this check-in
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* Materials Summary */}
+                        {selectedService && selectedService.materials.length > 0 && (
+                          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+                            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                              Materials Summary for {service.name}
+                            </h4>
+                            <div className="space-y-1">
+                              {selectedService.materials.map((material) => (
+                                <div key={material.materialId} className="flex justify-between text-xs">
+                                  <span className="text-blue-700 dark:text-blue-300">{material.materialName}</span>
+                                  <span className="text-blue-900 dark:text-blue-100 font-medium">
+                                    {material.quantity} {material.unit}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
@@ -920,7 +1033,6 @@ const NewCheckInPage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Display Final Price */}
                         <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">
                             Final Price: ${selectedService?.customPrice !== undefined ? selectedService.customPrice : service.price}
@@ -946,34 +1058,42 @@ const NewCheckInPage: React.FC = () => {
             Security & Check-in Process
           </h2>
           
-          {/* Customer Type Selection */}
+          {/* Wash Type Selection */}
           <div className="mb-6">
-            <FormField label="Customer Type" required>
+            <FormField label="Wash Type" required>
               <div className="flex space-x-4">
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    name="customerType"
+                    name="washType"
                     value="instant"
-                    checked={formData.customerType === 'instant'}
-                    onChange={(e) => handleInputChange('customerType', e.target.value as 'instant' | 'registered')}
-                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                    checked={formData.washType === 'instant'}
+                    onChange={(e) => handleInputChange('washType', e.target.value as 'instant' | 'delayed')}
+                    className="mr-2 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span className="text-gray-700 dark:text-gray-300">Instant Customer (Walk-in)</span>
+                  <span className="text-gray-700 dark:text-gray-300">Instant Wash</span>
                 </label>
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    name="customerType"
-                    value="registered"
-                    checked={formData.customerType === 'registered'}
-                    onChange={(e) => handleInputChange('customerType', e.target.value as 'instant' | 'registered')}
-                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                    name="washType"
+                    value="delayed"
+                    checked={formData.washType === 'delayed'}
+                    onChange={(e) => handleInputChange('washType', e.target.value as 'instant' | 'delayed')}
+                    className="mr-2 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span className="text-gray-700 dark:text-gray-300">Registered Customer</span>
+                  <span className="text-gray-700 dark:text-gray-300">Delayed Wash</span>
                 </label>
               </div>
             </FormField>
+          </div>
+
+          {/* Passcode Requirement Notice */}
+          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-blue-800 dark:text-blue-300 text-sm">
+              <strong>Important:</strong> All check-ins (both instant and delayed wash) require the check-in passcode to be marked as complete. 
+              This ensures security and accountability for all car wash services.
+            </p>
           </div>
 
           {/* Valuable Items Documentation */}
@@ -982,23 +1102,23 @@ const NewCheckInPage: React.FC = () => {
               <TextArea
                 value={formData.valuableItems}
                 onChange={(value) => handleInputChange('valuableItems', value)}
-                placeholder={formData.customerType === 'instant' 
-                  ? "Note of valuable items for instant customer..." 
-                  : "Note of valuable items and check-in process for registered customer..."
+                placeholder={formData.washType === 'instant' 
+                  ? "Note of valuable items for instant wash..." 
+                  : "Note of valuable items and check-in process for delayed wash..."
                 }
                 rows={3}
               />
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                {formData.customerType === 'instant' 
-                  ? "For instant customers: Take note of valuable items only"
-                  : "For registered customers: Take note of valuable items AND complete check-in process"
+                {formData.washType === 'instant' 
+                  ? "For instant wash: Take note of valuable items only"
+                  : "For delayed wash: Take note of valuable items AND complete check-in process"
                 }
               </p>
             </FormField>
           </div>
 
-          {/* Security Codes - Only for Registered Customers */}
-          {formData.customerType === 'registered' && (
+          {/* Security Codes - Only for Delayed Wash */}
+          {formData.washType === 'delayed' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField label="Security Code" required>

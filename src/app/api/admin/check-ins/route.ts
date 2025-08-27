@@ -89,15 +89,20 @@ export async function GET(request: NextRequest) {
       customerPhone: checkIn.customers?.phone || checkIn.customers?.email || 'N/A',
       licensePlate: checkIn.license_plate,
       vehicleType: checkIn.vehicle_type,
+      washType: checkIn.wash_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
-      services: checkIn.check_in_services?.map((cis: { services: { name: string } }) => cis.services?.name).filter(Boolean) || [],
+      services: checkIn.check_in_services?.map((cis: { services: { id: string; name: string; description: string; base_price: number; category: string }[] }) => 
+        cis.services?.[0]?.name || 'Unknown Service'
+      ).filter(Boolean) || [],
       status: checkIn.status,
       checkInTime: new Date(checkIn.check_in_time),
       completedTime: checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined,
       paidTime: checkIn.payment_status === 'paid' ? checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined : undefined,
       assignedWasher: checkIn.assigned_washer?.name || 'Unassigned',
       assignedWasherId: checkIn.assigned_washer_id,
+      passcode: checkIn.passcode,
+      washerCompletionStatus: checkIn.washer_completion_status || false,
       assignedAdmin: checkIn.assigned_admin?.name || 'Unassigned',
       estimatedDuration: calculateEstimatedDuration(checkIn.check_in_services),
       actualDuration: checkIn.actual_completion_time && checkIn.check_in_time 
@@ -194,6 +199,7 @@ export async function POST(request: NextRequest) {
       customerType,
       valuableItems,
       userCode,
+      washType,
       passcode,
       remarks
     }: {
@@ -210,6 +216,7 @@ export async function POST(request: NextRequest) {
       customerType: string;
       valuableItems: string;
       userCode: string;
+      washType: string;
       passcode: string;
       remarks: string;
     } = await request.json();
@@ -309,7 +316,6 @@ export async function POST(request: NextRequest) {
         customerId = newCustomer.id;
       }
     } else {
-      // For instant customers, create a temporary record or use null
       customerId = null;
     }
 
@@ -348,6 +354,7 @@ export async function POST(request: NextRequest) {
         payment_status: 'pending',
         valuable_items: valuableItems,
         user_code: userCode || null,
+        wash_type: washType || null,
         passcode: passcode || null,
         remarks: remarks || specialInstructions || null
       })
@@ -364,26 +371,32 @@ export async function POST(request: NextRequest) {
 
     console.log('Check-in created successfully with ID:', checkIn.id);
 
-    // Create check-in services records
+    // Create check-in services and materials records
     for (const service of services) {
-      // Create service record
+      // Create service record first
       const { error: serviceError } = await supabaseAdmin
         .from('check_in_services')
         .insert({
           check_in_id: checkIn.id,
           service_id: service.serviceId,
-          assigned_washer_id: service.workerId,
-          custom_price: service.customPrice,
-          estimated_duration: service.serviceData.duration
-        });
+          material_id: null, // This will be updated when materials are assigned
+          price: service.customPrice !== undefined ? service.customPrice : service.serviceData.price,
+          service_name: service.serviceData.name,
+          duration: service.serviceData.duration
+        })
+        .select('id')
+        .single();
 
       if (serviceError) {
         console.error('Error creating check-in service:', serviceError);
-        // Continue with other services, but log the error
+        return NextResponse.json(
+          { success: false, error: `Failed to create check-in service: ${serviceError.message}` },
+          { status: 500 }
+        );
       }
 
-      // Note: Material assignments are tracked in the service record for now
-      // You can implement a separate check_in_materials table later if needed
+
+
       console.log(`Service ${service.serviceId} assigned to worker ${service.workerId} with ${service.materials.length} materials`);
     }
 
@@ -403,19 +416,12 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper function to calculate estimated duration based on services
-function calculateEstimatedDuration(checkInServices: { services: { estimated_duration: number } }[]): number {
+function calculateEstimatedDuration(checkInServices: { services: { id: string; name: string; description: string; base_price: number; category: string }[] }[]): number {
   if (!checkInServices || checkInServices.length === 0) {
     return 30; // Default duration
   }
 
-  // Calculate total duration based on services
-  const totalDuration = checkInServices.reduce((total, cis) => {
-    const service = cis.services;
-    if (service && service.estimated_duration) {
-      return total + service.estimated_duration;
-    }
-    return total;
-  }, 0);
-
-  return totalDuration || 30; // Return calculated duration or default
+  // For now, return a default duration since we don't have estimated_duration in the new query
+  // You can update this later to fetch estimated_duration from the services table if needed
+  return 30; // Default duration
 }

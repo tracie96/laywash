@@ -8,6 +8,7 @@ interface ToolAssignment {
   id: string;
   toolName: string;
   workerName: string;
+  quantity: number;
   assignedDate: string;
   returnDate?: string;
   status: "assigned" | "returned" | "overdue";
@@ -71,8 +72,11 @@ const ToolsAssignmentsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [returningToolId, setReturningToolId] = useState<string | null>(null);
   
   const { isOpen, openModal, closeModal } = useModal();
+  const { isOpen: isReturnModalOpen, openModal: openReturnModal, closeModal: closeReturnModal } = useModal();
   
   const [assignmentForm, setAssignmentForm] = useState<AssignmentForm>({
     toolId: '',
@@ -108,6 +112,7 @@ const ToolsAssignmentsPage: React.FC = () => {
             id: tool.id,
             toolName: tool.toolName,
             workerName: tool.washer?.name || 'Unknown Worker',
+            quantity: tool.quantity,
             assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
             returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
             status: tool.isReturned ? "returned" : 
@@ -127,6 +132,57 @@ const ToolsAssignmentsPage: React.FC = () => {
     }
   };
   console.log({tools});
+
+  const handleReturnTool = async (assignmentId: string) => {
+    setReturningToolId(assignmentId);
+    openReturnModal();
+  };
+
+  const confirmReturnTool = async () => {
+    if (!returningToolId) return;
+    
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const response = await fetch('/api/admin/washer-tools', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          washerToolId: returningToolId,
+          isReturned: true
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to return tool');
+      }
+
+      // Refresh the data to show updated status
+      await fetchData();
+      
+      // Show success message
+      setSuccessMessage('Tool returned successfully!');
+      setError(null);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
+      
+      // Close modal and reset
+      closeReturnModal();
+      setReturningToolId(null);
+      
+    } catch (error) {
+      console.error('Error returning tool:', error);
+      setError(error instanceof Error ? error.message : 'Failed to return tool');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleAssignTool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,8 +243,11 @@ const ToolsAssignmentsPage: React.FC = () => {
       closeModal();
 
       // Show success message
+      setSuccessMessage('Tool assigned successfully!');
       setError(null);
-      console.log('Tool assigned successfully!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
       
     } catch (error) {
       console.error('Error assigning tool:', error);
@@ -229,6 +288,19 @@ const ToolsAssignmentsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Tool Assignments" />
+
+      {/* Success and Error Messages */}
+      {successMessage && (
+        <div className="p-4 bg-green-light-100 border border-green-light-300 text-green-light-700 rounded-lg">
+          {successMessage}
+        </div>
+      )}
+      
+      {error && (
+        <div className="p-4 bg-error-100 border border-error-300 text-error-700 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -296,6 +368,7 @@ const ToolsAssignmentsPage: React.FC = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tool</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Worker</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Return Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
@@ -313,6 +386,9 @@ const ToolsAssignmentsPage: React.FC = () => {
                     {assignment.workerName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {assignment.quantity}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(assignment.assignedDate).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -328,9 +404,18 @@ const ToolsAssignmentsPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex space-x-2">
-                      <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
-                        Return
-                      </button>
+                      {assignment.status !== "returned" && (
+                        <button 
+                          onClick={() => handleReturnTool(assignment.id)}
+                          disabled={submitting}
+                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Return
+                        </button>
+                      )}
+                      {assignment.status === "returned" && (
+                        <span className="text-gray-400 dark:text-gray-500">Returned</span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -340,7 +425,6 @@ const ToolsAssignmentsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Assignment Modal */}
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
@@ -466,6 +550,36 @@ const ToolsAssignmentsPage: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* Return Confirmation Modal */}
+      <Modal isOpen={isReturnModalOpen} onClose={closeReturnModal} className="max-w-md">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Tool Return</h3>
+          </div>
+          
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Are you sure you want to mark this tool as returned? This action cannot be undone.
+          </p>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={closeReturnModal}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmReturnTool}
+              disabled={submitting}
+              className="px-4 py-2 bg-green-light-600 hover:bg-green-light-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Returning...' : 'Confirm Return'}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         remarks,
         created_at,
         updated_at,
+        wash_type,
         customers (
           id,
           name,
@@ -112,7 +113,8 @@ export async function GET(request: NextRequest) {
         paymentMethod: checkIn.payment_method,
         customerId: checkIn.customers?.[0]?.id,
         createdAt: checkIn.created_at,
-        updatedAt: checkIn.updated_at
+        updatedAt: checkIn.updated_at,
+        washType: checkIn.wash_type || 'instant'
       };
     });
 

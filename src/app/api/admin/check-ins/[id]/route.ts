@@ -18,8 +18,98 @@ export async function PATCH(
   try {
     const { id } = await params;
     const updateData = await request.json();
+    
+    console.log('Received update data:', updateData);
+    console.log('User ID from request:', updateData?.userId);
 
-    console.log('PATCH request for check-in:', id, 'with data:', updateData);
+    // Get user role for authorization checks
+    let userRole = null;
+    let checkInData = null;
+    
+    if (updateData?.userId) {
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', updateData.userId)
+        .single();
+
+      if (userError || !userData) {
+        return NextResponse.json(
+          { success: false, error: 'User not found or unauthorized' },
+          { status: 400 }
+        );
+      }
+      
+      userRole = userData.role;
+      console.log('User role:', userRole);
+    }
+
+    // Get check-in data for validation
+    if (updateData.status === 'completed' || updateData.washer_completion_status !== undefined) {
+      const { data: checkInDataResult, error: fetchError } = await supabaseAdmin
+        .from('car_check_ins')
+        .select('assigned_washer_id, assigned_admin_id, wash_type')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !checkInDataResult) {
+        return NextResponse.json(
+          { success: false, error: 'Check-in not found' },
+          { status: 400 }
+        );
+      }
+      
+      checkInData = checkInDataResult;
+    }
+
+    // Handle status completion (for admins)
+    if (updateData.status === 'completed') {
+      const isWorker = userRole === 'car_washer';
+      const isInstantCustomer = checkInData?.wash_type === 'instant';
+      
+      // Skip passcode if it's a worker OR if it's an admin with instant customer
+      if (!(isWorker || isInstantCustomer)) {
+        if (!updateData.passcode) {
+          return NextResponse.json(
+            { success: false, error: 'Passcode is required to mark check-in as completed for delayed wash customers' },
+            { status: 400 }
+          );
+        }
+
+        const { data: checkInPasscodeData, error: passcodeError } = await supabaseAdmin
+          .from('car_check_ins')
+          .select('passcode')
+          .eq('id', id)
+          .single();
+
+        if (passcodeError || !checkInPasscodeData?.passcode) {
+          return NextResponse.json(
+            { success: false, error: 'Check-in passcode not found. Please set a passcode when creating the check-in.' },
+            { status: 400 }
+          );
+        }
+
+        // Verify passcode
+        if (checkInPasscodeData.passcode !== updateData.passcode) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid passcode' },
+            { status: 400 }
+          );
+        }
+
+        console.log('Passcode verified successfully for check-in:', id);
+      } else {
+        console.log('Passcode skipped for worker or instant customer, check-in:', id);
+      }
+    }
+
+    // Handle washer completion status (for car_washers only)
+    if (updateData.washer_completion_status !== undefined && userRole !== 'car_washer') {
+      return NextResponse.json(
+        { success: false, error: 'Only car washers can update washer completion status' },
+        { status: 403 }
+      );
+    }
 
     // Validate the update data
     if (updateData.status && !['pending', 'in_progress', 'completed', 'paid', 'cancelled'].includes(updateData.status)) {
@@ -46,15 +136,44 @@ export async function PATCH(
       );
     }
 
+    // Validate washer completion status
+    if (updateData.washerCompletionStatus !== undefined && typeof updateData.washerCompletionStatus !== 'boolean') {
+      console.log('Invalid washer completion status value:', updateData.washerCompletionStatus);
+      return NextResponse.json(
+        { success: false, error: 'Invalid washer completion status value' },
+        { status: 400 }
+      );
+    }
+
     // Transform frontend field names to database field names
-    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; payment_time?: string } = {};
+    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean } = {};
+    
+    // Handle status updates (for admins)
     if (updateData.status !== undefined) dbUpdateData.status = updateData.status;
+    
+    // Handle washer completion status (for car_washers)
+    if (updateData.washerCompletionStatus !== undefined) {
+      dbUpdateData.washer_completion_status = updateData.washerCompletionStatus;
+      console.log('Setting washer_completion_status from washerCompletionStatus:', updateData.washerCompletionStatus);
+    } else if (updateData.washer_completion_status !== undefined) {
+      // Handle snake_case format from frontend
+      const boolValue = updateData.washer_completion_status === 'completed' || updateData.washer_completion_status === true;
+      dbUpdateData.washer_completion_status = boolValue;
+      console.log('Setting washer_completion_status from washer_completion_status:', updateData.washer_completion_status, '->', boolValue);
+    }
+    
+    // Handle other fields
     if (updateData.paymentStatus !== undefined) dbUpdateData.payment_status = updateData.paymentStatus;
     if (updateData.paymentMethod !== undefined) dbUpdateData.payment_method = updateData.paymentMethod;
     if (updateData.assignedWasherId !== undefined) dbUpdateData.assigned_washer_id = updateData.assignedWasherId;
     if (updateData.assignedAdminId !== undefined) dbUpdateData.assigned_admin_id = updateData.assignedAdminId;
     if (updateData.remarks !== undefined) dbUpdateData.remarks = updateData.remarks;
     if (updateData.valuableItems !== undefined) dbUpdateData.valuable_items = updateData.valuableItems;
+    
+    // Handle actual completion time
+    if (updateData.actual_completion_time !== undefined) {
+      dbUpdateData.actual_completion_time = updateData.actual_completion_time;
+    }
 
     // Set completion time when status changes to completed
     if (updateData.status === 'completed' && !dbUpdateData.actual_completion_time) {
@@ -63,10 +182,11 @@ export async function PATCH(
 
     // Set payment time when payment status changes to paid
     if (updateData.paymentStatus === 'paid') {
-      dbUpdateData.payment_time = new Date().toISOString();
+      dbUpdateData.actual_completion_time = new Date().toISOString();
     }
 
-    console.log('Database update data:', dbUpdateData);
+    console.log('Final database update data:', dbUpdateData);
+    console.log('Update data keys:', Object.keys(dbUpdateData));
 
     // Update the check-in
     const { data: checkIn, error } = await supabaseAdmin
@@ -80,15 +200,6 @@ export async function PATCH(
           name,
           email,
           phone
-        ),
-        check_in_services (
-          services (
-            id,
-            name,
-            description,
-            base_price,
-            category
-          )
         ),
         assigned_washer:users!car_check_ins_assigned_washer_id_fkey (
           id,
@@ -121,9 +232,27 @@ export async function PATCH(
       );
     }
 
+    // Fetch check-in services separately to avoid the single() issue
+    const { data: checkInServices, error: servicesError } = await supabaseAdmin
+      .from('check_in_services')
+      .select(`
+        services (
+          id,
+          name,
+          description,
+          base_price,
+          category
+        )
+      `)
+      .eq('check_in_id', id);
+
+    if (servicesError) {
+      console.error('Error fetching check-in services:', servicesError);
+      // Don't fail the entire update, just log the error
+    }
+
     console.log('Check-in updated successfully:', checkIn.id, 'New status:', checkIn.status);
 
-    // If the check-in was just completed, trigger milestone checking for the customer
     if (updateData.status === 'completed' && checkIn.customers?.[0]?.id) {
       try {
         // Call milestone achievement checking API
@@ -152,13 +281,17 @@ export async function PATCH(
       vehicleType: checkIn.vehicle_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
-      services: checkIn.check_in_services?.map((cis: { services: { name: string } }) => cis.services?.name).filter(Boolean) || [],
+      services: checkInServices?.map((cis: { services: { id: string; name: string; description: string; base_price: number; category: string }[] }) => 
+        cis.services?.[0]?.name || 'Unknown Service'
+      ).filter(Boolean) || [],
       status: checkIn.status,
       checkInTime: new Date(checkIn.check_in_time),
       completedTime: checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined,
       paidTime: checkIn.payment_status === 'paid' ? checkIn.actual_completion_time ? new Date(checkIn.actual_completion_time) : undefined : undefined,
       assignedWasher: checkIn.assigned_washer?.name || 'Unassigned',
       assignedWasherId: checkIn.assigned_washer_id,
+      passcode: checkIn.passcode,
+      washerCompletionStatus: checkIn.washer_completion_status || false,
       assignedAdmin: checkIn.assigned_admin?.name || 'Unassigned',
       estimatedDuration: calculateEstimatedDuration(checkIn.check_in_services),
       actualDuration: checkIn.actual_completion_time && checkIn.check_in_time 

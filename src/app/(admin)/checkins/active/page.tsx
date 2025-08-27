@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
+import PasscodeModal from '@/components/admin/PasscodeModal';
 
 interface CheckIn {
   id: string;
@@ -11,12 +12,14 @@ interface CheckIn {
   vehicleType: string;
   vehicleColor: string;
   vehicleModel?: string;
+  washType?: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
   completedTime?: Date;
   assignedWasher?: string;
   assignedWasherId?: string;
+  washerCompletionStatus?: boolean;
   estimatedDuration: number;
   actualDuration?: number;
   totalPrice: number;
@@ -24,6 +27,7 @@ interface CheckIn {
   paymentStatus?: string;
   paymentMethod?: string;
   customerId: string;
+  passcode?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,12 +41,14 @@ interface RawCheckIn {
   vehicleType: string;
   vehicleColor: string;
   vehicleModel?: string;
+  washType?: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: string; // API returns as string
   completedTime?: string; // API returns as string
   assignedWasher?: string;
   assignedWasherId?: string;
+  washerCompletionStatus?: boolean;
   estimatedDuration: number;
   actualDuration?: number;
   totalPrice: number;
@@ -50,6 +56,7 @@ interface RawCheckIn {
   paymentStatus?: string;
   paymentMethod?: string;
   customerId: string;
+  passcode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +80,9 @@ const ActiveCheckInsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
+  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
+  const [passcodeError, setPasscodeError] = useState<string>('');
 
   // Fetch active check-ins from API
   const fetchActiveCheckIns = async (search = '') => {
@@ -92,10 +102,13 @@ const ActiveCheckInsPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        // Filter only active check-ins (pending and in_progress)
+        console.log('Raw API response:', result.checkIns); 
+        
         const activeCheckIns = result.checkIns.filter((checkIn: RawCheckIn) => 
           checkIn.status === 'pending' || checkIn.status === 'in_progress'
         );
+        
+        console.log('Active check-ins after filtering:', activeCheckIns); // Debug log
         
         // Convert string dates back to Date objects
         const processedCheckIns = activeCheckIns.map((checkIn: RawCheckIn) => ({
@@ -111,6 +124,8 @@ const ActiveCheckInsPage: React.FC = () => {
                  !isNaN(checkIn.updatedAt.getTime());
         });
         
+        console.log('Processed check-ins:', processedCheckIns); // Debug log
+        
         setCheckIns(processedCheckIns);
       } else {
         throw new Error(result.error || 'Failed to fetch check-ins');
@@ -121,14 +136,12 @@ const ActiveCheckInsPage: React.FC = () => {
     }
   };
 
-  // Fetch available washers from API
   const fetchWashers = async () => {
     try {
       const response = await fetch('/api/admin/washers');
       const result = await response.json();
       
       if (result.success) {
-        // Filter only available washers
         const availableWashers = result.washers.filter((washer: Washer) => 
           washer.status === 'active' && washer.isAvailable
         );
@@ -232,14 +245,21 @@ const ActiveCheckInsPage: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (checkInId: string, newStatus: string) => {
+  const handleStatusChange = async (checkInId: string, newStatus: string, passcode?: string) => {
     try {
+      const requestBody: { status: string; passcode?: string } = { status: newStatus };
+      
+      // If marking as completed, include passcode
+      if (newStatus === 'completed' && passcode) {
+        requestBody.passcode = passcode;
+      }
+
       const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -251,13 +271,60 @@ const ActiveCheckInsPage: React.FC = () => {
             ? { ...checkIn, ...result.checkIn }
             : checkIn
         ));
+        
+        // Close modal and clear error on success
+        if (newStatus === 'completed') {
+          setShowPasscodeModal(false);
+          setPasscodeError('');
+          setSelectedCheckInId('');
+        }
       } else {
         throw new Error(result.error || 'Failed to update status');
       }
     } catch (err) {
       console.error('Error updating status:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      if (newStatus === 'completed') {
+        setPasscodeError(err instanceof Error ? err.message : 'Failed to update status');
+      } else {
+        alert(err instanceof Error ? err.message : 'Failed to update status');
+      }
     }
+  };
+
+  const handleOpenPasscodeModal = (checkInId: string) => {
+    const checkIn = checkIns.find(c => c.id === checkInId);
+    console.log('Check-in data:', checkIn); // Debug log
+    
+    // For instant wash customers, no passcode is required
+    if (checkIn?.washType === 'instant') {
+      console.log('Instant wash customer, marking as completed directly'); // Debug log
+      handleStatusChange(checkInId, 'completed');
+      return;
+    }
+    
+    // For delayed wash customers, check if passcode is set
+    if (!checkIn?.passcode) {
+      console.log('Delayed wash customer but no passcode set, marking as completed directly'); // Debug log
+      handleStatusChange(checkInId, 'completed');
+      return;
+    }
+    
+    // For delayed wash customers with passcode, require passcode input
+    console.log('Delayed wash customer with passcode, passcode required'); // Debug log
+    setSelectedCheckInId(checkInId);
+    setShowPasscodeModal(true);
+    setPasscodeError('');
+  };
+
+  const handlePasscodeConfirm = (passcode: string) => {
+    handleStatusChange(selectedCheckInId, 'completed', passcode);
+  };
+
+
+  const handlePasscodeModalClose = () => {
+    setShowPasscodeModal(false);
+    setSelectedCheckInId('');
+    setPasscodeError('');
   };
 
   const handleAssignWasher = async (checkInId: string, washerId: string) => {
@@ -576,9 +643,25 @@ const ActiveCheckInsPage: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {checkIn.washType === 'delayed' && (
+                    <div className="text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Security: </span>
+                      <span className={`font-medium ${checkIn.passcode ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                        {checkIn.passcode ? 'Passcode Set' : 'No Passcode'}
+                      </span>
+                    </div>
+                  )}
+                  {checkIn.assignedWasher && (
+                    <div className="text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Washer Status: </span>
+                      <span className={`font-medium ${checkIn.washerCompletionStatus ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                        {checkIn.washerCompletionStatus ? 'Completed' : 'In Progress'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                   {checkIn.status === 'pending' && (
                     <>
                       {washers.length > 0 ? (
@@ -589,7 +672,7 @@ const ActiveCheckInsPage: React.FC = () => {
                             }
                           }}
                           value=""
-                          className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           <option value="">Assign Washer</option>
                           {washers.map((washer) => (
@@ -603,6 +686,7 @@ const ActiveCheckInsPage: React.FC = () => {
                           variant="outline"
                           size="sm"
                           disabled
+                          className="w-full sm:w-auto"
                         >
                           No Washers Available
                         </Button>
@@ -611,6 +695,7 @@ const ActiveCheckInsPage: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleStatusChange(checkIn.id, 'cancelled')}
+                        className="w-full sm:w-auto"
                       >
                         Cancel
                       </Button>
@@ -618,11 +703,23 @@ const ActiveCheckInsPage: React.FC = () => {
                   )}
                   {checkIn.status === 'in_progress' && (
                     <>
+                      {/* <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleWasherCompletionToggle(checkIn.id, !checkIn.washerCompletionStatus)}
+                        className={`w-full sm:w-auto ${
+                          checkIn.washerCompletionStatus 
+                            ? 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-300' 
+                            : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
+                        }`}
+                      >
+                        {checkIn.washerCompletionStatus ? 'Mark Incomplete' : 'Mark Washer Complete'}
+                      </Button> */}
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange(checkIn.id, 'completed')}
-                        className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                        onClick={() => handleOpenPasscodeModal(checkIn.id)}
+                        className="w-full sm:w-auto bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                       >
                         Mark Complete
                       </Button>
@@ -631,6 +728,7 @@ const ActiveCheckInsPage: React.FC = () => {
                   <Button
                     size="sm"
                     onClick={() => window.location.href = `/checkins/${checkIn.id}`}
+                    className="w-full sm:w-auto"
                   >
                     View Details
                   </Button>
@@ -640,6 +738,14 @@ const ActiveCheckInsPage: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Passcode Modal */}
+      <PasscodeModal
+        isOpen={showPasscodeModal}
+        onClose={handlePasscodeModalClose}
+        onConfirm={handlePasscodeConfirm}
+        error={passcodeError}
+      />
     </div>
   );
 };

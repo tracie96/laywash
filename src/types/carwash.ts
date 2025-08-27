@@ -9,6 +9,7 @@ export interface User {
   phone: string;
   role: UserRole;
   isActive: boolean;
+  passcode?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,12 +25,12 @@ export interface Admin extends User {
     phone: string;
     address: string;
   }>;
-  assignedWashers?: string[]; // IDs of assigned car washers
+  assignedWashers?: string[]; 
 }
 
 export interface CarWasher extends User {
   role: 'car_washer';
-  assignedAdmin?: string; // ID of the admin they report to
+  assignedAdmin?: string; 
   hourlyRate?: number;
   totalEarnings: number;
   isAvailable: boolean;
@@ -52,12 +53,10 @@ export interface Customer {
   email?: string;
   phone: string;
   dateOfBirth?: string;
-  // Legacy fields for backward compatibility
   licensePlate?: string;
   vehicleType?: string;
   vehicleModel?: string;
   vehicleColor?: string;
-  // New vehicles array for multiple vehicles - using the actual API response structure
   vehicles?: Array<{
     id: string;
     license_plate: string;
@@ -210,6 +209,7 @@ export interface CarCheckIn {
   assignedAdminId: string;
   assignedAdmin: Admin;
   status: CheckInStatus;
+  washerCompletionStatus?: boolean;
   checkInTime: Date;
   estimatedCompletionTime?: Date;
   actualCompletionTime?: Date;

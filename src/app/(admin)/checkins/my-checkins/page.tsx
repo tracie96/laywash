@@ -25,6 +25,7 @@ interface CheckIn {
   customerId?: string;
   createdAt: string;
   updatedAt: string;
+  customerType?: 'registered' | 'instant'; // Added customerType
 }
 
 const MyCheckInsPage: React.FC = () => {
@@ -107,7 +108,8 @@ const MyCheckInsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          status: 'in_progress'
+          status: 'in_progress',
+          userId: user?.id // Include user ID for role verification
         }),
       });
 
@@ -153,8 +155,9 @@ const MyCheckInsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          status: 'completed',
-          actual_completion_time: new Date().toISOString()
+          washer_completion_status: true, // Changed from 'completed' to true
+          actual_completion_time: new Date().toISOString(),
+          userId: user?.id 
         }),
       });
 
@@ -172,7 +175,6 @@ const MyCheckInsPage: React.FC = () => {
         // Show success message
         alert('Check-in marked as completed successfully!');
         
-        // Refresh the list to get any additional updates
         await fetchMyCheckIns();
       } else {
         throw new Error(result.error || 'Failed to mark as completed');
@@ -286,6 +288,11 @@ const MyCheckInsPage: React.FC = () => {
                     <Badge color={getPaymentStatusColor(checkIn.paymentStatus)}>
                     Payment Status:  {checkIn.paymentStatus.toUpperCase()}
                     </Badge>
+                    {checkIn.customerType && (
+                      <Badge color={checkIn.customerType === 'registered' ? 'warning' : 'info'}>
+                        {checkIn.customerType === 'registered' ? 'Registered Customer' : 'Instant Customer'}
+                      </Badge>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
@@ -333,16 +340,23 @@ const MyCheckInsPage: React.FC = () => {
                   )}
                   
                   {checkIn.status === 'in_progress' && (
-                    <Button
-                      onClick={() => {
-                        console.log('Mark Complete button clicked for check-in:', checkIn.id);
-                        handleMarkCompleted(checkIn.id);
-                      }}
-                      className="bg-green-600 hover:bg-green-700"
-                      disabled={updatingStatus === checkIn.id}
-                    >
-                      {updatingStatus === checkIn.id ? 'Completing...' : 'Mark Complete'}
-                    </Button>
+                    <div className="text-center">
+                      <Button
+                        onClick={() => {
+                          console.log('Mark Complete button clicked for check-in:', checkIn.id);
+                          handleMarkCompleted(checkIn.id);
+                        }}
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={updatingStatus === checkIn.id}
+                      >
+                        {updatingStatus === checkIn.id ? 'Completing...' : 'Mark Complete'}
+                      </Button>
+                      {checkIn.customerType === 'registered' && (
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                          ⚠️ Passcode required for registered customers
+                        </p>
+                      )}
+                    </div>
                   )}
                   
                   {checkIn.status === 'completed' && (

@@ -34,6 +34,7 @@ const CheckInHistoryPage: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'completed' | 'paid' | 'cancelled'>('all');
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState<string | null>(null);
 
   // Fetch real data from API
   useEffect(() => {
@@ -100,6 +101,43 @@ const CheckInHistoryPage: React.FC = () => {
     if (filter === 'all') return checkIn.status === 'completed' || checkIn.status === 'paid' || checkIn.status === 'cancelled';
     return checkIn.status === filter;
   });
+
+  const handleMarkAsPaid = async (checkInId: string) => {
+    try {
+      setIsUpdatingPayment(checkInId);
+      
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentStatus: 'paid'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update the local state to reflect the payment status change
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, paymentStatus: 'paid' }
+            : checkIn
+        ));
+        
+        // Show success message
+        alert('Payment status updated successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to update payment status');
+      }
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      alert(`Failed to update payment status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUpdatingPayment(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -312,7 +350,17 @@ const CheckInHistoryPage: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {checkIn.customerName}
                     </h3>
-                    {getStatusBadge(checkIn.status)}
+                    <div className="flex items-center space-x-2">
+                      {getStatusBadge(checkIn.status)}
+                      {checkIn.paymentStatus && (
+                        <Badge
+                          color={checkIn.paymentStatus === 'paid' ? 'success' : 'warning'}
+                          size="sm"
+                        >
+                          {checkIn.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
@@ -384,8 +432,8 @@ const CheckInHistoryPage: React.FC = () => {
               </div>
 
               {/* Performance */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4 text-sm">
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm">
                   <div>
                     <span className="text-gray-600 dark:text-gray-400">Estimated: </span>
                     <span className="font-medium text-gray-900 dark:text-white">
@@ -410,21 +458,29 @@ const CheckInHistoryPage: React.FC = () => {
                   )}
                 </div>
                 
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => window.location.href = `/checkins/${checkIn.id}`}
+                    className="w-full sm:w-auto"
                   >
                     View Details
                   </Button>
-                  {checkIn.status === 'completed' && (
+                  {checkIn.status === 'completed' && checkIn.paymentStatus === 'pending' && (
                     <Button
                       size="sm"
-                      onClick={() => console.log('Mark as paid:', checkIn.id)}
+                      onClick={() => handleMarkAsPaid(checkIn.id)}
+                      className="w-full sm:w-auto"
+                      disabled={isUpdatingPayment === checkIn.id}
                     >
-                      Mark as Paid
+                      {isUpdatingPayment === checkIn.id ? 'Updating...' : 'Mark as Paid'}
                     </Button>
+                  )}
+                  {checkIn.status === 'completed' && checkIn.paymentStatus === 'paid' && (
+                    <span className="px-3 py-2 text-sm font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 rounded-lg">
+                      ✓ Paid
+                    </span>
                   )}
                 </div>
               </div>
