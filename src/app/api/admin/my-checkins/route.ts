@@ -59,7 +59,8 @@ export async function GET(request: NextRequest) {
             id,
             name,
             description,
-            estimated_duration
+            estimated_duration,
+            washer_commission_percentage
           )
         )
       `)
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     // Transform the data
     const transformedCheckIns = (checkIns || []).map(checkIn => {
-      const services = checkIn.check_in_services?.map(cs => cs.services?.[0]?.name).filter(Boolean) || [];
+      const services = checkIn.check_in_services|| [];
       const estimatedDuration = checkIn.check_in_services?.reduce((total, cs) => {
         return total + (cs.services?.[0]?.estimated_duration || 30);
       }, 0) || 30;
@@ -117,7 +118,6 @@ export async function GET(request: NextRequest) {
         washType: checkIn.wash_type || 'instant'
       };
     });
-
     return NextResponse.json({
       success: true,
       checkIns: transformedCheckIns,

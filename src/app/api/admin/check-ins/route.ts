@@ -33,13 +33,11 @@ export async function GET(request: NextRequest) {
           phone
         ),
         check_in_services (
-          services (
-            id,
-            name,
-            description,
-            base_price,
-            category
-          )
+          id,
+          service_id,
+          service_name,
+          price,
+          duration
         ),
         assigned_washer:users!car_check_ins_assigned_washer_id_fkey (
           id,
@@ -92,8 +90,8 @@ export async function GET(request: NextRequest) {
       washType: checkIn.wash_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
-      services: checkIn.check_in_services?.map((cis: { services: { id: string; name: string; description: string; base_price: number; category: string }[] }) => 
-        cis.services?.[0]?.name || 'Unknown Service'
+      services: checkIn.check_in_services?.map((cis: { service_name: string; price: number; duration: number }) => 
+        cis.service_name || 'Unknown Service'
       ).filter(Boolean) || [],
       status: checkIn.status,
       checkInTime: new Date(checkIn.check_in_time),
@@ -114,7 +112,8 @@ export async function GET(request: NextRequest) {
       paymentMethod: checkIn.payment_method,
       customerId: checkIn.customer_id,
       createdAt: checkIn.created_at,
-      updatedAt: checkIn.updated_at
+      updatedAt: checkIn.updated_at,
+      reason: checkIn.reason
     })) || [];
 
     return NextResponse.json({
@@ -252,7 +251,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify that all assigned washer IDs exist and have car_washer role
     const washerIds = [...new Set(services.map(s => s.workerId))]; // Remove duplicates
     const { data: washers, error: washerCheckError } = await supabaseAdmin
       .from('users')
@@ -267,7 +265,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify that all service IDs exist and are active
     const serviceIds = services.map(s => s.serviceId);
     const { data: validServices, error: serviceCheckError } = await supabaseAdmin
       .from('services')
@@ -373,19 +370,16 @@ export async function POST(request: NextRequest) {
 
     // Create check-in services and materials records
     for (const service of services) {
-      // Create service record first
+      // Create check_in_services record
       const { error: serviceError } = await supabaseAdmin
         .from('check_in_services')
         .insert({
           check_in_id: checkIn.id,
           service_id: service.serviceId,
-          material_id: null, // This will be updated when materials are assigned
           price: service.customPrice !== undefined ? service.customPrice : service.serviceData.price,
           service_name: service.serviceData.name,
           duration: service.serviceData.duration
-        })
-        .select('id')
-        .single();
+        });
 
       if (serviceError) {
         console.error('Error creating check-in service:', serviceError);
@@ -395,7 +389,28 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Create checkin_materials records for each material used in this service
+      for (const material of service.materials) {
+        const { error: materialError } = await supabaseAdmin
+          .from('check_in_materials')
+          .insert({
+            check_in_id: checkIn.id,
+            washer_id: service.workerId,
+            material_name: material.materialName,
+            quantity_used: material.quantity,
+            unit: material.unit,
+            usage_date: new Date().toISOString(),
+            amount: 0, // You can calculate this based on material cost if needed
+          });
 
+        if (materialError) {
+          console.error('Error creating checkin material record:', materialError);
+          return NextResponse.json(
+            { success: false, error: `Failed to create material usage record: ${materialError.message}` },
+            { status: 500 }
+          );
+        }
+      }
 
       console.log(`Service ${service.serviceId} assigned to worker ${service.workerId} with ${service.materials.length} materials`);
     }

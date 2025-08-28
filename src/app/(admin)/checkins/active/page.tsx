@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
 import PasscodeModal from '@/components/admin/PasscodeModal';
+import { Modal } from '@/components/ui/modal';
 
 interface CheckIn {
   id: string;
@@ -83,6 +84,8 @@ const ActiveCheckInsPage: React.FC = () => {
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
   const [passcodeError, setPasscodeError] = useState<string>('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState<string>('');
 
   // Fetch active check-ins from API
   const fetchActiveCheckIns = async (search = '') => {
@@ -245,12 +248,16 @@ const ActiveCheckInsPage: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (checkInId: string, newStatus: string, passcode?: string) => {
+  const handleStatusChange = async (checkInId: string, newStatus: string, passcode?: string, reason?: string) => {
     try {
-      const requestBody: { status: string; passcode?: string } = { status: newStatus };
+      const requestBody: { status: string; passcode?: string; reason?: string } = { status: newStatus };
       
       if (newStatus === 'completed' && passcode) {
         requestBody.passcode = passcode;
+      }
+
+      if (newStatus === 'cancelled' && reason) {
+        requestBody.reason = reason;
       }
 
       const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
@@ -324,6 +331,34 @@ const ActiveCheckInsPage: React.FC = () => {
     setShowPasscodeModal(false);
     setSelectedCheckInId('');
     setPasscodeError('');
+  };
+
+  const handleOpenCancelModal = (checkInId: string) => {
+    setSelectedCheckInId(checkInId);
+    setShowCancelModal(true);
+    setCancelReason('');
+  };
+
+  const handleCancelModalClose = () => {
+    setShowCancelModal(false);
+    setSelectedCheckInId('');
+    setCancelReason('');
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancelReason.trim()) {
+      alert('Please provide a reason for cancellation');
+      return;
+    }
+    
+    // Store the reason before closing the modal
+    const reasonToSend = cancelReason;
+    
+    // Close the modal first
+    handleCancelModalClose();
+    
+    // Then call the status change with the stored reason
+    await handleStatusChange(selectedCheckInId, 'cancelled', undefined, reasonToSend);
   };
 
   const handleAssignWasher = async (checkInId: string, washerId: string) => {
@@ -692,7 +727,7 @@ const ActiveCheckInsPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange(checkIn.id, 'cancelled')}
+                        onClick={() => handleOpenCancelModal(checkIn.id)}
                         className="w-full sm:w-auto"
                       >
                         Cancel
@@ -737,13 +772,49 @@ const ActiveCheckInsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Passcode Modal */}
       <PasscodeModal
         isOpen={showPasscodeModal}
         onClose={handlePasscodeModalClose}
         onConfirm={handlePasscodeConfirm}
         error={passcodeError}
       />
+
+      <Modal
+        isOpen={showCancelModal}
+        onClose={handleCancelModalClose}
+        className="max-w-md mx-4"
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Cancel Check-in
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please provide a reason for cancelling this check-in:
+          </p>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Enter cancellation reason..."
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            rows={3}
+          />
+          <div className="flex space-x-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={handleCancelModalClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCancelConfirm}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Confirm Cancellation
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -193,6 +193,12 @@ const washerItems: NavItem[] = [
     name: "My Tools",
     path: "/tools/my-tools",
     roles: ["car_washer"]
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "My Profile",
+    path: "/profile/worker",
+    roles: ["car_washer"]
   }
 ];
 

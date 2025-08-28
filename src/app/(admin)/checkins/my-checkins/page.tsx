@@ -12,7 +12,7 @@ interface CheckIn {
   vehicleType: string;
   vehicleColor: string;
   vehicleModel?: string;
-  services: string[];
+  services: { services: { name: string; description?: string; estimated_duration?: number; washer_commission_percentage?: number } }[] | { name: string; description?: string; estimated_duration?: number; washer_commission_percentage?: number }[] | string[] | null | undefined;
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
   completedTime?: Date;
@@ -37,6 +37,41 @@ const MyCheckInsPage: React.FC = () => {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
 
   const { user } = useAuth();
+
+  // Helper function to extract service names from various data structures
+  const getServiceNames = (services: unknown): string => {
+    if (!services) return 'No services';
+    
+    if (Array.isArray(services)) {
+      // Handle array of service objects with nested structure
+      const serviceNames: string[] = [];
+      for (const item of services) {
+        if (item && typeof item === 'object') {
+          // Check if it has a nested services object
+          if ('services' in item && item.services && typeof item.services === 'object' && 'name' in item.services) {
+            serviceNames.push((item.services as { name: string }).name);
+          }
+          // Check if it has a direct name property
+          else if ('name' in item && (item as { name: string }).name) {
+            serviceNames.push((item as { name: string }).name);
+          }
+        }
+      }
+      return serviceNames.length > 0 ? serviceNames.join(', ') : 'No services';
+    }
+    
+    if (typeof services === 'object' && services !== null) {
+      if ('name' in services && (services as { name: string }).name) {
+        return (services as { name: string }).name;
+      }
+      
+      if ('services' in services && (services as { services: { name: string } }).services && typeof (services as { services: { name: string } }).services === 'object' && 'name' in (services as { services: { name: string } }).services) {
+        return ((services as { services: { name: string } }).services as { name: string }).name;
+      }
+    }
+    
+    return 'No services';
+  };
 
   const fetchMyCheckIns = useCallback(async () => {
     try {
@@ -78,8 +113,9 @@ const MyCheckInsPage: React.FC = () => {
           checkInTime: new Date(checkIn.checkInTime),
           completedTime: checkIn.completedTime ? new Date(checkIn.completedTime) : undefined
         }));
-        
+        console.log(transformedCheckIns,'transformedCheckIns');
         setCheckIns(transformedCheckIns);
+
       } else {
         setError(result.error || 'Failed to load check-ins');
       }
@@ -117,7 +153,6 @@ const MyCheckInsPage: React.FC = () => {
       console.log('Update response:', result);
 
       if (response.ok && result.success) {
-        // Update the local state immediately for better UX
         setCheckIns(prev => prev.map(checkIn => 
           checkIn.id === checkInId 
             ? { ...checkIn, status: 'in_progress' as const }
@@ -306,7 +341,40 @@ const MyCheckInsPage: React.FC = () => {
                       <span className="font-medium">Phone:</span> {checkIn.customerPhone}
                     </div>
                     <div>
-                      <span className="font-medium">Services:</span> {checkIn.services.join(', ')}
+                      <span className="font-medium">Commission:</span> {
+                        (() => {
+                          if (Array.isArray(checkIn.services) && checkIn.services.length > 0) {
+                            const firstService = checkIn.services[0];
+                            if (firstService && typeof firstService === 'object' && 'services' in firstService) {
+                              const nestedService = (firstService as { services: { washer_commission_percentage?: number } }).services;
+                              if (nestedService?.washer_commission_percentage) {
+                                return `${nestedService.washer_commission_percentage}%`;
+                              }
+                            }
+                          }
+                          return 'N/A';
+                        })()
+                      }
+                    </div>
+                    <div>
+                      <span className="font-medium">Expected Earnings:</span> {
+                        (() => {
+                          if (Array.isArray(checkIn.services) && checkIn.services.length > 0) {
+                            const firstService = checkIn.services[0];
+                            if (firstService && typeof firstService === 'object' && 'services' in firstService) {
+                              const nestedService = (firstService as { services: { washer_commission_percentage?: number } }).services;
+                              if (nestedService?.washer_commission_percentage) {
+                                const commission = (checkIn.totalPrice * nestedService.washer_commission_percentage) / 100;
+                                return `$${commission.toFixed(2)}`;
+                              }
+                            }
+                          }
+                          return 'N/A';
+                        })()
+                      }
+                    </div>
+                    <div>
+                      <span className="font-medium">Services:</span> {getServiceNames(checkIn.services)}
                     </div>
                     <div>
                       <span className="font-medium">Amount:</span> ${checkIn.totalPrice}

@@ -135,17 +135,26 @@ export async function GET() {
     performanceData?.forEach(checkIn => {
       const washerId = checkIn.assigned_washer_id;
       if (!washerId || !checkIn.assigned_washer) return;
-
+      
+      // Type assertion to handle the foreign key relationship correctly
+      const assignedWasher = (checkIn.assigned_washer as unknown) as {
+        id: string;
+        name: string;
+        email: string;
+        phone: string;
+        car_washer_profiles: { total_earnings: number }[];
+      };
+      
       if (!washerPerformance.has(washerId)) {
         washerPerformance.set(washerId, {
           washer: {
-            id: checkIn.assigned_washer[0].id,
-            name: checkIn.assigned_washer[0].name,
-            email: checkIn.assigned_washer[0].email,
-            phone: checkIn.assigned_washer[0].phone,
+            id: assignedWasher.id,
+            name: assignedWasher.name,
+            email: assignedWasher.email,
+            phone: assignedWasher.phone,
             role: 'car_washer',
             isActive: true,
-            totalEarnings: checkIn.assigned_washer[0].car_washer_profiles?.[0]?.total_earnings || 0,
+            totalEarnings: assignedWasher.car_washer_profiles?.[0]?.total_earnings || 0,
             isAvailable: true,
             createdAt: new Date(),
             updatedAt: new Date(),

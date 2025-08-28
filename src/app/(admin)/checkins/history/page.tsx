@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import { Modal } from '@/components/ui/modal';
 
 interface CheckIn {
   id: string;
@@ -27,6 +28,7 @@ interface CheckIn {
   paymentMethod?: string;
   customerId?: string;
   createdAt?: string;
+  reason?: string;
   updatedAt?: string;
 }
 
@@ -35,6 +37,9 @@ const CheckInHistoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'completed' | 'paid' | 'cancelled'>('all');
   const [isUpdatingPayment, setIsUpdatingPayment] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'mobile_money'>('cash');
 
   // Fetch real data from API
   useEffect(() => {
@@ -78,6 +83,7 @@ const CheckInHistoryPage: React.FC = () => {
               specialInstructions: checkIn.specialInstructions,
               paymentStatus: checkIn.paymentStatus,
               paymentMethod: checkIn.paymentMethod,
+              reason: checkIn.reason,
               customerId: checkIn.customerId,
               createdAt: checkIn.createdAt,
               updatedAt: checkIn.updatedAt
@@ -102,17 +108,24 @@ const CheckInHistoryPage: React.FC = () => {
     return checkIn.status === filter;
   });
 
-  const handleMarkAsPaid = async (checkInId: string) => {
+  const handleMarkAsPaid = (checkInId: string) => {
+    setSelectedCheckInId(checkInId);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentConfirm = async () => {
     try {
-      setIsUpdatingPayment(checkInId);
+      setIsUpdatingPayment(selectedCheckInId);
       
-      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+      // First, update the payment status
+      const response = await fetch(`/api/admin/check-ins/${selectedCheckInId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          paymentStatus: 'paid'
+          paymentStatus: 'paid',
+          paymentMethod: selectedPaymentMethod
         }),
       });
 
@@ -121,13 +134,21 @@ const CheckInHistoryPage: React.FC = () => {
       if (result.success) {
         // Update the local state to reflect the payment status change
         setCheckIns(prev => prev.map(checkIn => 
-          checkIn.id === checkInId 
-            ? { ...checkIn, paymentStatus: 'paid' }
+          checkIn.id === selectedCheckInId 
+            ? { ...checkIn, paymentStatus: 'paid', paymentMethod: selectedPaymentMethod }
             : checkIn
         ));
         
+        // Now update the washer's earnings
+        await updateWasherEarnings(selectedCheckInId);
+        
         // Show success message
         alert('Payment status updated successfully!');
+        
+        // Close modal and reset
+        setShowPaymentModal(false);
+        setSelectedCheckInId('');
+        setSelectedPaymentMethod('cash');
       } else {
         throw new Error(result.error || 'Failed to update payment status');
       }
@@ -137,6 +158,45 @@ const CheckInHistoryPage: React.FC = () => {
     } finally {
       setIsUpdatingPayment(null);
     }
+  };
+
+  const updateWasherEarnings = async (checkInId: string) => {
+    try {
+      // Find the check-in to get the assigned washer ID
+      const checkIn = checkIns.find(c => c.id === checkInId);
+      if (!checkIn?.assignedWasherId) {
+        console.warn('No assigned washer found for check-in:', checkInId);
+        return;
+      }
+
+      // Call the API to update washer earnings
+      const response = await fetch('/api/admin/check-ins/update-washer-earnings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          checkInId: checkInId,
+          washerId: checkIn.assignedWasherId
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.error('Failed to update washer earnings:', result.error);
+        // Don't throw error here as payment was successful
+      }
+    } catch (error) {
+      console.error('Error updating washer earnings:', error);
+      // Don't throw error here as payment was successful
+    }
+  };
+
+  const handlePaymentModalClose = () => {
+    setShowPaymentModal(false);
+    setSelectedCheckInId('');
+    setSelectedPaymentMethod('cash');
   };
 
   const getStatusBadge = (status: string) => {
@@ -367,6 +427,12 @@ const CheckInHistoryPage: React.FC = () => {
                       <p className="text-gray-600 dark:text-gray-400">License Plate</p>
                       <p className="font-medium text-gray-900 dark:text-white">{checkIn.licensePlate}</p>
                     </div>
+                    {checkIn.reason && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Reason</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{checkIn.reason}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Vehicle</p>
                       <p className="font-medium text-gray-900 dark:text-white">
@@ -402,34 +468,7 @@ const CheckInHistoryPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Timeline */}
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Timeline:</p>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Check-in:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {checkIn.checkInTime.toLocaleTimeString()}
-                    </span>
-                  </div>
-                  {checkIn.completedTime && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Completed:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {checkIn.completedTime.toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-                  {checkIn.paidTime && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Paid:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {checkIn.paidTime.toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+           
 
               {/* Performance */}
               <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
@@ -488,6 +527,47 @@ const CheckInHistoryPage: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Payment Method Modal */}
+      <Modal
+        isOpen={showPaymentModal}
+        onClose={handlePaymentModalClose}
+        className="max-w-md mx-4"
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Select Payment Method
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            How did the customer pay for this service?
+          </p>
+          <select
+            value={selectedPaymentMethod}
+            onChange={(e) => setSelectedPaymentMethod(e.target.value as 'cash' | 'card' | 'mobile_money')}
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-6"
+          >
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="mobile_money">Mobile Money</option>
+          </select>
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={handlePaymentModalClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePaymentConfirm}
+              className="flex-1"
+              disabled={isUpdatingPayment === selectedCheckInId}
+            >
+              {isUpdatingPayment === selectedCheckInId ? 'Updating...' : 'Confirm Payment'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

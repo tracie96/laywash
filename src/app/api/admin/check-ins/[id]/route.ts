@@ -146,7 +146,7 @@ export async function PATCH(
     }
 
     // Transform frontend field names to database field names
-    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean } = {};
+    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean; reason?: string } = {};
     
     // Handle status updates (for admins)
     if (updateData.status !== undefined) dbUpdateData.status = updateData.status;
@@ -168,8 +168,9 @@ export async function PATCH(
     if (updateData.assignedWasherId !== undefined) dbUpdateData.assigned_washer_id = updateData.assignedWasherId;
     if (updateData.assignedAdminId !== undefined) dbUpdateData.assigned_admin_id = updateData.assignedAdminId;
     if (updateData.remarks !== undefined) dbUpdateData.remarks = updateData.remarks;
+    if (updateData.reason !== undefined) dbUpdateData.reason = updateData.reason;
     if (updateData.valuableItems !== undefined) dbUpdateData.valuable_items = updateData.valuableItems;
-    
+    if (updateData.payment_method !== undefined) dbUpdateData.payment_method = updateData.payment_method;
     // Handle actual completion time
     if (updateData.actual_completion_time !== undefined) {
       dbUpdateData.actual_completion_time = updateData.actual_completion_time;
