@@ -31,6 +31,7 @@ const ToolsManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Equipment' | 'Tools' | 'Supplies'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'low_availability' | 'out_of_stock'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'replacementCost' | 'amount' | 'createdAt'>('name');
@@ -52,7 +53,7 @@ const ToolsManagementPage: React.FC = () => {
       setError(null);
       
       const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
+      if (searchQuery) params.append('search', searchQuery);
       if (filterCategory !== 'all') params.append('category', filterCategory);
       if (filterStatus !== 'all') params.append('status', filterStatus);
       params.append('sortBy', sortBy);
@@ -72,7 +73,7 @@ const ToolsManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder]);
+  }, [searchQuery, filterCategory, filterStatus, sortBy, sortOrder]);
 
   // Load tools on component mount
   useEffect(() => {
@@ -309,13 +310,22 @@ const ToolsManagementPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search by name, description, or category..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Search by name, description, or category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(searchTerm)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              />
+              <button
+                onClick={() => setSearchQuery(searchTerm)}
+                className="px-6 py-2 bg-green-light-600 hover:bg-green-light-700 text-white font-medium rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+              >
+                Search
+              </button>
+            </div>
           </div>
 
           {/* Category Filter */}

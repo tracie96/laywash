@@ -154,7 +154,6 @@ const adminItems: NavItem[] = [
     icon: <StockIcon />,
     name: "Stock",
     subItems: [
-      { name: "Inventory", path: "/stock/inventory", pro: false },
       { name: "Update Stock", path: "/stock/update", pro: false },
       { name: "Sales", path: "/sales", pro: false }
     ],
@@ -182,12 +181,7 @@ const washerItems: NavItem[] = [
     path: "/payment-requests",
     roles: ["car_washer"]
   },
-  {
-    icon: <ReportIcon />,
-    name: "My Performance",
-    path: "/reports/my-performance",
-    roles: ["car_washer"]
-  },
+ 
   {
     icon: <ReportIcon />,
     name: "My Tools",

@@ -92,7 +92,8 @@ export async function PATCH(
           assigned_admin_id,
           total_earnings,
           assigned_location,
-          is_available
+          is_available,
+          picture_url
         )
       `)
       .eq('id', id)
@@ -122,9 +123,9 @@ export async function PATCH(
 
       totalEarnings: updatedWasher.car_washer_profiles?.[0]?.total_earnings || 0,
       isAvailable: updatedWasher.car_washer_profiles?.[0]?.is_available || false,
-      assignedAdminId: updatedWasher.car_washer_profiles?.[0]?.assigned_admin_id || null
+      assignedAdminId: updatedWasher.car_washer_profiles?.[0]?.assigned_admin_id || null,
+      picture_url: updatedWasher.car_washer_profiles?.[0]?.picture_url || null
     };
-
     return NextResponse.json({
       success: true,
       washer: transformedWasher

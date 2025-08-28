@@ -20,21 +20,8 @@ export async function GET(
     const { id } = await params;
 
     const { data: paymentRequest, error } = await supabaseAdmin
-      .from('carwasher_payment_requests')
-      .select(`
-        *,
-        washer:users!carwasher_payment_requests_washer_id_fkey (
-          id,
-          name,
-          email,
-          phone
-        ),
-        reviewer:users!carwasher_payment_requests_reviewed_by_fkey (
-          id,
-          name,
-          email
-        )
-      `)
+      .from('payment_request')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -49,25 +36,13 @@ export async function GET(
     const transformedRequest = {
       id: paymentRequest.id,
       washerId: paymentRequest.washer_id,
-      washerName: paymentRequest.washer?.name || 'Unknown Washer',
-      washerEmail: paymentRequest.washer?.email || '',
-      washerPhone: paymentRequest.washer?.phone || '',
-      requestedAmount: parseFloat(paymentRequest.requested_amount || '0'),
-      requestType: paymentRequest.request_type,
+      totalEarnings: parseFloat(paymentRequest.total_earnings || '0'),
+      materialDeductions: parseFloat(paymentRequest.material_deductions || '0'),
+      toolDeductions: parseFloat(paymentRequest.tool_deductions || '0'),
+      requestedAmount: parseFloat(paymentRequest.total_earnings || '0') - parseFloat(paymentRequest.material_deductions || '0') - parseFloat(paymentRequest.tool_deductions || '0'),
       status: paymentRequest.status,
-      requestDate: paymentRequest.request_date,
-      periodStart: paymentRequest.requested_for_period_start,
-      periodEnd: paymentRequest.requested_for_period_end,
-      description: paymentRequest.description,
-      notes: paymentRequest.notes,
-      reviewedBy: paymentRequest.reviewed_by,
-      reviewerName: paymentRequest.reviewer?.name || null,
-      reviewedAt: paymentRequest.reviewed_at,
       adminNotes: paymentRequest.admin_notes,
-      approvedAmount: paymentRequest.approved_amount ? parseFloat(paymentRequest.approved_amount) : null,
-      paymentMethod: paymentRequest.payment_method,
-      paymentReference: paymentRequest.payment_reference,
-      paidAt: paymentRequest.paid_at,
+      approvalDate: paymentRequest.approval_date,
       createdAt: paymentRequest.created_at,
       updatedAt: paymentRequest.updated_at
     };
@@ -97,9 +72,6 @@ export async function PATCH(
     const {
       status,
       adminNotes,
-      approvedAmount,
-      paymentMethod,
-      paymentReference,
       reviewedBy
     } = body;
 
@@ -113,7 +85,7 @@ export async function PATCH(
 
     // Check if payment request exists
     const { data: existingRequest, error: fetchError } = await supabaseAdmin
-      .from('carwasher_payment_requests')
+      .from('payment_request')
       .select('*')
       .eq('id', id)
       .single();
@@ -128,60 +100,30 @@ export async function PATCH(
     // Prepare update data
     const updateData: {
       status?: string;
-      reviewed_by?: string;
-      reviewed_at?: string;
+      admin_id?: string;
+      approval_date?: string;
       admin_notes?: string;
-      approved_amount?: number;
-      payment_method?: string;
-      payment_reference?: string;
-      paid_at?: string;
+      updated_at?: string;
     } = {};
     
     if (status !== undefined) {
       updateData.status = status;
-      updateData.reviewed_by = reviewedBy;
-      updateData.reviewed_at = new Date().toISOString();
+      updateData.admin_id = reviewedBy;
+      updateData.approval_date = new Date().toISOString();
     }
     
     if (adminNotes !== undefined) {
       updateData.admin_notes = adminNotes;
     }
     
-    if (approvedAmount !== undefined) {
-      updateData.approved_amount = approvedAmount;
-    }
-    
-    if (paymentMethod !== undefined) {
-      updateData.payment_method = paymentMethod;
-    }
-    
-    if (paymentReference !== undefined) {
-      updateData.payment_reference = paymentReference;
-    }
-    
-    if (status === 'paid') {
-      updateData.paid_at = new Date().toISOString();
-    }
+    updateData.updated_at = new Date().toISOString();
 
     // Update the payment request
     const { data: updatedRequest, error: updateError } = await supabaseAdmin
-      .from('carwasher_payment_requests')
+      .from('payment_request')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        *,
-        washer:users!carwasher_payment_requests_washer_id_fkey (
-          id,
-          name,
-          email,
-          phone
-        ),
-        reviewer:users!carwasher_payment_requests_reviewed_by_fkey (
-          id,
-          name,
-          email
-        )
-      `)
+      .select('*')
       .single();
 
     if (updateError) {
@@ -196,25 +138,13 @@ export async function PATCH(
     const transformedRequest = {
       id: updatedRequest.id,
       washerId: updatedRequest.washer_id,
-      washerName: updatedRequest.washer?.name || 'Unknown Washer',
-      washerEmail: updatedRequest.washer?.email || '',
-      washerPhone: updatedRequest.washer?.phone || '',
-      requestedAmount: parseFloat(updatedRequest.requested_amount || '0'),
-      requestType: updatedRequest.request_type,
+      totalEarnings: parseFloat(updatedRequest.total_earnings || '0'),
+      materialDeductions: parseFloat(updatedRequest.material_deductions || '0'),
+      toolDeductions: parseFloat(updatedRequest.tool_deductions || '0'),
+      requestedAmount: parseFloat(updatedRequest.total_earnings || '0') - parseFloat(updatedRequest.material_deductions || '0') - parseFloat(updatedRequest.tool_deductions || '0'),
       status: updatedRequest.status,
-      requestDate: updatedRequest.request_date,
-      periodStart: updatedRequest.requested_for_period_start,
-      periodEnd: updatedRequest.requested_for_period_end,
-      description: updatedRequest.description,
-      notes: updatedRequest.notes,
-      reviewedBy: updatedRequest.reviewed_by,
-      reviewerName: updatedRequest.reviewer?.name || null,
-      reviewedAt: updatedRequest.reviewed_at,
       adminNotes: updatedRequest.admin_notes,
-      approvedAmount: updatedRequest.approved_amount ? parseFloat(updatedRequest.approved_amount) : null,
-      paymentMethod: updatedRequest.payment_method,
-      paymentReference: updatedRequest.payment_reference,
-      paidAt: updatedRequest.paid_at,
+      approvalDate: updatedRequest.approval_date,
       createdAt: updatedRequest.created_at,
       updatedAt: updatedRequest.updated_at
     };
@@ -244,7 +174,7 @@ export async function DELETE(
 
     // Check if payment request exists and is pending
     const { data: existingRequest, error: fetchError } = await supabaseAdmin
-      .from('carwasher_payment_requests')
+      .from('payment_request')
       .select('status')
       .eq('id', id)
       .single();
@@ -265,7 +195,7 @@ export async function DELETE(
 
     // Delete the payment request
     const { error: deleteError } = await supabaseAdmin
-      .from('carwasher_payment_requests')
+      .from('payment_request')
       .delete()
       .eq('id', id);
 

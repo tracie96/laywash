@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
+import WasherDetailModal from "@/components/admin/WasherDetailModal";
 
 interface Washer {
   id: string;
@@ -19,6 +20,12 @@ interface Washer {
   averageRating: number;
   createdAt: string;
   lastActive: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  skills?: string[];
+  certifications?: string[];
+  notes?: string;
+  picture_url?: string | null;
 }
 
 const UsersWashersPage: React.FC = () => {
@@ -26,6 +33,8 @@ const UsersWashersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [viewingWasher, setViewingWasher] = useState<Washer | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -65,6 +74,16 @@ const UsersWashersPage: React.FC = () => {
   const activeWashers = filteredWashers.filter(w => w.isAvailable).length;
   const unavailableWashers = filteredWashers.filter(w => !w.isAvailable).length;
   const totalCheckInsCompleted = filteredWashers.reduce((sum, washer) => sum + washer.completedCheckIns, 0);
+
+  const handleViewWasher = (washer: Washer) => {
+    setViewingWasher(washer);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setViewingWasher(null);
+  };
 
   const handleDeactivateWasher = async (washerId: string, washerName: string) => {
     const confirmDeactivate = window.confirm(
@@ -152,7 +171,7 @@ const UsersWashersPage: React.FC = () => {
       <PageBreadCrumb pageTitle="Manage Washers" />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -211,7 +230,7 @@ const UsersWashersPage: React.FC = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <button
           onClick={fetchWashers}
           className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
@@ -366,17 +385,18 @@ const UsersWashersPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
                         <button 
+                          onClick={() => handleViewWasher(washer)}
+                          className="text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                        >
+                          View Details
+                        </button>
+                        <button 
                           onClick={() => router.push(`/workers/edit?id=${washer.id}`)}
                           className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
                         >
                           Edit
                         </button>
-                        <button 
-                          onClick={() => router.push(`/reports/performance?washerId=${washer.id}`)}
-                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 transition-colors"
-                        >
-                          Performance
-                        </button>
+                    
                         <button 
                           onClick={() => handleDeactivateWasher(washer.id, washer.name)}
                           className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300 transition-colors"
@@ -392,6 +412,13 @@ const UsersWashersPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Washer Detail Modal */}
+      <WasherDetailModal
+        washer={viewingWasher}
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+      />
     </div>
   );
 };

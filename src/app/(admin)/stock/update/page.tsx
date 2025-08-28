@@ -250,7 +250,7 @@ const StockUpdatePage: React.FC = () => {
                 >
                   Stock In
                 </button>
-                <button
+                {/* <button
                   onClick={() => setUpdateType('out')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium ${
                     updateType === 'out'
@@ -259,7 +259,7 @@ const StockUpdatePage: React.FC = () => {
                   }`}
                 >
                   Stock Out
-                </button>
+                </button> */}
               </div>
             </div>
 

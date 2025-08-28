@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import EditAdminModal from "@/components/admin/EditAdminModal";
+import AdminDetailModal from "@/components/admin/AdminDetailModal";
 
 interface Admin {
   id: string;
@@ -30,6 +31,8 @@ const UsersAdminsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [viewingAdmin, setViewingAdmin] = useState<Admin | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const router = useRouter();
 
@@ -66,6 +69,16 @@ const UsersAdminsPage: React.FC = () => {
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setEditingAdmin(null);
+  };
+
+  const handleViewAdmin = (admin: Admin) => {
+    setViewingAdmin(admin);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setViewingAdmin(null);
   };
 
   const handleSaveAdmin = async (adminId: string, updatedData: Partial<Admin>) => {
@@ -327,6 +340,12 @@ const UsersAdminsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
                         <button 
+                          onClick={() => handleViewAdmin(admin)}
+                          className="text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300 font-medium"
+                        >
+                          View Details
+                        </button>
+                        <button 
                           onClick={() => handleEditAdmin(admin)}
                           className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 font-medium"
                         >
@@ -352,6 +371,13 @@ const UsersAdminsPage: React.FC = () => {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onSave={handleSaveAdmin}
+      />
+
+      {/* Admin Detail Modal */}
+      <AdminDetailModal
+        admin={viewingAdmin}
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
       />
     </div>
   );

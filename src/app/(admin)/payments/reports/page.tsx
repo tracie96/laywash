@@ -8,7 +8,6 @@ interface PaymentReport {
   totalRevenue: number;
   cashPayments: number;
   cardPayments: number;
-  mobilePayments: number;
   pendingPayments: number;
   pendingAmount: number;
 }
@@ -56,7 +55,6 @@ const PaymentReportsPage: React.FC = () => {
       totalRevenue: totals.totalRevenue + report.totalRevenue,
       cashPayments: totals.cashPayments + report.cashPayments,
       cardPayments: totals.cardPayments + report.cardPayments,
-      mobilePayments: totals.mobilePayments + report.mobilePayments,
       pendingPayments: totals.pendingPayments + report.pendingPayments,
       pendingAmount: totals.pendingAmount + report.pendingAmount
     }), {
@@ -64,7 +62,6 @@ const PaymentReportsPage: React.FC = () => {
       totalRevenue: 0,
       cashPayments: 0,
       cardPayments: 0,
-      mobilePayments: 0,
       pendingPayments: 0,
       pendingAmount: 0
     });
@@ -82,7 +79,7 @@ const PaymentReportsPage: React.FC = () => {
       return;
     }
 
-    const headers = ['Date', 'Total Payments', 'Revenue', 'Cash Payments', 'Card Payments', 'Mobile Payments', 'Pending Payments', 'Pending Amount'];
+    const headers = ['Date', 'Total Payments', 'Revenue', 'Cash Payments', 'Card Payments', 'Pending Payments', 'Pending Amount'];
     const csvContent = [
       headers.join(','),
       ...reports.map(report => [
@@ -91,7 +88,6 @@ const PaymentReportsPage: React.FC = () => {
         report.totalRevenue.toFixed(2),
         report.cashPayments,
         report.cardPayments,
-        report.mobilePayments,
         report.pendingPayments,
         report.pendingAmount.toFixed(2)
       ].join(','))
@@ -301,7 +297,7 @@ const PaymentReportsPage: React.FC = () => {
       </div>
 
       {/* Payment Method Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cash Payments</h3>
@@ -317,7 +313,7 @@ const PaymentReportsPage: React.FC = () => {
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Card Payments</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">POS Payments</h3>
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -326,19 +322,6 @@ const PaymentReportsPage: React.FC = () => {
           </div>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">{totals.cardPayments}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">Total card transactions</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mobile Payments</h3>
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">{totals.mobilePayments}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total mobile transactions</p>
         </div>
       </div>
 
@@ -368,9 +351,7 @@ const PaymentReportsPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Card
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Mobile
-                </th>
+
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Pending
                 </th>
@@ -379,7 +360,7 @@ const PaymentReportsPage: React.FC = () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {reports.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -411,9 +392,7 @@ const PaymentReportsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {report.cardPayments}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {report.mobilePayments}
-                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {report.pendingPayments} (${report.pendingAmount.toFixed(2)})
                     </td>

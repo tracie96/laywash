@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/modal';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import Image from 'next/image';
 
 interface CarWashRecord {
   id: string;
@@ -12,7 +13,7 @@ interface CarWashRecord {
   serviceType: string;
   price: number;
   rating: number;
-  completedAt: Date;
+  completedAt: Date | string;
   duration: number; // in minutes
   customerName: string;
   customerPhone: string;
@@ -23,6 +24,7 @@ interface Worker {
   name: string;
   email: string;
   phone: string;
+  profileImage?: string;
   totalEarnings: number;
   isAvailable: boolean;
   assignedAdminId: string;
@@ -32,6 +34,7 @@ interface Worker {
   averageRating: number;
   createdAt: Date;
   lastActive: Date;
+  picture_url: string;
   address: string;
   emergencyContact: string;
   emergencyPhone: string;
@@ -73,6 +76,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
         
         if (data.success) {
           setWorker(data.worker);
+          console.log('Worker details:', data.worker);
           setCarWashHistory(data.carWashHistory || []);
         } else {
           setError(data.error || 'Failed to fetch worker details');
@@ -116,14 +120,26 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
       <Badge color="warning">Unavailable</Badge>;
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+  const formatDate = (date: Date | string) => {
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      
+      // Check if the date is valid
+      if (isNaN(dateObj.getTime())) {
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(dateObj);
+    } catch (error) {
+      console.error('Error formatting date:', error, date);
+      return 'Invalid date';
+    }
   };
 
   const formatDuration = (minutes: number) => {
@@ -199,14 +215,38 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
       <div className="p-8">
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {worker?.name}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Car Washer • {worker?.assignedAdminName}
-            </p>
+          <div className="flex items-start space-x-4">
+            {/* Profile Picture */}
+            <div className="flex-shrink-0">
+                              <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600">
+                  {worker?.picture_url ? (
+                    <Image
+                      src={worker.picture_url}
+                      alt={`${worker.name}'s profile`}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : null}
+                  <div className={`w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 ${worker?.picture_url ? 'hidden' : ''}`}>
+                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+            </div>
+            
+            {/* Worker Info */}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {worker?.name}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Car Washer • {worker?.assignedAdminName}
+              </p>
+            </div>
           </div>
+          
           <div className="flex items-center space-x-3">
             {getAvailabilityBadge(worker?.isAvailable || false)}
             <Button

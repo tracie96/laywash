@@ -65,6 +65,14 @@ interface WasherToolWithWorker {
   };
 }
 
+interface GroupedAssignment {
+  workerName: string;
+  assignedDate: string;
+  assignments: ToolAssignment[];
+  totalTools: number;
+  totalQuantity: number;
+}
+
 const ToolsAssignmentsPage: React.FC = () => {
   const [assignments, setAssignments] = useState<ToolAssignment[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
@@ -74,6 +82,7 @@ const ToolsAssignmentsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [returningToolId, setReturningToolId] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const { isOpen, openModal, closeModal } = useModal();
   const { isOpen: isReturnModalOpen, openModal: openReturnModal, closeModal: closeReturnModal } = useModal();
@@ -131,6 +140,47 @@ const ToolsAssignmentsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Group assignments by worker and date
+  const groupedAssignments: GroupedAssignment[] = assignments.reduce((groups: GroupedAssignment[], assignment) => {
+    const existingGroup = groups.find(g => g.workerName === assignment.workerName && g.assignedDate === assignment.assignedDate);
+    
+    if (existingGroup) {
+      existingGroup.assignments.push(assignment);
+      existingGroup.totalTools += 1;
+      existingGroup.totalQuantity += assignment.quantity;
+    } else {
+      groups.push({
+        workerName: assignment.workerName,
+        assignedDate: assignment.assignedDate,
+        assignments: [assignment],
+        totalTools: 1,
+        totalQuantity: assignment.quantity
+      });
+    }
+    
+    return groups;
+  }, []);
+
+  // Sort groups by date (newest first) and then by worker name
+  const sortedGroups = groupedAssignments.sort((a, b) => {
+    const dateComparison = new Date(b.assignedDate).getTime() - new Date(a.assignedDate).getTime();
+    if (dateComparison !== 0) return dateComparison;
+    return a.workerName.localeCompare(b.workerName);
+  });
+
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
+  const getGroupKey = (workerName: string, assignedDate: string) => `${workerName}-${assignedDate}`;
+
   console.log({tools});
 
   const handleReturnTool = async (assignmentId: string) => {
@@ -357,69 +407,116 @@ const ToolsAssignmentsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Assignments Table */}
+      {/* Grouped Assignments Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Map tools</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tool Assignments by Washer & Date</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tool</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Worker</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Return Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Notes</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Washer</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tools</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Quantity</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {assignments.map((assignment) => (
-                <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {assignment.toolName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {assignment.workerName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {assignment.quantity}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(assignment.assignedDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {assignment.returnDate ? new Date(assignment.returnDate).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(assignment.status)}`}>
-                      {assignment.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                    {assignment.notes}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex space-x-2">
-                      {assignment.status !== "returned" && (
-                        <button 
-                          onClick={() => handleReturnTool(assignment.id)}
-                          disabled={submitting}
-                          className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              {sortedGroups.map((group) => {
+                const groupKey = getGroupKey(group.workerName, group.assignedDate);
+                const isExpanded = expandedGroups.has(groupKey);
+                
+                return (
+                  <React.Fragment key={groupKey}>
+                    {/* Group Header Row */}
+                    <tr className="bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800/50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {group.workerName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(group.assignedDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {group.totalTools} tool{group.totalTools !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {group.totalQuantity}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <button
+                          onClick={() => toggleGroup(groupKey)}
+                          className="flex items-center space-x-1 text-blue-light-600 hover:text-blue-light-700 dark:text-blue-light-400 dark:hover:text-blue-light-300"
                         >
-                          Return
+                          <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+                          <svg
+                            className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
                         </button>
-                      )}
-                      {assignment.status === "returned" && (
-                        <span className="text-gray-400 dark:text-gray-500">Returned</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      </td>
+                    </tr>
+                    
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <>
+                        {/* Sub-header for individual tools */}
+                        <tr className="bg-gray-25 dark:bg-gray-850/50">
+                          <td colSpan={5} className="px-6 py-2">
+                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                              Individual Tools
+                            </div>
+                          </td>
+                        </tr>
+                        
+                        {/* Individual tool rows */}
+                        {group.assignments.map((assignment) => (
+                          <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-l-blue-light-200 dark:border-l-blue-light-700">
+                            <td className="px-6 py-3 pl-12 text-sm text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-light-400 rounded-full"></div>
+                                <span>{assignment.toolName}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              {assignment.quantity}
+                            </td>
+                            <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              {assignment.returnDate ? new Date(assignment.returnDate).toLocaleDateString() : "-"}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(assignment.status)}`}>
+                                {assignment.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              <div className="flex space-x-2">
+                                {assignment.status !== "returned" && (
+                                  <button 
+                                    onClick={() => handleReturnTool(assignment.id)}
+                                    disabled={submitting}
+                                    className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Return
+                                  </button>
+                                )}
+                                {assignment.status === "returned" && (
+                                  <span className="text-gray-400 dark:text-gray-500">Returned</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -44,7 +44,6 @@ const WorkerProfilePage: React.FC = () => {
 
         const response = await fetch(`/api/worker/profile?workerId=${user?.id}`);
         const data = await response.json();
-        console.log(data,'data');
         if (data.success) {
           setProfile(data.worker);
         } else {
@@ -141,7 +140,7 @@ const WorkerProfilePage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              ₦{profile.totalEarnings.toLocaleString()}
+              ₦{profile.totalEarnings}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
           </div>
@@ -324,7 +323,7 @@ const WorkerProfilePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
-                  ₦{profile.totalEarnings.toLocaleString()}
+                  ₦{profile.totalEarnings}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
               </div>

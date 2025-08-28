@@ -2,28 +2,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import { Modal } from '@/components/ui/modal';
+import { useModal } from '@/hooks/useModal';
 import { useAuth } from '../../../context/AuthContext';
 
 interface PaymentRequest {
   id: string;
   washerId: string;
   washerName: string;
+  totalEarnings: number;
+  materialDeductions: number;
+  toolDeductions: number;
   requestedAmount: number;
-  requestType: 'salary' | 'bonus' | 'overtime' | 'advance';
   status: 'pending' | 'approved' | 'rejected' | 'paid';
-  requestDate: string;
-  periodStart?: string;
-  periodEnd?: string;
-  description?: string;
-  notes?: string;
-  reviewedBy?: string;
-  reviewerName?: string;
-  reviewedAt?: string;
   adminNotes?: string;
-  approvedAmount?: number;
-  paymentMethod?: string;
-  paymentReference?: string;
-  paidAt?: string;
+  approvalDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,15 +25,14 @@ const PaymentRequestsPage: React.FC = () => {
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const { isOpen: showCreateForm, openModal: openCreateForm, closeModal: closeCreateForm } = useModal();
+  const [currentEarnings, setCurrentEarnings] = useState(0);
   
   // Form state
   const [formData, setFormData] = useState({
     requestedAmount: '',
-    requestType: 'salary' as PaymentRequest['requestType'],
-    periodStart: '',
-    periodEnd: '',
-    description: '',
+    materialDeductions: '0',
+    toolDeductions: '0',
     notes: ''
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
@@ -58,7 +50,7 @@ const PaymentRequestsPage: React.FC = () => {
       }
       
       const washerId = user.id;
-      const response = await fetch(`/api/admin/payment-requests?washerId=${washerId}&sortBy=request_date&sortOrder=desc`);
+      const response = await fetch(`/api/admin/payment-requests?washerId=${washerId}&sortBy=created_at&sortOrder=desc`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch payment requests');
@@ -79,15 +71,42 @@ const PaymentRequestsPage: React.FC = () => {
     }
   }, [user?.id]);
 
+  const fetchCurrentEarnings = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/worker/profile?workerId=${user.id}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setCurrentEarnings(result.worker.totalEarnings);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching current earnings:', err);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     fetchPaymentRequests();
-  }, [fetchPaymentRequests]);
+    fetchCurrentEarnings();
+  }, [fetchPaymentRequests, fetchCurrentEarnings]);
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.requestedAmount || parseFloat(formData.requestedAmount) <= 0) {
+    const requestedAmount = parseFloat(formData.requestedAmount);
+    const materialDeductions = parseFloat(formData.materialDeductions);
+    const toolDeductions = parseFloat(formData.toolDeductions);
+    
+    if (!requestedAmount || requestedAmount <= 0) {
       alert('Please enter a valid amount');
+      return;
+    }
+
+    const totalRequested = requestedAmount + materialDeductions + toolDeductions;
+    if (totalRequested > currentEarnings) {
+      alert(`Requested amount (₦${totalRequested}) exceeds available earnings (₦${currentEarnings})`);
       return;
     }
 
@@ -107,11 +126,9 @@ const PaymentRequestsPage: React.FC = () => {
         },
         body: JSON.stringify({
           washerId,
-          requestedAmount: parseFloat(formData.requestedAmount),
-          requestType: formData.requestType,
-          periodStart: formData.periodStart || null,
-          periodEnd: formData.periodEnd || null,
-          description: formData.description || null,
+          requestedAmount,
+          materialDeductions,
+          toolDeductions,
           notes: formData.notes || null
         }),
       });
@@ -122,16 +139,15 @@ const PaymentRequestsPage: React.FC = () => {
         // Reset form and close modal
         setFormData({
           requestedAmount: '',
-          requestType: 'salary',
-          periodStart: '',
-          periodEnd: '',
-          description: '',
+          materialDeductions: '0',
+          toolDeductions: '0',
           notes: ''
         });
-        setShowCreateForm(false);
+        closeCreateForm();
         
-        // Refresh the list
+        // Refresh the list and earnings
         await fetchPaymentRequests();
+        await fetchCurrentEarnings();
         
         alert('Payment request created successfully!');
       } else {
@@ -179,16 +195,6 @@ const PaymentRequestsPage: React.FC = () => {
     }
   };
 
-  const getRequestTypeLabel = (type: string) => {
-    switch (type) {
-      case 'salary': return 'Salary';
-      case 'bonus': return 'Bonus';
-      case 'overtime': return 'Overtime';
-      case 'advance': return 'Advance';
-      default: return type;
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -199,271 +205,236 @@ const PaymentRequestsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-        <Button onClick={fetchPaymentRequests}>Try Again</Button>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-2">Error</div>
+          <div className="text-gray-600">{error}</div>
+          <button 
+            onClick={fetchPaymentRequests}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Payment Requests
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Payment Requests</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Request payments for your work and track their status
+            Manage your payment requests and track their status
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button onClick={fetchPaymentRequests} className="bg-gray-600 hover:bg-gray-700">
-            Refresh
-          </Button>
-          <Button onClick={() => setShowCreateForm(true)} className="bg-blue-600 hover:bg-blue-700">
-            New Request
-          </Button>
+        
+        {/* Current Earnings Display */}
+        <div className="text-right">
+          <div className="text-sm text-gray-600 dark:text-gray-400">Available Earnings</div>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            ₦{currentEarnings.toLocaleString()}
+          </div>
         </div>
       </div>
 
-      {/* Create Form Modal */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+      {/* Create Request Button */}
+      <div className="mb-6">
+        <Button
+          onClick={openCreateForm}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          Create Payment Request
+        </Button>
+      </div>
+
+      {/* Payment Requests List */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Your Payment Requests
+          </h2>
+          
+          {paymentRequests.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500 dark:text-gray-400 mb-2">No payment requests yet</div>
+              <div className="text-sm text-gray-400">Create your first payment request to get started</div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paymentRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        Payment Request #{request.id.slice(0, 8)}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Created: {new Date(request.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <Badge color={getStatusColor(request.status)}>
+                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                    <div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
+                      <div className="font-semibold text-green-600 dark:text-green-400">
+                        ₦{request.totalEarnings.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Material Deductions</div>
+                      <div className="font-semibold text-red-600 dark:text-red-400">
+                        ₦{request.materialDeductions.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Tool Deductions</div>
+                      <div className="font-semibold text-red-600 dark:text-red-400">
+                        ₦{request.toolDeductions.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Net Amount</div>
+                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                          ₦{request.requestedAmount.toLocaleString()}
+                        </div>
+                      </div>
+                      
+                      {request.status === 'pending' && (
+                        <Button
+                          onClick={() => handleCancelRequest(request.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          Cancel Request
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {request.adminNotes && (
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Admin Notes:</div>
+                      <div className="text-gray-900 dark:text-white">{request.adminNotes}</div>
+                    </div>
+                  )}
+                  
+                  {request.approvalDate && (
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      Approved: {new Date(request.approvalDate).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create Request Modal */}
+      <Modal
+        isOpen={showCreateForm}
+        onClose={closeCreateForm}
+        className="max-w-md p-6"
+      >
+
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Create Payment Request
-            </h2>
+            </h3>
             
             <form onSubmit={handleCreateRequest} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Request Type
-                </label>
-                <select
-                  value={formData.requestType}
-                  onChange={(e) => setFormData(prev => ({ ...prev, requestType: e.target.value as PaymentRequest['requestType'] }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  required
-                >
-                  <option value="salary">Salary</option>
-                  <option value="bonus">Bonus</option>
-                  <option value="overtime">Overtime</option>
-                  <option value="advance">Advance</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Requested Amount ($)
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Requested Amount (₦)
                 </label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
                   value={formData.requestedAmount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, requestedAmount: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  onChange={(e) => setFormData({ ...formData, requestedAmount: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter amount"
+                  min="0"
+                  max={currentEarnings}
                   required
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Period Start (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.periodStart}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodStart: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Period End (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.periodEnd}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodEnd: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+                <div className="text-xs text-gray-500 mt-1">
+                  Available: ₦{currentEarnings.toLocaleString()}
                 </div>
               </div>
-
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description (Optional)
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Material Deductions (₦)
                 </label>
                 <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief description of the request"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  type="number"
+                  value={formData.materialDeductions}
+                  onChange={(e) => setFormData({ ...formData, materialDeductions: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  placeholder="0"
+                  min="0"
                 />
               </div>
-
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Tool Deductions (₦)
+                </label>
+                <input
+                  type="number"
+                  value={formData.toolDeductions}
+                  onChange={(e) => setFormData({ ...formData, toolDeductions: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Notes (Optional)
                 </label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Additional notes or justification"
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  placeholder="Add any additional notes..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700"
-                >
-                  Cancel
-                </Button>
+              
+              <div className="flex space-x-3 pt-4">
                 <Button
                   type="submit"
                   disabled={formSubmitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {formSubmitting ? 'Creating...' : 'Create Request'}
                 </Button>
+                <Button
+                  type="button"
+                  onClick={closeCreateForm}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Requests List */}
-      <div className="space-y-4">
-        {paymentRequests.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">No payment requests found</p>
-            <Button onClick={() => setShowCreateForm(true)} className="bg-blue-600 hover:bg-blue-700">
-              Create Your First Request
-            </Button>
-          </div>
-        ) : (
-          paymentRequests.map((request) => (
-            <div key={request.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                {/* Request Info */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {getRequestTypeLabel(request.requestType)} Request
-                    </h3>
-                    <Badge color={getStatusColor(request.status)}>
-                      {request.status.toUpperCase()}
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    <div>
-                      <span className="font-medium">Amount:</span> ${request.requestedAmount}
-                    </div>
-                    <div>
-                      <span className="font-medium">Requested:</span> {new Date(request.requestDate).toLocaleDateString()}
-                    </div>
-                    {request.periodStart && request.periodEnd && (
-                      <div>
-                        <span className="font-medium">Period:</span> {new Date(request.periodStart).toLocaleDateString()} - {new Date(request.periodEnd).toLocaleDateString()}
-                      </div>
-                    )}
-                    {request.approvedAmount && (
-                      <div>
-                        <span className="font-medium">Approved:</span> ${request.approvedAmount}
-                      </div>
-                    )}
-                    {request.reviewerName && (
-                      <div>
-                        <span className="font-medium">Reviewed by:</span> {request.reviewerName}
-                      </div>
-                    )}
-                    {request.paidAt && (
-                      <div>
-                        <span className="font-medium">Paid:</span> {new Date(request.paidAt).toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {request.description && (
-                    <div className="mb-2">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1">{request.description}</p>
-                    </div>
-                  )}
-                  
-                  {request.notes && (
-                    <div className="mb-2">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Notes:</span>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1">{request.notes}</p>
-                    </div>
-                  )}
-                  
-                  {request.adminNotes && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                      <span className="font-medium text-blue-800 dark:text-blue-300">Admin Notes:</span>
-                      <p className="text-blue-700 dark:text-blue-200 mt-1">{request.adminNotes}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2 lg:w-auto">
-                  {request.status === 'pending' && (
-                    <Button
-                      onClick={() => handleCancelRequest(request.id)}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      Cancel Request
-                    </Button>
-                  )}
-                  
-                  {request.status === 'approved' && (
-                    <div className="text-center">
-                      <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                        ✓ Approved
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Awaiting payment
-                      </p>
-                    </div>
-                  )}
-                  
-                  {request.status === 'paid' && (
-                    <div className="text-center">
-                      <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                        ✓ Paid
-                      </p>
-                      {request.paymentMethod && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          via {request.paymentMethod}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {request.status === 'rejected' && (
-                    <div className="text-center">
-                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                        ✗ Rejected
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      </Modal>
     </div>
   );
 };

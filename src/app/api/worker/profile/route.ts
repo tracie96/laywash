@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     // Fetch worker's check-in statistics
     const { data: allCheckIns, error: checkInsError } = await supabaseAdmin
       .from('car_check_ins')
-      .select('id, status, check_in_time, actual_completion_time, total_amount')
+      .select('id, status')
       .eq('assigned_washer_id', workerId);
 
     if (checkInsError) {
@@ -86,7 +86,6 @@ export async function GET(request: NextRequest) {
 
     const totalAllCheckIns = allCheckIns?.length || 0;
     const actualCompletedCount = allCheckIns?.filter(c => c.status === 'completed').length || 0;
-    const totalEarnings = allCheckIns?.filter(c => c.status === 'completed').reduce((sum, c) => sum + (c.total_amount || 0), 0) || 0;
 
     // Calculate average rating (placeholder for now)
     const averageRating = 4.5;
@@ -97,7 +96,7 @@ export async function GET(request: NextRequest) {
       name: worker.name,
       email: worker.email,
       phone: worker.phone,
-      totalEarnings: totalEarnings,
+      totalEarnings: profile?.total_earnings || 0,
       isAvailable: profile?.is_available ?? true,
       assignedAdminId: profile?.assigned_admin_id || null,
       assignedAdminName,

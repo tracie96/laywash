@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
           case 'cash':
             group.cashPayments += 1;
             break;
-          case 'card':
+          case 'pos':
             group.cardPayments += 1;
             break;
           case 'mobile_money':

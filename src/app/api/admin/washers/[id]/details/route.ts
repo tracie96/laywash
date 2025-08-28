@@ -37,7 +37,8 @@ export async function GET(
           is_available,
           assigned_location,
           address,
-          next_of_kin
+          next_of_kin,
+          picture_url
         )
       `)
       .eq('id', id)
@@ -162,7 +163,8 @@ export async function GET(
       emergencyPhone: profile?.next_of_kin?.[0]?.phone || 'Not provided',
       skills: ['Car Washing', 'Customer Service'],
       certifications: [],
-      notes: 'No additional notes.'
+      notes: 'No additional notes.',
+      picture_url: profile?.picture_url || null
     };
 
     return NextResponse.json({

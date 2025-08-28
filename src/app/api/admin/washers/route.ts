@@ -95,7 +95,6 @@ export async function GET() {
       const profile = washer.car_washer_profiles?.[0];
       const stats = washerStats.get(washer.id) || { totalCheckIns: 0, completedCheckIns: 0, lastActive: null };
       const assignedAdminName = profile?.assigned_admin_id ? adminMap.get(profile.assigned_admin_id) || 'Unassigned' : 'Unassigned';
-      
       return {
         id: washer.id,
         name: washer.name,
@@ -114,6 +113,7 @@ export async function GET() {
         lastActive: stats.lastActive || new Date(washer.updated_at)
       };
     }) || [];
+
 
     return NextResponse.json({
       success: true,
