@@ -4,6 +4,7 @@ import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
 import PasscodeModal from '@/components/admin/PasscodeModal';
 import { Modal } from '@/components/ui/modal';
+import CheckInDetailModal from '@/components/admin/CheckInDetailModal';
 
 interface CheckIn {
   id: string;
@@ -31,6 +32,7 @@ interface CheckIn {
   passcode?: string;
   createdAt: Date;
   updatedAt: Date;
+  userCode?: string;  
 }
 
 // Raw API data interface (dates come as strings)
@@ -57,6 +59,7 @@ interface RawCheckIn {
   paymentStatus?: string;
   paymentMethod?: string;
   customerId: string;
+  userCode?: string;  
   passcode?: string;
   createdAt: string;
   updatedAt: string;
@@ -86,6 +89,8 @@ const ActiveCheckInsPage: React.FC = () => {
   const [passcodeError, setPasscodeError] = useState<string>('');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState<string>('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedCheckInForDetail, setSelectedCheckInForDetail] = useState<CheckIn | null>(null);
 
   // Fetch active check-ins from API
   const fetchActiveCheckIns = async (search = '') => {
@@ -141,15 +146,23 @@ const ActiveCheckInsPage: React.FC = () => {
 
   const fetchWashers = async () => {
     try {
+      console.log('Fetching washers...');
       const response = await fetch('/api/admin/washers');
       const result = await response.json();
       
+      console.log('Washers API response:', result);
+      
       if (result.success) {
-        const availableWashers = result.washers.filter((washer: Washer) => 
-          washer.status === 'active' && washer.isAvailable
-        );
+        const allWashers = result.washers || [];
+        console.log('All washers:', allWashers);
+        
+        // Temporarily show all washers for debugging
+        const availableWashers = allWashers; // .filter((washer: Washer) => washer.status === 'active' && washer.isAvailable);
+        console.log('Available washers (showing all for now):', availableWashers);
+        
         setWashers(availableWashers);
       } else {
+        console.error('Washers API error:', result.error);
         throw new Error(result.error || 'Failed to fetch washers');
       }
     } catch (err) {
@@ -190,19 +203,7 @@ const ActiveCheckInsPage: React.FC = () => {
     }
   }, []);
 
-  // Debounced search effect
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery !== '') {
-        performSearch(searchQuery);
-      } else {
-        // If search is cleared, fetch all active check-ins
-        performSearch('');
-      }
-    }, 300); // 300ms debounce
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, performSearch]);
 
   // Refresh data function
   const refreshData = () => {
@@ -219,6 +220,7 @@ const ActiveCheckInsPage: React.FC = () => {
   // Clear search
   const clearSearch = () => {
     setSearchQuery('');
+    performSearch(''); // Clear search results and show all check-ins
   };
 
   const filteredCheckIns = checkIns.filter(checkIn => {
@@ -370,16 +372,21 @@ const ActiveCheckInsPage: React.FC = () => {
         },
         body: JSON.stringify({ 
           assignedWasherId: washerId,
-          status: 'in_progress'
         }),
       });
 
       const result = await response.json();
       
       if (result.success) {
-                setCheckIns(prev => prev.map(checkIn => 
+        console.log('Washer assigned successfully:', result.checkIn);
+        setCheckIns(prev => prev.map(checkIn => 
           checkIn.id === checkInId 
-            ? { ...checkIn, ...result.checkIn }
+            ? { 
+                ...checkIn, 
+                assignedWasher: result.checkIn.assignedWasher,
+                assignedWasherId: result.checkIn.assignedWasherId,
+                status: result.checkIn.status
+              }
             : checkIn
         ));
       } else {
@@ -501,27 +508,34 @@ const ActiveCheckInsPage: React.FC = () => {
           </div>
           <input
             type="text"
-            placeholder="Search by license plate, customer name, phone, or email..."
+            placeholder="Search by name, phone number, license plate, or key code..."
             value={searchQuery}
             onChange={handleSearchChange}
-            className="block w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          {searchQuery && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-2">
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={() => performSearch(searchQuery)}
+              disabled={searchLoading}
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+            >
               {searchLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               ) : (
-                <button
-                  onClick={clearSearch}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                'Search'
               )}
-            </div>
-          )}
+            </button>
+          </div>
         </div>
         {searchQuery && (
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -600,6 +614,11 @@ const ActiveCheckInsPage: React.FC = () => {
                     {getStatusBadge(checkIn.status)}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                 
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Phone Number</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{checkIn.customerPhone}</p>
+                    </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">License Plate</p>
                       <p className="font-medium text-gray-900 dark:text-white">{checkIn.licensePlate}</p>
@@ -648,8 +667,14 @@ const ActiveCheckInsPage: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Special Instructions */}
+              {checkIn.userCode && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Key Code:</p>
+                  <p className="text-sm text-gray-900 dark:text-white bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded">
+                    {checkIn.userCode}
+                  </p>
+                </div>
+              )}
               {checkIn.specialInstructions && (
                 <div className="mb-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Special Instructions:</p>
@@ -659,9 +684,11 @@ const ActiveCheckInsPage: React.FC = () => {
                 </div>
               )}
 
+
               {/* Actions */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4">
+              <div className="space-y-4">
+                {/* Status Info */}
+                <div className="flex flex-wrap gap-4">
                   <div className="text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Estimated Duration: </span>
                     <span className="font-medium text-gray-900 dark:text-white">
@@ -694,32 +721,38 @@ const ActiveCheckInsPage: React.FC = () => {
                   )}
                 </div>
                 
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                {/* Action Buttons */}
+                <div className="flex flex-row flex-wrap gap-2">
                   {checkIn.status === 'pending' && (
                     <>
                       {washers.length > 0 ? (
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleAssignWasher(checkIn.id, e.target.value);
-                            }
-                          }}
-                          value=""
-                          className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Assign Washer</option>
-                          {washers.map((washer) => (
-                            <option key={washer.id} value={washer.id}>
-                              {washer.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex flex-col sm:flex-row items-center gap-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {checkIn.assignedWasher ? 'Reassign Worker:' : 'Assign Worker:'}
+                          </label>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleAssignWasher(checkIn.id, e.target.value);
+                              }
+                            }}
+                            value={checkIn.assignedWasherId || ""}
+                            className="flex-shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">{checkIn.assignedWasher ? 'Reassign Washer' : 'Assign Washer'}</option>
+                            {washers.map((washer) => (
+                              <option key={washer.id} value={washer.id}>
+                                {washer.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       ) : (
                         <Button
                           variant="outline"
                           size="sm"
                           disabled
-                          className="w-full sm:w-auto"
+                          className="flex-shrink-0"
                         >
                           No Washers Available
                         </Button>
@@ -728,7 +761,7 @@ const ActiveCheckInsPage: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenCancelModal(checkIn.id)}
-                        className="w-full sm:w-auto"
+                        className="flex-shrink-0"
                       >
                         Cancel
                       </Button>
@@ -736,23 +769,11 @@ const ActiveCheckInsPage: React.FC = () => {
                   )}
                   {checkIn.status === 'in_progress' && (
                     <>
-                      {/* <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleWasherCompletionToggle(checkIn.id, !checkIn.washerCompletionStatus)}
-                        className={`w-full sm:w-auto ${
-                          checkIn.washerCompletionStatus 
-                            ? 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-300' 
-                            : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
-                        }`}
-                      >
-                        {checkIn.washerCompletionStatus ? 'Mark Incomplete' : 'Mark Washer Complete'}
-                      </Button> */}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenPasscodeModal(checkIn.id)}
-                        className="w-full sm:w-auto bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                        className="flex-shrink-0 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                       >
                         Mark Complete
                       </Button>
@@ -760,8 +781,11 @@ const ActiveCheckInsPage: React.FC = () => {
                   )}
                   <Button
                     size="sm"
-                    onClick={() => window.location.href = `/checkins/${checkIn.id}`}
-                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      setSelectedCheckInForDetail(checkIn);
+                      setShowDetailModal(true);
+                    }}
+                    className="flex-shrink-0"
                   >
                     View Details
                   </Button>
@@ -777,6 +801,15 @@ const ActiveCheckInsPage: React.FC = () => {
         onClose={handlePasscodeModalClose}
         onConfirm={handlePasscodeConfirm}
         error={passcodeError}
+      />
+
+      <CheckInDetailModal
+        checkIn={selectedCheckInForDetail}
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedCheckInForDetail(null);
+        }}
       />
 
       <Modal

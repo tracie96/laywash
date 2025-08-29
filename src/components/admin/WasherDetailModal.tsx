@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '@/components/ui/modal';
-import Image from 'next/image';
+import { ExpandableImage } from '@/components/ui/ExpandableImage';
 
 interface CarWashRecord {
   id: string;
@@ -147,7 +147,7 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
             <div className="flex-shrink-0">
               <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600">
                 {washer.picture_url ? (
-                  <Image
+                  <ExpandableImage
                     src={washer.picture_url}
                     alt={`${washer.name}'s profile`}
                     width={96}

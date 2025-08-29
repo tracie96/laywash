@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Customer } from '@/types/carwash';
 
 interface CheckInFormData {
+  customerId: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -64,6 +65,7 @@ const NewCheckInPage: React.FC = () => {
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
 
   const [formData, setFormData] = useState<CheckInFormData>({
+    customerId: '',
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -321,6 +323,7 @@ const NewCheckInPage: React.FC = () => {
     
     setFormData(prev => ({
       ...prev,
+      customerId: customer.id,
       customerName: customer.name,
       customerPhone: customer.phone,
       customerEmail: customer.email || '',
@@ -497,6 +500,7 @@ const NewCheckInPage: React.FC = () => {
         }
       }
       const submissionData = {
+        customerId: formData.customerId,
         customerName: formData.customerName,
         customerPhone: formData.customerPhone,
         customerEmail: formData.customerEmail,
@@ -710,11 +714,7 @@ const NewCheckInPage: React.FC = () => {
           {isCustomerSelected && (
             <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-yellow-800 dark:text-yellow-200 text-sm">
-                    Customer information is locked - fields are populated from existing customer record
-                  </span>
-                </div>
+              
                 <Button
                   type="button"
                   variant="outline"
@@ -881,7 +881,7 @@ const NewCheckInPage: React.FC = () => {
                           {service.name}
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          ${service.price} • {service.duration} min
+                          NGN {service.price} • {service.duration} min
                         </p>
                         {service.description && (
                           <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
@@ -969,7 +969,7 @@ const NewCheckInPage: React.FC = () => {
                                           min="0"
                                           max={material.quantity}
                                           step="0"
-                                          className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          className="w-16 px-2 py-1 text-xs border dark:bg-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                           placeholder="0"
                                           value={assignedMaterial?.quantity || 0}
                                           onChange={(e) => {
@@ -1017,7 +1017,7 @@ const NewCheckInPage: React.FC = () => {
                         {service.price === 0 && (
                           <div>
                             <Label htmlFor={`price-${service.id}`}>
-                              Custom Price (USD) *
+                              Custom Price *
                             </Label>
                             <InputField
                               id={`price-${service.id}`}
@@ -1030,7 +1030,7 @@ const NewCheckInPage: React.FC = () => {
                               className="mt-1"
                             />
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              Base price is $0. Set custom price for this service.
+                              Base price is 0. Set custom price for this service.
                             </p>
                           </div>
                         )}
@@ -1039,7 +1039,7 @@ const NewCheckInPage: React.FC = () => {
                         {service.price > 0 && (
                           <div>
                             <Label htmlFor={`price-increase-${service.id}`}>
-                              Price Increase (USD) - Optional
+                              Price Increase (NGN) - Optional
                             </Label>
                             <InputField
                               id={`price-increase-${service.id}`}
@@ -1156,7 +1156,7 @@ const NewCheckInPage: React.FC = () => {
                     placeholder="Enter security code"
                   />
                 </FormField>
-                <FormField label="User Code" required>
+                <FormField label="Key Code" required>
                   <InputField
                     type="text"
                     value={formData.userCode}
@@ -1202,7 +1202,7 @@ const NewCheckInPage: React.FC = () => {
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Price</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${calculateTotalPrice()}
+                NGN {calculateTotalPrice()}
               </p>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">

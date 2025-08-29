@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/modal';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
-import Image from 'next/image';
+import { ExpandableImage } from '@/components/ui/ExpandableImage';
 
 interface CarWashRecord {
   id: string;
@@ -220,7 +220,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
             <div className="flex-shrink-0">
                               <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600">
                   {worker?.picture_url ? (
-                    <Image
+                    <ExpandableImage
                       src={worker.picture_url}
                       alt={`${worker.name}'s profile`}
                       width={80}
