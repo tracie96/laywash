@@ -43,6 +43,7 @@ interface AssignmentForm {
   expectedReturnDate: string;
   notes: string;
   quantity: number;
+  price: number;
 }
 
 interface WasherToolWithWorker {
@@ -93,7 +94,8 @@ const ToolsAssignmentsPage: React.FC = () => {
     assignedDate: new Date().toISOString().split('T')[0],
     expectedReturnDate: '',
     notes: '',
-    quantity: 1
+    quantity: 1,
+    price:0
   });
 
   useEffect(() => {
@@ -122,6 +124,7 @@ const ToolsAssignmentsPage: React.FC = () => {
             toolName: tool.toolName,
             workerName: tool.washer?.name || 'Unknown Worker',
             quantity: tool.quantity,
+
             assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
             returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
             status: tool.isReturned ? "returned" : 
@@ -131,7 +134,10 @@ const ToolsAssignmentsPage: React.FC = () => {
         : [];
 
       setAssignments(transformedAssignments);
-      setTools(toolsData.success ? toolsData.tools : []);
+      setTools(toolsData.success ? toolsData.tools.map((tool: Tool) => ({
+        ...tool,
+        amount: tool.replacementCost
+      })) : []);
       setWorkers(workersData.success ? workersData.washers : []);
       setLoading(false);
     } catch (error) {
@@ -270,7 +276,8 @@ const ToolsAssignmentsPage: React.FC = () => {
           toolName: selectedTool.name,
           toolType: 'equipment',
           quantity: assignmentForm.quantity,
-          notes: assignmentForm.notes
+          notes: assignmentForm.notes,
+          price:assignmentForm.price
         })
       });
 
@@ -288,7 +295,8 @@ const ToolsAssignmentsPage: React.FC = () => {
         assignedDate: new Date().toISOString().split('T')[0],
         expectedReturnDate: '',
         notes: '',
-        quantity: 1
+        quantity: 1,
+        price:0
       });
       closeModal();
 

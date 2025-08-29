@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       toolName: tool.tool_name,
       toolType: tool.tool_type,
       quantity: tool.quantity,
-      amount: tool.amount,
+      price: tool.amount, // Changed from amount to price
       assignedDate: tool.assigned_date,
       returnedDate: tool.returned_date,
       isReturned: tool.is_returned,
@@ -89,22 +89,22 @@ export async function POST(request: NextRequest) {
       toolName, 
       toolType, 
       quantity, 
-      amount, 
+      price, // Changed from amount to price
       notes 
     } = await request.json();
 
     // Validate required input
-    if (!washerId || !toolName || !toolType || !quantity || amount === undefined) {
+    if (!washerId || !toolName || !toolType || !quantity || price === undefined) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: washerId, toolName, toolType, quantity, and amount are required' },
+        { success: false, error: 'Missing required fields: washerId, toolName, toolType, quantity, and price are required' },
         { status: 400 }
       );
     }
 
-    // Validate quantity and amount
-    if (quantity <= 0 || amount <= 0) {
+    // Validate quantity and price
+    if (quantity <= 0 || price <= 0) {
       return NextResponse.json(
-        { success: false, error: 'Quantity and amount must be greater than 0' },
+        { success: false, error: 'Quantity and price must be greater than 0' },
         { status: 400 }
       );
     }
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         tool_name: toolName,
         tool_type: toolType,
         quantity: quantity,
-        amount: amount,
+        price: price, // Changed from amount to price
         notes: notes || null
       })
       .select(`
@@ -139,7 +139,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transform the response
     const transformedTool = {
       id: tool.id,
       washerId: tool.washer_id,
@@ -147,7 +146,7 @@ export async function POST(request: NextRequest) {
       toolName: tool.tool_name,
       toolType: tool.tool_type,
       quantity: tool.quantity,
-      amount: tool.amount,
+      price: tool.price, 
       assignedDate: tool.assigned_date,
       returnedDate: tool.returned_date,
       isReturned: tool.is_returned,
@@ -158,16 +157,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      tool: transformedTool,
-      message: 'Washer tool assigned successfully'
+      tool: transformedTool
     });
 
   } catch (error) {
-    console.error('Create washer tool error:', error);
+    console.error('Create washer material error:', error);
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred' },
       { status: 500 }
-      );
+    );
   }
 }
 

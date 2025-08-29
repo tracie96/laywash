@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { Modal } from '@/components/ui/modal';
 
 interface StockItem {
   id: string;
@@ -71,15 +72,8 @@ const StockInventoryPage: React.FC = () => {
       console.log({data})
 
       if (data.success) {
-        const previousCount = stockItems.length;
         setStockItems(data.inventory);
         setLastUpdateTime(new Date());
-        
-        // Show notification if inventory count changed (indicating sales or updates)
-        if (previousCount > 0 && data.inventory.length !== previousCount) {
-          setInventoryChangeNotification('Inventory has been updated');
-          setTimeout(() => setInventoryChangeNotification(null), 5000);
-        }
       } else {
         setError(data.error || 'Failed to fetch inventory');
       }
@@ -89,18 +83,18 @@ const StockInventoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter, sortBy, sortOrder, stockItems]);
+  }, [searchTerm, filter, sortBy, sortOrder]);
 
   // Add useEffect to fetch data on mount and when dependencies change
   useEffect(() => {
     fetchInventoy();
   }, [fetchInventoy]);
 
-  // Add auto-refresh every 30 seconds to keep inventory up-to-date
+  // Auto-refresh every 5 minutes to keep inventory up-to-date (only when page is active)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchInventoy();
-    }, 30000); // Refresh every 30 seconds
+    }, 300000); // Refresh every 5 minutes
 
     return () => clearInterval(interval);
   }, [fetchInventoy]);
@@ -587,165 +581,159 @@ const StockInventoryPage: React.FC = () => {
       </div>
 
       {/* Create Item Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Inventory Item</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        className="w-full max-w-md mx-4"
+      >
+        <div className="p-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Inventory Item</h3>
+          </div>
+
+          <form onSubmit={handleCreateItem} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Item Name
+              </label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter item name"
+                required
+              />
             </div>
 
-            <form onSubmit={handleCreateItem} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Category
+              </label>
+              <input
+                type="text"
+                value={createForm.category}
+                onChange={(e) => setCreateForm({...createForm, category: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., Cleaning Supplies"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Item Name
+                  Current Stock
                 </label>
                 <input
-                  type="text"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                  type="number"
+                  min="0"
+                  value={createForm.currentStock}
+                  onChange={(e) => setCreateForm({...createForm, currentStock: parseInt(e.target.value) || 0})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter item name"
+                  placeholder="0"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Category
+                  Unit
                 </label>
                 <input
                   type="text"
-                  value={createForm.category}
-                  onChange={(e) => setCreateForm({...createForm, category: e.target.value})}
+                  value={createForm.unit}
+                  onChange={(e) => setCreateForm({...createForm, unit: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Cleaning Supplies"
+                  placeholder="e.g., Liters, Pieces"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Min Stock Level
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={createForm.minStockLevel}
+                  onChange={(e) => setCreateForm({...createForm, minStockLevel: parseInt(e.target.value) || 0})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Current Stock
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={createForm.currentStock}
-                    onChange={(e) => setCreateForm({...createForm, currentStock: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Max Stock Level
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={createForm.maxStockLevel}
+                  onChange={(e) => setCreateForm({...createForm, maxStockLevel: parseInt(e.target.value) || 0})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Unit
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.unit}
-                    onChange={(e) => setCreateForm({...createForm, unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., Liters, Pieces"
-                    required
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Price per Unit
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={createForm.price}
+                  onChange={(e) => setCreateForm({...createForm, price: parseFloat(e.target.value) || 0})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                  required
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Min Stock Level
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={createForm.minStockLevel}
-                    onChange={(e) => setCreateForm({...createForm, minStockLevel: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Max Stock Level
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={createForm.maxStockLevel}
-                    onChange={(e) => setCreateForm({...createForm, maxStockLevel: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Supplier
+                </label>
+                <input
+                  type="text"
+                  value={createForm.supplier}
+                  onChange={(e) => setCreateForm({...createForm, supplier: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter supplier name"
+                  required
+                />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Price per Unit
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={createForm.price}
-                    onChange={(e) => setCreateForm({...createForm, price: parseFloat(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Supplier
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.supplier}
-                    onChange={(e) => setCreateForm({...createForm, supplier: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter supplier name"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                >
-                  {submitting ? 'Creating...' : 'Create Item'}
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+              >
+                {submitting ? 'Creating...' : 'Create Item'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

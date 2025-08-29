@@ -56,12 +56,6 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
   const [carWashHistory, setCarWashHistory] = useState<CarWashRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (washer && isOpen) {
-      fetchWasherHistory();
-    }
-  }, [washer, isOpen]);
-
   const fetchWasherHistory = useCallback(async () => {
     if (!washer) return;
     
@@ -79,6 +73,12 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
       setLoading(false);
     }
   }, [washer]);
+
+  useEffect(() => {
+    if (washer && isOpen) {
+      fetchWasherHistory();
+    }
+  }, [washer, isOpen, fetchWasherHistory]);
 
   if (!washer) return null;
 

@@ -16,7 +16,7 @@ interface WorkerTool {
   returnedDate?: string;
   notes?: string;
   washerId: string;
-  amount: number;
+  price: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,7 +73,7 @@ const MyToolsPage: React.FC = () => {
 
   const assignedToolsCount = tools.filter(t => !t.isReturned).length;
   const returnedToolsCount = tools.filter(t => t.isReturned).length;
-  const totalToolsValue = tools.reduce((sum, tool) => sum + (tool.amount || 0), 0);
+    const totalToolsValue = tools.reduce((sum, tool) => sum + (tool.price || 0), 0);
 
   if (loading) {
     return (
@@ -238,27 +238,25 @@ const MyToolsPage: React.FC = () => {
                       {new Date(tool.assignedDate).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      ${tool.amount}
+                      ${tool.price}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        {!tool.isReturned && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              // TODO: Implement tool return functionality
-                              console.log('Return tool:', tool.id);
-                            }}
-                          >
-                            Return Tool
-                          </Button>
-                        )}
                         {tool.isReturned && (
                           <span className="text-sm text-gray-500 dark:text-gray-400">
                             Returned on {tool.returnedDate ? new Date(tool.returnedDate).toLocaleDateString() : 'N/A'}
                           </span>
                         )}
+                         {!tool.isReturned && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                          
+                          >
+                            Not Returned
+                          </Button>
+                        )}
+                         
                       </div>
                     </td>
                   </tr>

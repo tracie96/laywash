@@ -36,6 +36,21 @@ const PaymentRequestsPage: React.FC = () => {
     notes: ''
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [calculatedDeductions, setCalculatedDeductions] = useState({
+    materialDeductions: 0,
+    toolDeductions: 0,
+    totalDeductions: 0
+  });
+  const [unreturnedItems, setUnreturnedItems] = useState<Array<{
+    id: string;
+    toolName: string;
+    toolType: string;
+    quantity: number;
+    amount: number;
+    totalValue: number;
+    assignedDate: string;
+    notes?: string;
+  }>>([]);
 
   const { user } = useAuth();
 
@@ -87,17 +102,45 @@ const PaymentRequestsPage: React.FC = () => {
     }
   }, [user?.id]);
 
+  const fetchCalculatedDeductions = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/admin/calculate-deductions?washerId=${user.id}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setCalculatedDeductions(result.deductions);
+          setUnreturnedItems(result.unreturnedItems);
+          
+          // Update form data with calculated deductions
+          setFormData(prev => ({
+            ...prev,
+            materialDeductions: result.deductions.materialDeductions.toString(),
+            toolDeductions: result.deductions.toolDeductions.toString()
+          }));
+          
+          // Also update the calculated deductions state
+          setCalculatedDeductions(result.deductions);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching calculated deductions:', err);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     fetchPaymentRequests();
     fetchCurrentEarnings();
-  }, [fetchPaymentRequests, fetchCurrentEarnings]);
+    fetchCalculatedDeductions();
+  }, [fetchPaymentRequests, fetchCurrentEarnings, fetchCalculatedDeductions]);
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const requestedAmount = parseFloat(formData.requestedAmount);
-    const materialDeductions = parseFloat(formData.materialDeductions);
-    const toolDeductions = parseFloat(formData.toolDeductions);
+    const materialDeductions = calculatedDeductions.materialDeductions;
+    const toolDeductions = calculatedDeductions.toolDeductions;
     
     if (!requestedAmount || requestedAmount <= 0) {
       alert('Please enter a valid amount');
@@ -139,8 +182,8 @@ const PaymentRequestsPage: React.FC = () => {
         // Reset form and close modal
         setFormData({
           requestedAmount: '',
-          materialDeductions: '0',
-          toolDeductions: '0',
+          materialDeductions: calculatedDeductions.materialDeductions.toString(),
+          toolDeductions: calculatedDeductions.toolDeductions.toString(),
           notes: ''
         });
         closeCreateForm();
@@ -354,6 +397,33 @@ const PaymentRequestsPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Create Payment Request
             </h3>
+
+            {/* Deductions Summary */}
+            {calculatedDeductions.totalDeductions > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+                <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium mb-1">⚠️ Deductions Applied</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>Material: ₦{calculatedDeductions.materialDeductions.toLocaleString()}</div>
+                        <div>Tools: ₦{calculatedDeductions.toolDeductions.toLocaleString()}</div>
+                      </div>
+                      <div className="font-medium mt-1 text-yellow-900 dark:text-yellow-100">
+                        Total Deductions: ₦{calculatedDeductions.totalDeductions.toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={fetchCalculatedDeductions}
+                      className="text-xs px-2 py-1 bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded hover:bg-yellow-300 dark:hover:bg-yellow-700"
+                      title="Refresh deductions"
+                    >
+                      🔄
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={handleCreateRequest} className="space-y-4">
               <div>
@@ -379,28 +449,28 @@ const PaymentRequestsPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Material Deductions (₦)
                 </label>
-                <input
-                  type="number"
-                  value={formData.materialDeductions}
-                  onChange={(e) => setFormData({ ...formData, materialDeductions: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  placeholder="0"
-                  min="0"
-                />
+                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300">
+                  ₦{calculatedDeductions.materialDeductions.toLocaleString()}
+                </div>
+                {unreturnedItems.filter(item => item.toolType === 'material' || item.toolType === 'supply').length > 0 && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Based on {unreturnedItems.filter(item => item.toolType === 'material' || item.toolType === 'supply').length} unreturned material(s)
+                  </div>
+                )}
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Tool Deductions (₦)
                 </label>
-                <input
-                  type="number"
-                  value={formData.toolDeductions}
-                  onChange={(e) => setFormData({ ...formData, toolDeductions: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  placeholder="0"
-                  min="0"
-                />
+                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300">
+                  ₦{calculatedDeductions.toolDeductions.toLocaleString()}
+                </div>
+                {unreturnedItems.filter(item => item.toolType !== 'material' && item.toolType !== 'supply').length > 0 && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Based on {unreturnedItems.filter(item => item.toolType !== 'material' && item.toolType !== 'supply').length} unreturned tool(s)
+                  </div>
+                )}
               </div>
               
               <div>
@@ -415,6 +485,29 @@ const PaymentRequestsPage: React.FC = () => {
                   rows={3}
                 />
               </div>
+
+              {/* Unreturned Items Details */}
+              {(unreturnedItems.length > 0) && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Unreturned Items (Total: ₦{calculatedDeductions.totalDeductions.toLocaleString()})
+                  </h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {unreturnedItems.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center text-xs bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                        <div>
+                          <span className="font-medium">{item.toolName}</span>
+                          <span className="text-gray-500 ml-2">({item.toolType})</span>
+                        </div>
+                        <div className="text-right">
+                          <div>Qty: {item.quantity}</div>
+                          <div className="text-red-600">₦{item.totalValue.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="flex space-x-3 pt-4">
                 <Button
