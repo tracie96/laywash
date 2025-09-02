@@ -5,6 +5,7 @@ import Badge from '@/components/ui/badge/Badge';
 import PasscodeModal from '@/components/admin/PasscodeModal';
 import { Modal } from '@/components/ui/modal';
 import CheckInDetailModal from '@/components/admin/CheckInDetailModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface CheckIn {
   id: string;
@@ -77,6 +78,7 @@ interface Washer {
 }
 
 const ActiveCheckInsPage: React.FC = () => {
+  const { hasRole, user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +93,7 @@ const ActiveCheckInsPage: React.FC = () => {
   const [cancelReason, setCancelReason] = useState<string>('');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCheckInForDetail, setSelectedCheckInForDetail] = useState<CheckIn | null>(null);
+  const [sendingSMS, setSendingSMS] = useState<string | null>(null);
 
   // Fetch active check-ins from API
   const fetchActiveCheckIns = async (search = '') => {
@@ -398,6 +401,36 @@ const ActiveCheckInsPage: React.FC = () => {
     }
   };
 
+  const handleSendKeyCode = async (checkInId: string) => {
+    setSendingSMS(checkInId);
+    
+    try {
+      const response = await fetch('/api/admin/send-sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
+        },
+        body: JSON.stringify({ 
+          checkInId: checkInId
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('Key code sent successfully via SMS!');
+      } else {
+        throw new Error(result.error || 'Failed to send SMS');
+      }
+    } catch (err) {
+      console.error('Error sending SMS:', err);
+      alert(err instanceof Error ? err.message : 'Failed to send SMS');
+    } finally {
+      setSendingSMS(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -669,10 +702,39 @@ const ActiveCheckInsPage: React.FC = () => {
               </div>
               {checkIn.userCode && (
                 <div className="mb-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Key Code:</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Key Code:</p>
+                    {hasRole('super_admin') && checkIn.customerId && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleSendKeyCode(checkIn.id)}
+                        disabled={sendingSMS === checkIn.id}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {sendingSMS === checkIn.id ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Sending...
+                          </div>
+                        ) : (
+                          'Send Key Code'
+                        )}
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-900 dark:text-white bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded">
                     {checkIn.userCode}
                   </p>
+                  {hasRole('super_admin') && checkIn.customerId && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Key code will be sent via SMS to {checkIn.customerPhone}
+                    </p>
+                  )}
+                  {hasRole('super_admin') && !checkIn.customerId && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      SMS not available for walk-in customers
+                    </p>
+                  )}
                 </div>
               )}
               {checkIn.specialInstructions && (

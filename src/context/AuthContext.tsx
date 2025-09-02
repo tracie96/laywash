@@ -94,7 +94,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Determine if identifier is email or phone
       const isEmail = identifier.includes('@');
-      const isPhone = /^\+?[\d\s\-\(\)]+$/.test(identifier);
+      const isPhone = /^[\+]?[0-9\s\-\(\)]{7,}$/.test(identifier.replace(/\s/g, ''));
+      
+      console.log('Login attempt - Identifier:', identifier);
+      console.log('Detected as email:', isEmail);
+      console.log('Detected as phone:', isPhone);
       
       if (!isEmail && !isPhone) {
         console.error('Invalid identifier format');

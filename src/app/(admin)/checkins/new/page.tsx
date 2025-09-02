@@ -444,28 +444,7 @@ const NewCheckInPage: React.FC = () => {
         return;
       }
 
-      // Validate materials for each service
-      if (serviceItem.materials.length === 0) {
-        setError(`Materials must be assigned for service: ${service.name}`);
-        setIsSubmitting(false);
-        return;
-      }
 
-      for (const material of serviceItem.materials) {
-        if (material.quantity <= 0) {
-          setError(`Quantity must be greater than 0 for material: ${material.materialName} for service: ${service.name}`);
-          setIsSubmitting(false);
-          return;
-        }
-        
-        // Check if allocated quantity exceeds available quantity
-        const washerMaterial = washerMaterials.find(wm => wm.id === material.materialId);
-        if (washerMaterial && material.quantity > washerMaterial.quantity) {
-          setError(`Cannot allocate ${material.quantity} ${material.unit} of ${material.materialName} - only ${washerMaterial.quantity} ${washerMaterial.unit} available`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
     }
 
     try {
@@ -495,9 +474,6 @@ const NewCheckInPage: React.FC = () => {
         if (!service.workerId) {
           throw new Error(`Worker not assigned for service: ${service.serviceData.name}`);
         }
-        if (service.materials.length === 0) {
-          throw new Error(`No materials assigned for service: ${service.serviceData.name}`);
-        }
       }
       const submissionData = {
         customerId: formData.customerId,
@@ -515,7 +491,8 @@ const NewCheckInPage: React.FC = () => {
         valuableItems: formData.valuableItems,
         userCode: formData.userCode,
         passcode: formData.securityCode,
-        remarks: formData.checkInProcess
+        remarks: formData.checkInProcess,
+        totalAmount: calculateTotalPrice()
       };
 
       console.log('Submitting check-in:', submissionData);
@@ -811,10 +788,10 @@ const NewCheckInPage: React.FC = () => {
         {formData.services.some(s => s.workerId) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Service Materials Summary
+              Service Materials Summary (Optional)
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Overview of materials assigned to each service
+              Overview of materials assigned to each service (materials can be handled by workers)
             </p>
             {formData.services.filter(s => s.workerId).map((serviceItem) => {
               const service = availableServices.find(s => s.id === serviceItem.serviceId);
@@ -826,7 +803,7 @@ const NewCheckInPage: React.FC = () => {
                     {service?.name} - {worker?.name}
                   </h3>
                   {serviceItem.materials.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No materials assigned</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No materials assigned (optional - workers can handle)</p>
                   ) : (
                     <div className="space-y-2">
                       {serviceItem.materials.map((material) => (
@@ -927,14 +904,14 @@ const NewCheckInPage: React.FC = () => {
                           />
                         </div>
 
-                        {/* Materials Assignment - Only show when worker is assigned */}
+                        {/* Materials Assignment - Optional (workers can handle on their end) */}
                         {selectedService?.workerId && (
                           <div>
                             <Label htmlFor={`materials-${service.id}`}>
-                              Materials Assignment
+                              Materials Assignment (Optional)
                             </Label>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                              Select materials for this service
+                              Materials can be assigned here or handled by workers during the service
                             </p>
                             {isLoadingMaterials ? (
                               <div className="text-center py-2">
@@ -994,11 +971,11 @@ const NewCheckInPage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Materials Summary */}
+                        {/* Materials Summary (Optional) */}
                         {selectedService && selectedService.materials.length > 0 && (
                           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
                             <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                              Materials Summary for {service.name}
+                              Materials Summary for {service.name} (Optional)
                             </h4>
                             <div className="space-y-1">
                               {selectedService.materials.map((material) => (

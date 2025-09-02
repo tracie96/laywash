@@ -31,7 +31,7 @@ export class AuthService {
           error: 'Email or phone number is required',
         };
       }
-
+      console.log('Attempting login with:', credentials);
       let authData;
       if (credentials.email) {
         // Login with email
@@ -42,16 +42,22 @@ export class AuthService {
         authData = { data, error };
       } else {
         // Login with phone - we'll need to find the user first
+        console.log('Attempting phone-based login with:', credentials.phone);
+        
         const { data: userProfile, error: profileError } = await supabase
           .from('users')
           .select('email')
           .eq('phone', credentials.phone)
           .single();
 
+          console.log('User profile:', profileError, userProfile);
+
         if (profileError || !userProfile) {
+          console.log('Phone lookup error:', profileError);
+          console.log('User profile found:', userProfile);
           return {
             success: false,
-            error: 'Phone number not found',
+            error: profileError ? `Phone lookup failed: ${profileError.message}` : 'Phone number not found',
           };
         }
 

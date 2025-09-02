@@ -15,7 +15,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, phone, password, nextOfKin, pictureUrl, createdBy } = await request.json();
+    const { name, email, phone, password, assignedLocation, nextOfKin,bankInformation, pictureUrl, createdBy } = await request.json();
 
     // Validate input
     if (!name || !email || !phone || !password) {
@@ -95,7 +95,8 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: data.user.id,
         assigned_admin_id: createdBy,
-
+        assigned_location: assignedLocation,
+        bank_information: bankInformation,
         total_earnings: 0,
         is_available: true,
         picture_url: pictureUrl || null,

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { Location, LocationStats } from '../../../../types/location';
-import { PlusIcon, SearchIcon, EditIcon, TrashBinIcon, AlertIcon, CheckCircleIcon, CloseIcon } from '../../../../icons';
+import { PlusIcon, SearchIcon, EditIcon, TrashBinIcon, AlertIcon, CheckCircleIcon, CloseIcon, EyeIcon } from '../../../../icons';
 import { Modal } from '../../../../components/ui/modal';
 import { useModal } from '../../../../hooks/useModal';
 
@@ -17,7 +17,17 @@ const LocationsPage: React.FC = () => {
   const [uniqueLGAs, setUniqueLGAs] = useState<string[]>([]);
   const createModal = useModal();
   const editModal = useModal();
+  const viewModal = useModal();
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [viewingLocation, setViewingLocation] = useState<Location | null>(null);
+  const [workers, setWorkers] = useState<Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    is_active: boolean;
+  }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -213,6 +223,23 @@ const LocationsPage: React.FC = () => {
       is_active: location.is_active
     });
     editModal.openModal();
+  };
+
+  const openViewModal = async (location: Location) => {
+    setViewingLocation(location);
+    try {
+      const response = await fetch(`/api/admin/locations/${location.id}/workers`);
+      const result = await response.json();
+      if (result.success) {
+        setWorkers(result.data);
+      } else {
+        setWorkers([]);
+      }
+    } catch (err) {
+      console.error('Error fetching workers:', err);
+      setWorkers([]);
+    }
+    viewModal.openModal();
   };
 
   const closeCreateModal = () => {
@@ -439,14 +466,23 @@ const LocationsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button
+                          onClick={() => openViewModal(location)}
+                          className="text-green-600 hover:text-green-900"
+                          title="View Details"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openEditModal(location)}
                           className="text-blue-600 hover:text-blue-900"
+                          title="Edit"
                         >
                           <EditIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteLocation(location.id)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete"
                         >
                           <TrashBinIcon className="w-4 h-4" />
                         </button>
@@ -611,6 +647,113 @@ const LocationsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </Modal>
+
+        {/* View Location Details Modal */}
+        <Modal isOpen={viewModal.isOpen} onClose={viewModal.closeModal} className="max-w-4xl mx-4">
+          <div className="p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Location Details</h3>
+            {viewingLocation && (
+              <div className="space-y-6">
+                {/* Location Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Location Information</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Address</label>
+                      <p className="text-sm text-gray-900">{viewingLocation.address}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">LGA</label>
+                      <p className="text-sm text-gray-900">{viewingLocation.lga}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Status</label>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        viewingLocation.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {viewingLocation.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Created</label>
+                      <p className="text-sm text-gray-900">
+                        {new Date(viewingLocation.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Workers List */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Workers at this Location</h4>
+                  {workers.length > 0 ? (
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Phone
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {workers.map((worker) => (
+                            <tr key={worker.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {worker.first_name} {worker.last_name}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{worker.email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{worker.phone || 'N/A'}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  worker.is_active
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {worker.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No workers assigned to this location</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={viewModal.closeModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:ring-2 focus:ring-gray-500"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </Modal>
       </div>

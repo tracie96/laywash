@@ -2,11 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Define proper types
-interface Service {
+interface ServiceData {
   id: string;
   name: string;
   price: number;
   duration: number;
+}
+
+interface CheckInServiceItem {
+  serviceId: string;
+  workerId: string;
+  materials: Array<{
+    materialId: string;
+    materialName: string;
+    quantity: number;
+    unit: string;
+  }>;
+  serviceData: ServiceData;
 }
 
 interface CheckInService {
@@ -316,12 +328,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (adminUser.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'User does not have admin privileges' },
-        { status: 403 }
-      );
-    }
+    // if (adminUser.role !== 'admin') {
+    //   return NextResponse.json(
+    //     { success: false, error: 'User does not have admin privileges' },
+    //     { status: 403 }
+    //   );
+    // }
 
     const body = await request.json();
     const {
@@ -333,9 +345,8 @@ export async function POST(request: NextRequest) {
       vehicleModel,
       services,
       remarks,
+      passcode,
       valuableItems,
-      assignedWasherId,
-      assignedAdminId,
       estimatedDuration,
       totalAmount,
       userCode,
@@ -350,28 +361,86 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate that at least one service has a worker assigned
+    if (!services.some((service: CheckInServiceItem) => service.workerId)) {
+      return NextResponse.json(
+        { success: false, error: 'At least one service must have a worker assigned' },
+        { status: 400 }
+      );
+    }
+    
+    // Get the first assigned worker ID
+    const assignedWorkerId = services.find((service: CheckInServiceItem) => service.workerId)?.workerId;
+    if (!assignedWorkerId) {
+      return NextResponse.json(
+        { success: false, error: 'No worker ID found in services' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate worker ID format
+    if (!uuidRegex.test(assignedWorkerId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid worker ID format' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate that the worker exists
+    const { data: worker, error: workerError } = await supabaseAdmin
+      .from('users')
+      .select('id, role')
+      .eq('id', assignedWorkerId)
+      .eq('role', 'car_washer')
+      .single();
+      
+    if (workerError || !worker) {
+      return NextResponse.json(
+        { success: false, error: 'Worker not found or invalid role' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate admin ID
+    if (!currentAdminId) {
+      return NextResponse.json(
+        { success: false, error: 'Admin ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Debug logging
+    console.log('Services data:', services);
+    console.log('First service worker ID:', services[0]?.workerId);
+    console.log('Current admin ID:', currentAdminId);
+    
+    const insertData = {
+      customer_id: customerId || null, // Allow null for new customers
+      license_plate: licensePlate,
+      vehicle_type: vehicleType,
+      wash_type: washType,
+      vehicle_color: vehicleColor,
+      vehicle_model: vehicleModel,
+      remarks,
+      valuable_items: valuableItems,
+      assigned_washer_id: assignedWorkerId, // Use the validated worker ID
+      assigned_admin_id: currentAdminId, // Use the current admin ID
+      estimated_completion_time: new Date(Date.now() + (estimatedDuration * 60 * 1000)).toISOString(),
+      total_amount: totalAmount || 0,
+      user_code: userCode,
+      passcode: passcode,
+      reason,
+      status: 'pending',
+      payment_status: 'pending',
+      check_in_time: new Date().toISOString()
+    };
+    
+    console.log('Insert data:', insertData);
+
     // Create check-in record
     const { data: checkIn, error: checkInError } = await supabaseAdmin
       .from('car_check_ins')
-      .insert({
-        customer_id: customerId,
-        license_plate: licensePlate,
-        vehicle_type: vehicleType,
-        wash_type: washType,
-        vehicle_color: vehicleColor,
-        vehicle_model: vehicleModel,
-        remarks,
-        valuable_items: valuableItems,
-        assigned_washer_id: assignedWasherId,
-        assigned_admin_id: assignedAdminId,
-        estimated_duration: estimatedDuration,
-        total_amount: totalAmount,
-        user_code: userCode,
-        reason,
-        status: 'pending',
-        payment_status: 'pending',
-        check_in_time: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -382,15 +451,19 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    console.log('Check-in created successfully:', checkIn);
+    console.log('Stored assigned_washer_id:', checkIn.assigned_washer_id);
+    console.log('Stored assigned_admin_id:', checkIn.assigned_admin_id);
 
     // Create check-in services records
     if (services && services.length > 0) {
-      const checkInServices = services.map((service: Service) => ({
+      const checkInServices = services.map((service: CheckInServiceItem) => ({
         check_in_id: checkIn.id,
-        service_id: service.id,
-        service_name: service.name,
-        price: service.price,
-        duration: service.duration
+        service_id: service.serviceData.id,
+        service_name: service.serviceData.name,
+        price: service.serviceData.price,
+        duration: service.serviceData.duration
       }));
 
       const { error: servicesError } = await supabaseAdmin
@@ -417,7 +490,7 @@ export async function POST(request: NextRequest) {
         valuableItems: checkIn.valuable_items,
         assignedWasherId: checkIn.assigned_washer_id,
         assignedAdminId: checkIn.assigned_admin_id,
-        estimatedDuration: checkIn.estimated_duration,
+        estimatedDuration: estimatedDuration, // Return the original duration value in minutes
         totalAmount: checkIn.total_amount,
         userCode: checkIn.user_code,
         reason: checkIn.reason,

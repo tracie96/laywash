@@ -35,7 +35,8 @@
     "react-dropzone": "^14.3.5",
     "resend": "^4.7.0",
     "swiper": "^11.2.0",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "twilio": "^5.8.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

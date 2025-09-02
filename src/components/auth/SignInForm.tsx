@@ -31,6 +31,7 @@ export default function SignInForm() {
 
     try {
       const success = await login(email, password);
+      console.log('Login success:', success);
       
       if (success) {
         router.push('/dashboard');
