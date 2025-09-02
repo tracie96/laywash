@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { ExpandableImage } from '@/components/ui/ExpandableImage';
+import { LocationDisplay } from '@/components/ui/LocationDisplay';
 
 interface CarWashRecord {
   id: string;
@@ -256,7 +257,9 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned Location</label>
-                    <p className="text-gray-900 dark:text-white">{washer.assigned_location}</p>
+                    <p className="text-gray-900 dark:text-white">
+                      <LocationDisplay locationId={washer.assigned_location} />
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Check-ins</label>

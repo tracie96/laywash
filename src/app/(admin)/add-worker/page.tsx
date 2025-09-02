@@ -7,6 +7,7 @@ import Label from '../../../components/form/Label';
 import Button from '../../../components/ui/button/Button';
 import { ChevronLeftIcon } from '../../../icons';
 import Link from 'next/link';
+import { LocationSelect } from '../../../components/ui/LocationSelect';
 
 const AddWorkerPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,8 @@ const AddWorkerPage: React.FC = () => {
     phone: '',
     password: '',
     assignedAdmin: '',
+    assignedLocation: '',
+    bankInformation: '',
     nextOfKin: [{ name: '', phone: '', address: '' }]
   });
   const [pictureFile, setPictureFile] = useState<File | null>(null);
@@ -81,14 +84,15 @@ const AddWorkerPage: React.FC = () => {
         formData.email,
         formData.phone,
         formData.password,
-        undefined, // hourlyRate removed
+        formData.assignedLocation,
+        formData.bankInformation,
         formData.nextOfKin,
         pictureFile || undefined
       );
 
       if (result.success) {
         setSuccess('Car washer account created successfully! Login credentials have been sent to their email.');
-        setFormData({ name: '', email: '', phone: '', password: '', assignedAdmin: '', nextOfKin: [{ name: '', phone: '', address: '' }] });
+        setFormData({ name: '', email: '', phone: '', password: '', assignedAdmin: '', assignedLocation: '', bankInformation: '', nextOfKin: [{ name: '', phone: '', address: '' }] });
         setPictureFile(null);
         if (pictureInputRef.current) {
           pictureInputRef.current.value = '';
@@ -202,13 +206,38 @@ const AddWorkerPage: React.FC = () => {
           {/* Assigned Admin */}
           <div>
             <Label>
-              Assigned Location
+              Assigned Admin
             </Label>
             <Input
               type="text"
               placeholder="Enter assigned admin"
-              defaultValue={formData.assignedAdmin}
+              value={formData.assignedAdmin}
               onChange={(e) => handleInputChange('assignedAdmin', e.target.value)}
+            />
+          </div>
+
+          {/* Assigned Location */}
+          <div>
+            <Label>
+              Assigned Location
+            </Label>
+            <LocationSelect
+              value={formData.assignedLocation}
+              onChange={(locationId) => handleInputChange('assignedLocation', locationId)}
+              placeholder="Select a location (optional)"
+            />
+          </div>
+
+          {/* Bank Information */}
+          <div>
+            <Label>
+              Bank Information
+            </Label>
+            <Input
+              type="text"
+              placeholder="Enter bank information"
+              value={formData.bankInformation}
+              onChange={(e) => handleInputChange('bankInformation', e.target.value)}
             />
           </div>
 

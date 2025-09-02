@@ -257,6 +257,24 @@ export interface StockItem {
   updatedAt: Date;
 }
 
+// New Inventory interface matching your database schema exactly
+export interface Inventory {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  unit: string;
+  current_stock: number;
+  min_stock_level: number;
+  cost_per_unit: number;
+  supplier: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  max_stock_level: number;
+  quantity: number;
+}
+
 export interface StockMovement {
   id: string;
   stockItemId: string;

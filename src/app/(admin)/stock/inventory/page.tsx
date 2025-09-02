@@ -23,6 +23,7 @@ interface StockItem {
 
 interface CreateStockForm {
   name: string;
+  description: string;
   category: string;
   currentStock: number;
   minStockLevel: number;
@@ -43,6 +44,7 @@ const StockInventoryPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateStockForm>({
     name: '',
+    description: '',
     category: '',
     currentStock: 0,
     minStockLevel: 0,
@@ -134,6 +136,7 @@ const StockInventoryPage: React.FC = () => {
         setShowCreateModal(false);
         setCreateForm({
           name: '',
+          description: '',
           category: '',
           currentStock: 0,
           minStockLevel: 0,
@@ -534,7 +537,7 @@ const StockInventoryPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {item.currentStock} {item.unit}
+                          {item.currentStock} 
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             Min: {item.minStockLevel} | Max: {item.maxStockLevel}
@@ -603,6 +606,19 @@ const StockInventoryPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter item name"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </label>
+              <textarea
+                value={createForm.description}
+                onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter item description"
+                rows={3}
               />
             </div>
 

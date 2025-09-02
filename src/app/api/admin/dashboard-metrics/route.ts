@@ -31,17 +31,39 @@ export async function GET() {
       throw new Error('Failed to fetch income data');
     }
 
-    // Calculate income metrics
-    const dailyIncome = incomeData
-      ?.filter(item => new Date(item.check_in_time) >= today)
-      .reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
+    // 1.1. Fetch stock sales income from sales_transactions
+    const { data: stockSalesData, error: stockSalesError } = await supabaseAdmin
+      .from('sales_transactions')
+      .select('total_amount, created_at, status')
+      .eq('status', 'completed')
+      .gte('created_at', monthStart.toISOString());
 
-    const weeklyIncome = incomeData
-      ?.filter(item => new Date(item.check_in_time) >= weekStart)
-      .reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
+    if (stockSalesError) {
+      console.error('Error fetching stock sales data:', stockSalesError);
+      // Continue without stock sales data rather than failing completely
+    }
 
-    const monthlyIncome = incomeData
-      ?.reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
+    // Calculate combined income metrics (car wash + stock sales)
+    const calculateIncome = (data: Array<{ total_amount: number; [key: string]: string | number }>, dateField: string, startDate: Date) => {
+      return data
+        ?.filter(item => new Date(item[dateField]) >= startDate)
+        .reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
+    };
+
+    // Car wash income
+    const dailyCarWashIncome = calculateIncome(incomeData, 'check_in_time', today);
+    const weeklyCarWashIncome = calculateIncome(incomeData, 'check_in_time', weekStart);
+    const monthlyCarWashIncome = calculateIncome(incomeData, 'check_in_time', monthStart);
+
+    // Stock sales income
+    const dailyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', today);
+    const weeklyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', weekStart);
+    const monthlyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', monthStart);
+
+    // Combined total income
+    const dailyIncome = dailyCarWashIncome + dailyStockSalesIncome;
+    const weeklyIncome = weeklyCarWashIncome + weeklyStockSalesIncome;
+    const monthlyIncome = monthlyCarWashIncome + monthlyStockSalesIncome;
 
     // 2. Calculate car count metrics
     const dailyCarCount = incomeData
@@ -246,6 +268,16 @@ export async function GET() {
         daily: dailyIncome,
         weekly: weeklyIncome,
         monthly: monthlyIncome,
+      },
+      carWashIncome: {
+        daily: dailyCarWashIncome,
+        weekly: weeklyCarWashIncome,
+        monthly: monthlyCarWashIncome,
+      },
+      stockSalesIncome: {
+        daily: dailyStockSalesIncome,
+        weekly: weeklyStockSalesIncome,
+        monthly: monthlyStockSalesIncome,
       },
       carCount: {
         daily: dailyCarCount,

@@ -23,11 +23,10 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortOrder = searchParams.get('sortOrder') || 'asc';
 
-    // Build the query using existing stock_items table
+    // Build the query using the inventory table with correct field names
     let query = supabaseAdmin
-      .from('stock_items')
+      .from('inventory')
       .select('*');
-    // Temporarily removed .eq('is_active', true) to debug
 
     // Apply search filter
     if (search) {
@@ -68,14 +67,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform the data to match the frontend interface
+    // Transform the data to match the frontend interface using correct field names
     const transformedItems = inventory?.map(item => ({
       id: item.id,
       name: item.name || 'Unknown Item',
       category: item.category || 'General',
       currentStock: item.current_stock || 0,
-      minStockLevel: item.minimum_stock || 0,
-      maxStockLevel: 0, // Not available in your schema
+      minStockLevel: item.min_stock_level || 0,
+      maxStockLevel: item.max_stock_level || 0,
       unit: item.unit || 'units',
       price: item.cost_per_unit || 0,
       supplier: item.supplier || 'Unknown',
@@ -144,19 +143,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert into the inventory table using existing field names
+    // Insert into the inventory table using correct field names from your schema
     const { data: newItem, error: insertError } = await supabaseAdmin
       .from('inventory')
       .insert([{
         name,
+        description: '', // Add description field
         category,
-        quantity: currentStock,
+        current_stock: currentStock,
         min_stock_level: minStockLevel,
         max_stock_level: maxStockLevel,
         unit,
         cost_per_unit: price,
         supplier,
-        last_restocked: new Date().toISOString()
+        is_active: true,
+        quantity: currentStock, // Set quantity to match current_stock initially
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }])
       .select()
       .single();
@@ -174,16 +177,16 @@ export async function POST(request: NextRequest) {
       id: newItem.id,
       name: newItem.name,
       category: newItem.category,
-      currentStock: newItem.quantity,
+      currentStock: newItem.current_stock,
       minStockLevel: newItem.min_stock_level,
       maxStockLevel: newItem.max_stock_level,
       unit: newItem.unit,
       price: newItem.cost_per_unit,
       supplier: newItem.supplier,
       lastUpdated: newItem.updated_at,
-      lastRestocked: newItem.last_restocked,
-      totalValue: newItem.quantity * newItem.cost_per_unit,
-      isActive: true
+      lastRestocked: newItem.updated_at,
+      totalValue: newItem.current_stock * newItem.cost_per_unit,
+      isActive: newItem.is_active
     };
 
     return NextResponse.json({

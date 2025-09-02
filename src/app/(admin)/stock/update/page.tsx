@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
 import { Modal } from '@/components/ui/modal';
+import { useAuth } from '@/context/AuthContext';
 
 interface StockItem {
   id: string;
@@ -29,6 +30,7 @@ interface InventoryApiResponse {
 }
 
 const StockUpdatePage: React.FC = () => {
+  const { user } = useAuth();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
@@ -73,11 +75,24 @@ const StockUpdatePage: React.FC = () => {
     fetchStockItems();
   }, []);
 
+  // Reset updateType to 'in' if user is not super admin and updateType is 'out'
+  useEffect(() => {
+    if (user?.role !== 'super_admin' && updateType === 'out') {
+      setUpdateType('in');
+    }
+  }, [user, updateType]);
+
   const handleUpdateStock = async () => {
     if (!selectedItem || !updateQuantity) return;
 
     const quantity = parseInt(updateQuantity);
     if (isNaN(quantity) || quantity <= 0) return;
+
+    // Prevent stock out operations for non-super admin users
+    if (updateType === 'out' && user?.role !== 'super_admin') {
+      alert('Only Super Administrators can perform stock out operations');
+      return;
+    }
 
     const newStock = updateType === 'in' 
       ? selectedItem.currentStock + quantity
@@ -153,12 +168,31 @@ const StockUpdatePage: React.FC = () => {
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Update Stock
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Manage inventory levels and stock movements
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Update Stock
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Manage inventory levels and stock movements
+            </p>
+            {user?.role !== 'super_admin' && (
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                ⚠️ Stock Out operations are restricted to Super Administrators only
+              </p>
+            )}
+          </div>
+          {user?.role === 'super_admin' && (
+            <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-2">
+              <div className="flex items-center text-green-800 dark:text-green-200">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium">Full Access</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stock Items Grid */}
@@ -250,16 +284,18 @@ const StockUpdatePage: React.FC = () => {
                 >
                   Stock In
                 </button>
-                {/* <button
-                  onClick={() => setUpdateType('out')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                    updateType === 'out'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  Stock Out
-                </button> */}
+                {user?.role === 'super_admin' && (
+                  <button
+                    onClick={() => setUpdateType('out')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      updateType === 'out'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    Stock Out
+                  </button>
+                )}
               </div>
             </div>
 

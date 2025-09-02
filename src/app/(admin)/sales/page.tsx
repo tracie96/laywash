@@ -4,6 +4,7 @@ import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useAuth } from '@/context/AuthContext';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 
 interface InventoryItem {
   id: string;
@@ -60,7 +61,6 @@ const SalesPage: React.FC = () => {
       setError('Failed to fetch inventory from server');
     }
   }, []);
-
   const fetchCustomers = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/customers');
@@ -108,15 +108,10 @@ const SalesPage: React.FC = () => {
     const updatedItems = [...salesItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     
-    if (field === 'quantity' || field === 'unitPrice') {
-      const item = updatedItems[index];
-      if (item.inventoryId) {
-        const inventoryItem = inventoryItems.find(inv => inv.id === item.inventoryId);
-        if (inventoryItem) {
-          item.unitPrice = inventoryItem.price;
-          item.totalPrice = item.quantity * item.unitPrice;
-        }
-      }
+    // Recalculate total price when any field changes
+    const item = updatedItems[index];
+    if (item.inventoryId && item.quantity && item.unitPrice) {
+      item.totalPrice = item.quantity * item.unitPrice;
     }
     
     setSalesItems(updatedItems);
@@ -252,18 +247,19 @@ const SalesPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Customer (Optional)
                   </label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: '', label: 'Walk-in Customer' },
+                      ...customers.map(customer => ({
+                        value: customer.id,
+                        label: `${customer.name} - ${customer.phone}`
+                      }))
+                    ]}
                     value={selectedCustomer}
-                    onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Walk-in Customer</option>
-                    {customers.map(customer => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name} - {customer.phone}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedCustomer}
+                    placeholder="Walk-in Customer"
+                    searchPlaceholder="Search customers..."
+                  />
                 </div>
 
                 {/* Payment Method */}
@@ -312,19 +308,29 @@ const SalesPage: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                               Item
                             </label>
-                            <select
+                            <SearchableSelect
+                              options={[
+                                { value: '', label: 'Select Item' },
+                                ...filteredInventory.map(invItem => ({
+                                  value: invItem.id,
+                                  label: `${invItem.name} (${invItem.currentStock}  available)`
+                                }))
+                              ]}
                               value={item.inventoryId}
-                              onChange={(e) => updateSalesItem(index, 'inventoryId', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              required
-                            >
-                              <option value="">Select Item</option>
-                              {filteredInventory.map(invItem => (
-                                <option key={invItem.id} value={invItem.id}>
-                                  {invItem.name} ({invItem.currentStock} {invItem.unit} available)
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(value) => {
+                                updateSalesItem(index, 'inventoryId', value);
+                                // Auto-populate unit price when item is selected
+                                if (value) {
+                                  const selectedInventoryItem = inventoryItems.find(inv => inv.id === value);
+                                  if (selectedInventoryItem) {
+                                    updateSalesItem(index, 'unitPrice', selectedInventoryItem.price);
+                                  }
+                                }
+                              }}
+                              placeholder="Select Item"
+                              searchPlaceholder="Search inventory items..."
+                             
+                            />
                           </div>
 
                           <div>
@@ -349,7 +355,7 @@ const SalesPage: React.FC = () => {
                               type="number"
                               step="0.01"
                               min="0"
-                              value={item.unitPrice}
+                              value={inventoryItems.find(inv => inv.id === item.inventoryId)?.price || 0}
                               onChange={(e) => updateSalesItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               required
@@ -363,7 +369,7 @@ const SalesPage: React.FC = () => {
                                   Total
                                 </label>
                                 <div className="px-3 py-2 bg-gray-100 dark:bg-gray-600 rounded-lg text-gray-900 dark:text-white">
-                                  ${item.totalPrice.toFixed(2)}
+                                  NGN {item.totalPrice.toFixed(2)}
                                 </div>
                               </div>
                               <Button
@@ -406,7 +412,7 @@ const SalesPage: React.FC = () => {
                   disabled={submitting || salesItems.length === 0}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Processing Sale...' : `Complete Sale - $${getTotalAmount().toFixed(2)}`}
+                  {submitting ? 'Processing Sale...' : `Complete Sale - NGN ${getTotalAmount().toFixed(2)}`}
                 </Button>
               </div>
             </form>
@@ -436,7 +442,7 @@ const SalesPage: React.FC = () => {
                     {item.category} • {item.currentStock} {item.unit} available
                   </div>
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    ${item.price.toFixed(2)} per {item.unit}
+                    NGN {item.price.toFixed(2)} per {item.unit}
                   </div>
                   <div className="mt-2">
                     {item.currentStock <= 10 ? (

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
+import { LocationSelect } from '@/components/ui/LocationSelect';
 
 interface WorkerData {
   id: string;
@@ -194,10 +195,10 @@ const WorkerEditPage: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Assigned Location
             </label>
-            <InputField
-              type="text"
+            <LocationSelect
               value={workerData.assigned_location}
-              onChange={(e) => setWorkerData(prev => prev ? ({ ...prev, assigned_location: e.target.value }) : null)}
+              onChange={(locationId) => setWorkerData(prev => prev ? ({ ...prev, assigned_location: locationId }) : null)}
+              placeholder="Select a location"
             />
           </div>
           <div>

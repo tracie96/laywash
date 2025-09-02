@@ -34,11 +34,23 @@ const superAdminItems: NavItem[] = [
     roles: ["super_admin"]
   },
   {
+    icon: <CheckLineIcon />,
+    name: "Check-ins",
+    subItems: [
+      { name: "Active Check-ins", path: "/checkins/active", pro: false },
+      { name: "New Check-in", path: "/checkins/new", pro: false },
+      { name: "Check-in History", path: "/checkins/history", pro: false }
+    ],
+    roles: ["super_admin"]
+  },
+  {
     icon: <UserCircleIcon />,
     name: "User Management",
     subItems: [
       { name: "Manage Admins", path: "/users/admins", pro: false },
-      { name: "Manage Washers", path: "/users/washers", pro: false }
+      { name: "Manage Washers", path: "/users/washers", pro: false },
+      { name: "Manage Locations", path: "/users/locations", pro: false }
+
     ],
     roles: ["super_admin"]
   },

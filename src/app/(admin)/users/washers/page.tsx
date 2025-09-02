@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import WasherDetailModal from "@/components/admin/WasherDetailModal";
+import { LocationDisplay } from "@/components/ui/LocationDisplay";
 
 interface Washer {
   id: string;
@@ -380,7 +381,7 @@ const UsersWashersPage: React.FC = () => {
                       ${washer.totalEarnings.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {washer.assigned_location}
+                      <LocationDisplay locationId={washer.assigned_location} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">

@@ -29,7 +29,8 @@ interface AuthContextType {
     email: string, 
     phone: string, 
     password: string,
-    hourlyRate?: number,
+    assignedLocation?: string,
+    bankInformation?: string,
     nextOfKin?: Array<{name: string; phone: string; address: string}>,
     pictureFile?: File
   ) => Promise<{ success: boolean; error?: string }>;
@@ -227,7 +228,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     email: string, 
     phone: string, 
     password: string,
-    hourlyRate?: number,
+    assignedLocation?: string,
+    bankInformation?: string,
     nextOfKin?: Array<{name: string; phone: string; address: string}>,
     pictureFile?: File
   ): Promise<{ success: boolean; error?: string }> => {
@@ -261,7 +263,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email,
           phone,
           password,
-          hourlyRate,
+          assignedLocation,
+          bankInformation,
           nextOfKin: nextOfKin || [],
           pictureUrl: pictureUrl || null,
           createdBy: user.id,

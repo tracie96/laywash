@@ -276,6 +276,32 @@ export interface Database {
           updated_at?: string;
         };
       };
+      locations: {
+        Row: {
+          id: string;
+          address: string;
+          lga: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          address: string;
+          lga: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          address?: string;
+          lga?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 } 

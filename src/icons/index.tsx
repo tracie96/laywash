@@ -56,6 +56,9 @@ import CarIcon from "./car.svg";
 import ToolIcon from "./tool.svg";
 import StockIcon from "./stock.svg";
 import ReportIcon from "./report.svg";
+import SearchIcon from "./search.svg";
+import FilterIcon from "./filter.svg";
+import EditIcon from "./edit.svg";
 
 export {
   DownloadIcon,
@@ -116,4 +119,7 @@ export {
   ToolIcon,
   StockIcon,
   ReportIcon,
+  SearchIcon,
+  FilterIcon,
+  EditIcon,
 };

@@ -7,6 +7,7 @@ import Label from '../../../components/form/Label';
 import Button from '../../../components/ui/button/Button';
 import { ChevronLeftIcon } from '../../../icons';
 import Link from 'next/link';
+import { LocationSelect } from '../../../components/ui/LocationSelect';
 
 const AddAdminPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -211,11 +212,10 @@ const AddAdminPage: React.FC = () => {
             <Label>
               Assigned Location
             </Label>
-            <Input
-              type="text"
-              placeholder="Enter location (optional)"
+            <LocationSelect
               value={formData.location}
-              onChange={(e) => handleInputChange('location', e.target.value)}
+              onChange={(locationId) => handleInputChange('location', locationId)}
+              placeholder="Select a location (optional)"
             />
           </div>
 
