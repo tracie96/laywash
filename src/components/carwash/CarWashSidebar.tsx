@@ -61,7 +61,6 @@ const superAdminItems: NavItem[] = [
       { name: "Payment History", path: "/financial/payments", pro: false },
       { name: "Financial Reports", path: "/financial/reports", pro: false },
       { name: "Bonuses", path: "/financial/bonuses", pro: false },
-      { name: "Commission Setting", path: "/financial/commission-settings", pro: false }
     ],
     roles: ["super_admin"]
   },
