@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
+import { useAuth } from '@/context/AuthContext';
 
 interface PaymentReport {
   date: string;
@@ -18,6 +19,7 @@ interface PaymentReport {
 }
 
 const PaymentReportsPage: React.FC = () => {
+  const { user } = useAuth();
   const [reports, setReports] = useState<PaymentReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -27,8 +29,17 @@ const PaymentReportsPage: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Check if user is admin (restricted to current month only)
+  const isAdmin = user?.role === 'admin';
+
   // Set default custom dates when custom period is selected
   const handlePeriodChange = (newPeriod: string) => {
+    // Admin users can only select current month
+    if (isAdmin && newPeriod !== 'month') {
+      setSelectedPeriod('month');
+      return;
+    }
+    
     setSelectedPeriod(newPeriod);
     if (newPeriod === 'custom') {
       const today = new Date();
@@ -37,6 +48,13 @@ const PaymentReportsPage: React.FC = () => {
       setCustomEndDate(today.toISOString().split('T')[0]);
     }
   };
+
+  // Set admin users to current month on component mount
+  useEffect(() => {
+    if (isAdmin) {
+      setSelectedPeriod('month');
+    }
+  }, [isAdmin]);
 
   // Fetch payment reports from API
   const fetchReports = useCallback(async () => {
@@ -285,14 +303,22 @@ const PaymentReportsPage: React.FC = () => {
             value={selectedPeriod}
             onChange={(e) => handlePeriodChange(e.target.value)}
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            disabled={isAdmin}
           >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="week">This Week</option>
+            {!isAdmin && <option value="today">Today</option>}
+            {!isAdmin && <option value="yesterday">Yesterday</option>}
+            {!isAdmin && <option value="week">This Week</option>}
             <option value="month">This Month</option>
-            <option value="quarter">This Quarter</option>
-            <option value="custom">Custom Date Range</option>
+            {!isAdmin && <option value="quarter">This Quarter</option>}
+            {!isAdmin && <option value="custom">Custom Date Range</option>}
           </select>
+          
+          {/* Admin restriction notice */}
+          {isAdmin && (
+            <div className="text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+              <span className="font-medium">Admin Access:</span> Limited to current month data only
+            </div>
+          )}
 
           {/* Stock Sales Toggle */}
           <div className="flex items-center space-x-2">
@@ -307,8 +333,8 @@ const PaymentReportsPage: React.FC = () => {
             </label>
           </div>
 
-          {/* Custom Date Range Inputs */}
-          {selectedPeriod === 'custom' && (
+          {/* Custom Date Range Inputs - Hidden for admin users */}
+          {selectedPeriod === 'custom' && !isAdmin && (
             <div className="flex space-x-2">
               <input
                 type="date"

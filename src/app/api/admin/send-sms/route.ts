@@ -36,13 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has super_admin role
-    if (adminUser.role !== 'super_admin') {
-      return NextResponse.json(
-        { success: false, error: 'Only super_admin users can send SMS' },
-        { status: 403 }
-      );
-    }
 
     const body = await request.json();
     const { checkInId } = body;

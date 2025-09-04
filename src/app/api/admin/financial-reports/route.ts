@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Types for the response data
+interface CheckInData {
+  id: string;
+  company_income: number;
+  payment_status: string;
+  check_in_time: string;
+  customer_id: string;
+  assigned_admin_id: string;
+}
+
+interface SaleData {
+  id: string;
+  total_amount: number;
+  payment_method: string;
+  status: string;
+  created_at: string;
+  customer_id: string;
+  admin_id: string;
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -15,10 +35,44 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '6'; // Default to last 6 months
+    const location = searchParams.get('location'); // Optional location filter
 
     const now = new Date();
     const startDate = new Date();
     startDate.setMonth(now.getMonth() - parseInt(period));
+
+    // Get admin IDs for the selected location if location filter is provided
+    let adminIdsForLocation: string[] = [];
+    if (location) {
+      const { data: locationData, error: locationError } = await supabaseAdmin
+        .from('locations')
+        .select('id')
+        .eq('id', location)
+        .single();
+      
+      if (locationError || !locationData) {
+        return NextResponse.json(
+          { success: false, error: 'Location not found' },
+          { status: 404 }
+        );
+      }
+
+      // Get all admin IDs that belong to this location
+      const { data: adminProfiles, error: adminProfilesError } = await supabaseAdmin
+        .from('admin_profiles')
+        .select('user_id')
+        .eq('location', location);
+      
+      if (adminProfilesError) {
+        console.error('Error fetching admin profiles:', adminProfilesError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch admin profiles' },
+          { status: 500 }
+        );
+      }
+      
+      adminIdsForLocation = adminProfiles?.map(profile => profile.user_id) || [];
+    }
 
     // Fetch data from multiple sources concurrently
     const [
@@ -36,6 +90,7 @@ export async function GET(request: NextRequest) {
           payment_status,
           check_in_time,
           customer_id,
+          assigned_admin_id,
           customers (
             id,
             name
@@ -55,6 +110,7 @@ export async function GET(request: NextRequest) {
           status,
           created_at,
           customer_id,
+          admin_id,
           customers (
             id,
             name
@@ -111,6 +167,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Filter data by location if specified
+    let filteredCheckIns = (checkInsResponse.data || []) as CheckInData[];
+    let filteredSales = (salesResponse.data || []) as SaleData[];
+
+    if (location && adminIdsForLocation.length > 0) {
+      // Filter check-ins by admin IDs that belong to the selected location
+      filteredCheckIns = filteredCheckIns.filter(checkIn => {
+        return adminIdsForLocation.includes(checkIn.assigned_admin_id);
+      });
+
+      // Filter sales by admin IDs that belong to the selected location
+      filteredSales = filteredSales.filter(sale => {
+        return adminIdsForLocation.includes(sale.admin_id);
+      });
+    } else if (location && adminIdsForLocation.length === 0) {
+      // If location is selected but no admins found for that location, return empty results
+      filteredCheckIns = [];
+      filteredSales = [];
+    }
+
     // Group data by month and calculate comprehensive financial metrics
     const monthlyData = new Map<string, {
       // Revenue
@@ -134,7 +210,7 @@ export async function GET(request: NextRequest) {
     }>();
 
     // Process car wash check-ins
-    checkInsResponse.data?.forEach(checkIn => {
+    filteredCheckIns.forEach(checkIn => {
       const date = new Date(checkIn.check_in_time);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -174,7 +250,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Process product sales
-    salesResponse.data?.forEach(sale => {
+    filteredSales.forEach(sale => {
       const date = new Date(sale.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 

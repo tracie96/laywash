@@ -726,16 +726,14 @@ const ActiveCheckInsPage: React.FC = () => {
                     {checkIn.userCode}
                   </p>
                   )}
-                  {hasRole('super_admin') && checkIn.customerId && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Key code will be sent via SMS to {checkIn.customerPhone}
                     </p>
-                  )}
-                  {hasRole('super_admin') && !checkIn.customerId && (
+                  
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       SMS not available for walk-in customers
                     </p>
-                  )}
+                  
                 </div>
               )}
               {checkIn.specialInstructions && (

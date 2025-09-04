@@ -51,7 +51,7 @@ const LocationsPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        setLocations(result.data);
+        setLocations(result.locations || []);
         setError(null);
       } else {
         throw new Error(result.error || 'Failed to fetch locations');
@@ -95,7 +95,7 @@ const LocationsPage: React.FC = () => {
   };
 
   const filterLocations = useCallback(() => {
-    let filtered = [...locations];
+    let filtered = [...(locations || [])];
 
     // Search filter
     if (searchTerm) {

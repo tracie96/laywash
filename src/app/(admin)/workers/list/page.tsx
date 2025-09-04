@@ -104,11 +104,15 @@ const WorkerListPage: React.FC = () => {
     });
 
   const calculateStats = () => {
+    const totalEarnings = workers.reduce((sum, w) => {
+      return sum + (w.totalEarnings || 0);
+    }, 0);
+    
     const stats = {
       total: workers.length,
       available: workers.filter(w => w.isAvailable).length,
       unavailable: workers.filter(w => !w.isAvailable).length,
-      totalEarnings: workers.reduce((sum, w) => sum + w.totalEarnings, 0),
+      totalEarnings,
       totalCheckIns: workers.reduce((sum, w) => sum + w.completedCheckIns, 0),
       averageRating: workers.length > 0 ? workers.reduce((sum, w) => sum + w.averageRating, 0) / workers.length : 0
     };
@@ -283,7 +287,7 @@ const WorkerListPage: React.FC = () => {
                 Total Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${stats.totalEarnings.toFixed(2)}
+                ₦{stats.totalEarnings.toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">

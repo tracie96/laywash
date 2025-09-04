@@ -36,13 +36,33 @@ const FinancialReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('6');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [locations, setLocations] = useState<Array<{id: string, address: string, lga: string}>>([]);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/locations');
+      const data = await response.json();
+      
+      if (data.success) {
+        setLocations(data.locations || []);
+      }
+    } catch (err) {
+      console.error('Error fetching locations:', err);
+    }
+  }, []);
 
   const fetchFinancialReports = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/admin/financial-reports?period=${selectedPeriod}`);
+      const params = new URLSearchParams({
+        period: selectedPeriod,
+        ...(selectedLocation !== 'all' && { location: selectedLocation })
+      });
+      
+      const response = await fetch(`/api/admin/financial-reports?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -56,7 +76,11 @@ const FinancialReportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod]);
+  }, [selectedPeriod, selectedLocation]);
+
+  useEffect(() => {
+    fetchLocations();
+  }, [fetchLocations]);
 
   useEffect(() => {
     fetchFinancialReports();
@@ -139,19 +163,39 @@ const FinancialReportsPage: React.FC = () => {
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Financial Reports" />
 
-      {/* Period Selector */}
+      {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Report Period</h3>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="3">Last 3 Months</option>
-            <option value="6">Last 6 Months</option>
-            <option value="12">Last 12 Months</option>
-          </select>
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Report Filters</h3>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="3">Last 3 Months</option>
+                <option value="6">Last 6 Months</option>
+                <option value="12">Last 12 Months</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location:</label>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Locations</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.address} - {location.lga}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
     const { 
       items, 
       totalAmount, 
-      adminId
+      adminId,
+      customerId,
+      paymentMethod,
+      remarks
     } = await request.json();
 
     // Validate admin ID
@@ -133,10 +136,33 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Create sales transaction record
+    const { data: salesTransaction, error: transactionError } = await supabaseAdmin
+      .from('sales_transactions')
+      .insert({
+        customer_id: customerId || null,
+        total_amount: totalAmount,
+        payment_method: paymentMethod || 'cash',
+        admin_id: adminId,
+        status: 'completed',
+        remarks: remarks || null
+      })
+      .select()
+      .single();
+
+    if (transactionError) {
+      console.error('Error creating sales transaction:', transactionError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create sales transaction record' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Sale completed successfully',
       totalAmount: totalAmount,
+      transactionId: salesTransaction.id,
       itemsSold: inventoryUpdates,
       inventoryUpdates: inventoryUpdates.map(update => ({
         id: update.id,

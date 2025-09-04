@@ -105,16 +105,18 @@ const SalesPage: React.FC = () => {
   };
 
   const updateSalesItem = (index: number, field: keyof SalesItem, value: number | string) => {
-    const updatedItems = [...salesItems];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-    
-    // Recalculate total price when any field changes
-    const item = updatedItems[index];
-    if (item.inventoryId && item.quantity && item.unitPrice) {
-      item.totalPrice = item.quantity * item.unitPrice;
-    }
-    
-    setSalesItems(updatedItems);
+    setSalesItems(prevItems => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = { ...updatedItems[index], [field]: value };
+      
+      // Recalculate total price when any field changes
+      const item = updatedItems[index];
+      if (item.inventoryId && item.quantity && item.unitPrice) {
+        item.totalPrice = item.quantity * item.unitPrice;
+      }
+      
+      return updatedItems;
+    });
   };
 
   const getTotalAmount = () => {
@@ -311,12 +313,13 @@ const SalesPage: React.FC = () => {
                             <SearchableSelect
                               options={[
                                 { value: '', label: 'Select Item' },
-                                ...filteredInventory.map(invItem => ({
+                                ...inventoryItems.map(invItem => ({
                                   value: invItem.id,
                                   label: `${invItem.name} (${invItem.currentStock}  available)`
                                 }))
                               ]}
                               value={item.inventoryId}
+                              key={`${index}-${item.inventoryId}`}
                               onChange={(value) => {
                                 updateSalesItem(index, 'inventoryId', value);
                                 // Auto-populate unit price when item is selected
@@ -329,7 +332,6 @@ const SalesPage: React.FC = () => {
                               }}
                               placeholder="Select Item"
                               searchPlaceholder="Search inventory items..."
-                             
                             />
                           </div>
 
@@ -355,7 +357,7 @@ const SalesPage: React.FC = () => {
                               type="number"
                               step="0.01"
                               min="0"
-                              value={inventoryItems.find(inv => inv.id === item.inventoryId)?.price || 0}
+                              value={item.unitPrice || 0}
                               onChange={(e) => updateSalesItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               required

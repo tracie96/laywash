@@ -118,6 +118,30 @@ export async function PATCH(
     
     updateData.updated_at = new Date().toISOString();
 
+    // If marking as paid, deduct the amount from washer's total earnings
+    if (status === 'paid') {
+      const paymentAmount = existingRequest.amount;
+      const materialDeductions = existingRequest.material_deductions || 0;
+      const toolDeductions = existingRequest.tool_deductions || 0;
+      const totalDeduction = paymentAmount + materialDeductions + toolDeductions;
+
+      // Update washer's total earnings
+      const { error: earningsError } = await supabaseAdmin
+        .from('car_washer_profiles')
+        .update({
+          total_earnings: existingRequest.total_earnings - totalDeduction
+        })
+        .eq('user_id', existingRequest.washer_id);
+
+      if (earningsError) {
+        console.error('Error updating washer earnings:', earningsError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to update washer earnings' },
+          { status: 500 }
+        );
+      }
+    }
+
     // Update the payment request
     const { data: updatedRequest, error: updateError } = await supabaseAdmin
       .from('payment_request')

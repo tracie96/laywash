@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: locations
+      locations: locations
     });
   } catch (error) {
     console.error('Error fetching locations:', error);

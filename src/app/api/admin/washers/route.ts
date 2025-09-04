@@ -13,28 +13,29 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function GET() {
   try {
-    // Fetch car washers from the users table with role = 'car_washer'
+    // Fetch car washers from the car_washer_profiles table and join with users
     const { data: washers, error } = await supabaseAdmin
-      .from('users')
+      .from('car_washer_profiles')
       .select(`
-        id,
-        name,
-        email,
-        phone,
-        role,
-        is_active,
-        created_at,
-        updated_at,
-        car_washer_profiles!car_washer_profiles_user_id_fkey (
-          assigned_admin_id,
-          address,
-          total_earnings,
-          is_available,
-          assigned_location
+        user_id,
+        assigned_admin_id,
+        address,
+        total_earnings,
+        is_available,
+        assigned_location,
+        users!user_id (
+          id,
+          name,
+          email,
+          phone,
+          role,
+          is_active,
+          created_at,
+          updated_at
         )
       `)
-      .eq('role', 'car_washer')
-      .order('created_at', { ascending: false });
+      .eq('users.role', 'car_washer')
+      .order('created_at', { ascending: false, referencedTable: 'users' });
 
     if (error) {
       console.error('Error fetching washers:', error);
@@ -46,7 +47,7 @@ export async function GET() {
 
     // Fetch assigned admin names
     const adminIds = washers
-      ?.map(w => w.car_washer_profiles?.[0]?.assigned_admin_id)
+      ?.map(w => w.assigned_admin_id)
       .filter(Boolean) || [];
 
     const { data: admins } = await supabaseAdmin
@@ -58,7 +59,7 @@ export async function GET() {
     const adminMap = new Map(admins?.map(admin => [admin.id, admin.name]) || []);
 
     // Fetch check-in statistics for each washer
-    const washerIds = washers?.map(w => w.id) || [];
+    const washerIds = washers?.map(w => w.user_id) || [];
     const { data: checkInStats } = await supabaseAdmin
       .from('car_check_ins')
       .select('assigned_washer_id, status, updated_at')
@@ -92,29 +93,29 @@ export async function GET() {
 
     // Transform the data to match the frontend interface
     const transformedWashers = washers?.map(washer => {
-      const profile = washer.car_washer_profiles?.[0];
-      const stats = washerStats.get(washer.id) || { totalCheckIns: 0, completedCheckIns: 0, lastActive: null };
-      const assignedAdminName = profile?.assigned_admin_id ? adminMap.get(profile.assigned_admin_id) || 'Unassigned' : 'Unassigned';
+      const user = Array.isArray(washer.users) ? washer.users[0] : washer.users;
+      const stats = washerStats.get(washer.user_id) || { totalCheckIns: 0, completedCheckIns: 0, lastActive: null };
+      const assignedAdminName = washer.assigned_admin_id ? adminMap.get(washer.assigned_admin_id) || 'Unassigned' : 'Unassigned';
       return {
-        id: washer.id,
-        name: washer.name,
-        email: washer.email,
-        phone: washer.phone,
-        address: profile?.address || "Not specified",
-        totalEarnings: profile?.total_earnings || 0,
-        isAvailable: profile?.is_available ?? true,
-        assignedAdminId: profile?.assigned_admin_id || null,
+        id: washer.user_id,
+        name: user?.name || 'Unknown',
+        email: user?.email || 'Unknown',
+        phone: user?.phone || 'Unknown',
+        address: washer.address || "Not specified",
+        totalEarnings: parseFloat(washer.total_earnings || '0'),
+        isAvailable: washer.is_available ?? true,
+        assignedAdminId: washer.assigned_admin_id || null,
         assignedAdminName,
-        assigned_location: profile?.assigned_location || "Not specified",
+        assigned_location: washer.assigned_location || "Not specified",
         totalCheckIns: stats.totalCheckIns,
         completedCheckIns: stats.completedCheckIns,
         averageRating: 4.5, // TODO: Calculate from actual ratings
-        createdAt: new Date(washer.created_at),
-        lastActive: stats.lastActive || new Date(washer.updated_at)
+        createdAt: new Date(user?.created_at || new Date()),
+        lastActive: stats.lastActive || new Date(user?.updated_at || new Date())
       };
     }) || [];
 
-
+    console.log(transformedWashers);
     return NextResponse.json({
       success: true,
       washers: transformedWashers
