@@ -1063,7 +1063,7 @@ const NewCheckInPage: React.FC = () => {
 
                         <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            Final Price: ${selectedService?.customPrice !== undefined ? selectedService.customPrice : service.price}
+                            Final Price: NGN {selectedService?.customPrice !== undefined ? selectedService.customPrice : service.price}
                           </p>
                           {selectedService?.customPrice !== undefined && selectedService.customPrice !== service.price && (
                             <p className="text-xs text-gray-600 dark:text-gray-400">

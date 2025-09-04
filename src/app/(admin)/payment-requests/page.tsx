@@ -8,17 +8,23 @@ import { useAuth } from '../../../context/AuthContext';
 
 interface PaymentRequest {
   id: string;
-  washerId: string;
-  washerName: string;
-  totalEarnings: number;
-  materialDeductions: number;
-  toolDeductions: number;
-  requestedAmount: number;
+  washer_id: string;
+  admin_id?: string;
+  approval_date?: string;
+  total_earnings: number;
+  material_deductions: number;
+  tool_deductions: number;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
-  adminNotes?: string;
-  approvalDate?: string;
-  createdAt: string;
-  updatedAt: string;
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+  amount: number;
+  washer: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
 }
 
 const PaymentRequestsPage: React.FC = () => {
@@ -90,11 +96,11 @@ const PaymentRequestsPage: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      const response = await fetch(`/api/worker/profile?workerId=${user.id}`);
+      const response = await fetch(`/api/worker/earnings?workerId=${user.id}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setCurrentEarnings(result.worker.totalEarnings);
+          setCurrentEarnings(result.totalEarnings || 0);
         }
       }
     } catch (err) {
@@ -317,7 +323,7 @@ const PaymentRequestsPage: React.FC = () => {
                         Payment Request #{request.id.slice(0, 8)}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Created: {new Date(request.createdAt).toLocaleDateString()}
+                        Created: {new Date(request.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <Badge color={getStatusColor(request.status)}>
@@ -329,19 +335,19 @@ const PaymentRequestsPage: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
                       <div className="font-semibold text-green-600 dark:text-green-400">
-                        ₦{request.totalEarnings.toLocaleString()}
+                        ₦{request.total_earnings.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Material Deductions</div>
                       <div className="font-semibold text-red-600 dark:text-red-400">
-                        ₦{request.materialDeductions.toLocaleString()}
+                        ₦{request.material_deductions.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Tool Deductions</div>
                       <div className="font-semibold text-red-600 dark:text-red-400">
-                        ₦{request.toolDeductions.toLocaleString()}
+                        ₦{request.tool_deductions.toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -351,7 +357,7 @@ const PaymentRequestsPage: React.FC = () => {
                       <div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">Net Amount</div>
                         <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                          ₦{request.requestedAmount.toLocaleString()}
+                          ₦{request.amount.toLocaleString()}
                         </div>
                       </div>
                       
@@ -368,16 +374,16 @@ const PaymentRequestsPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {request.adminNotes && (
+                  {request.admin_notes && (
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Admin Notes:</div>
-                      <div className="text-gray-900 dark:text-white">{request.adminNotes}</div>
+                      <div className="text-gray-900 dark:text-white">{request.admin_notes}</div>
                     </div>
                   )}
                   
-                  {request.approvalDate && (
+                  {request.approval_date && (
                     <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Approved: {new Date(request.approvalDate).toLocaleDateString()}
+                      Approved: {new Date(request.approval_date).toLocaleDateString()}
                     </div>
                   )}
                 </div>

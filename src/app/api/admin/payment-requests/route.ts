@@ -18,12 +18,25 @@ export async function GET(request: NextRequest) {
     const washerId = searchParams.get('washerId');
     const adminId = searchParams.get('adminId');
     const status = searchParams.get('status') || 'all';
+    const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
+    // Build the query with washer information
     let query = supabaseAdmin
       .from('payment_request')
-      .select('*')
+      .select(`
+        *,
+        washer:car_washer_profiles!payment_request_washer_id_fkey(
+          user_id,
+          users!car_washer_profiles_user_id_fkey(
+            id,
+            name,
+            email,
+            phone
+          )
+        )
+      `)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
     // Filter by washer if specified
@@ -51,20 +64,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform the data
-    const transformedRequests = paymentRequests?.map(request => ({
+    // Transform the data and apply search filter
+    let transformedRequests = paymentRequests?.map(request => ({
       id: request.id,
-      washerId: request.washer_id,
-      totalEarnings: parseFloat(request.total_earnings || '0'),
-      materialDeductions: parseFloat(request.material_deductions || '0'),
-      toolDeductions: parseFloat(request.tool_deductions || '0'),
-      requestedAmount: parseFloat(request.amount || '0'),
+      washer_id: request.washer_id,
+      admin_id: request.admin_id,
+      approval_date: request.approval_date,
+      total_earnings: parseFloat(request.total_earnings || '0'),
+      material_deductions: parseFloat(request.material_deductions || '0'),
+      tool_deductions: parseFloat(request.tool_deductions || '0'),
       status: request.status,
-      adminNotes: request.admin_notes,
-      approvalDate: request.approval_date,
-      createdAt: request.created_at,
-      updatedAt: request.updated_at
+      admin_notes: request.admin_notes,
+      created_at: request.created_at,
+      updated_at: request.updated_at,
+      amount: parseFloat(request.amount || '0'),
+      washer: {
+        id: request.washer?.user_id,
+        name: request.washer?.users?.name || 'Unknown',
+        email: request.washer?.users?.email || 'Unknown',
+        phone: request.washer?.users?.phone || null
+      }
     })) || [];
+
+    // Apply search filter if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      transformedRequests = transformedRequests.filter(request => 
+        request.washer.name.toLowerCase().includes(searchLower) ||
+        request.washer.email.toLowerCase().includes(searchLower) ||
+        request.id.toLowerCase().includes(searchLower)
+      );
+    }
 
     return NextResponse.json({
       success: true,

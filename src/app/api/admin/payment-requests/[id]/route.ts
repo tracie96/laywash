@@ -71,8 +71,8 @@ export async function PATCH(
     const body = await request.json();
     const {
       status,
-      adminNotes,
-      reviewedBy
+      admin_notes,
+      admin_id
     } = body;
 
     // Validate status
@@ -108,12 +108,12 @@ export async function PATCH(
     
     if (status !== undefined) {
       updateData.status = status;
-      updateData.admin_id = reviewedBy;
+      updateData.admin_id = admin_id;
       updateData.approval_date = new Date().toISOString();
     }
     
-    if (adminNotes !== undefined) {
-      updateData.admin_notes = adminNotes;
+    if (admin_notes !== undefined) {
+      updateData.admin_notes = admin_notes;
     }
     
     updateData.updated_at = new Date().toISOString();

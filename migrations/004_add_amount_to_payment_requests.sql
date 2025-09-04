@@ -17,3 +17,4 @@ WHERE amount = 0;
 CREATE INDEX idx_payment_request_amount ON payment_request(amount);
 
 
+

@@ -147,7 +147,9 @@ const adminItems: NavItem[] = [
     name: "Financial",
     subItems: [
       { name: "Payment History", path: "/payments/history", pro: false },
-      { name: "Payment Reports", path: "/payments/reports", pro: false }
+      { name: "Payment Reports", path: "/payments/reports", pro: false },
+      { name: "Payment Requests", path: "/payments/requests", pro: false },
+
     ],
     roles: ["admin"]
   },

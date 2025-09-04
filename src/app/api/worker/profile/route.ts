@@ -114,7 +114,6 @@ export async function GET(request: NextRequest) {
       notes: 'No additional notes.',
       pictureUrl: profile?.picture_url || null
     };
-
     return NextResponse.json({
       success: true,
       worker: transformedWorker

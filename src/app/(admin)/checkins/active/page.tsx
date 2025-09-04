@@ -703,7 +703,7 @@ const ActiveCheckInsPage: React.FC = () => {
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Key Code:</p>
-                    {hasRole('super_admin') && checkIn.customerId && (
+                    {hasRole('admin') && checkIn.customerId && (
                       <Button
                         size="sm"
                         onClick={() => handleSendKeyCode(checkIn.id)}
@@ -721,9 +721,11 @@ const ActiveCheckInsPage: React.FC = () => {
                       </Button>
                     )}
                   </div>
+                  {hasRole('super_admin') && checkIn.customerId && (
                   <p className="text-sm text-gray-900 dark:text-white bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded">
                     {checkIn.userCode}
                   </p>
+                  )}
                   {hasRole('super_admin') && checkIn.customerId && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Key code will be sent via SMS to {checkIn.customerPhone}

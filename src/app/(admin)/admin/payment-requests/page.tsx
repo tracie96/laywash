@@ -6,16 +6,23 @@ import { useAuth } from '../../../../context/AuthContext';
 
 interface PaymentRequest {
   id: string;
-  washerId: string;
-  totalEarnings: number;
-  materialDeductions: number;
-  toolDeductions: number;
-  requestedAmount: number;
+  washer_id: string;
+  admin_id?: string;
+  approval_date?: string;
+  total_earnings: number;
+  material_deductions: number;
+  tool_deductions: number;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
-  adminNotes?: string;
-  approvalDate?: string;
-  createdAt: string;
-  updatedAt: string;
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+  amount: number;
+  washer: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
 }
 
 const AdminPaymentRequestsPage: React.FC = () => {
@@ -63,7 +70,7 @@ const AdminPaymentRequestsPage: React.FC = () => {
   const handleAction = (request: PaymentRequest, type: 'approve' | 'reject' | 'pay') => {
     setSelectedRequest(request);
     setActionType(type);
-    setAdminNotes(request.adminNotes || '');
+    setAdminNotes(request.admin_notes || '');
     setShowActionModal(true);
   };
 
@@ -202,10 +209,10 @@ const AdminPaymentRequestsPage: React.FC = () => {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        Worker ID: {request.washerId.slice(0, 8)}
+                        Worker ID: {request.washer_id.slice(0, 8)}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Requested: {new Date(request.createdAt).toLocaleDateString()}
+                        Requested: {new Date(request.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <Badge color={getStatusColor(request.status)}>
@@ -217,25 +224,25 @@ const AdminPaymentRequestsPage: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
                       <div className="font-semibold text-green-600 dark:text-green-400">
-                        ₦{request.totalEarnings.toLocaleString()}
+                        ₦{request.total_earnings.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Material Deductions</div>
                       <div className="font-semibold text-red-600 dark:text-red-400">
-                        ₦{request.materialDeductions.toLocaleString()}
+                        ₦{request.material_deductions.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Tool Deductions</div>
                       <div className="font-semibold text-red-600 dark:text-red-400">
-                        ₦{request.toolDeductions.toLocaleString()}
+                        ₦{request.tool_deductions.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Net Amount</div>
                       <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        ₦{request.requestedAmount.toLocaleString()}
+                        ₦{request.amount.toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -275,16 +282,16 @@ const AdminPaymentRequestsPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {request.adminNotes && (
+                  {request.admin_notes && (
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Admin Notes:</div>
-                      <div className="text-gray-900 dark:text-white">{request.adminNotes}</div>
+                      <div className="text-gray-900 dark:text-white">{request.admin_notes}</div>
                     </div>
                   )}
                   
-                  {request.approvalDate && (
+                  {request.approval_date && (
                     <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      {request.status === 'approved' ? 'Approved' : request.status === 'rejected' ? 'Rejected' : 'Paid'}: {new Date(request.approvalDate).toLocaleDateString()}
+                      {request.status === 'approved' ? 'Approved' : request.status === 'rejected' ? 'Rejected' : 'Paid'}: {new Date(request.approval_date).toLocaleDateString()}
                     </div>
                   )}
                 </div>
@@ -304,10 +311,10 @@ const AdminPaymentRequestsPage: React.FC = () => {
             
             <div className="mb-4">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Worker ID: <span className="font-semibold">{selectedRequest.washerId.slice(0, 8)}</span>
+                Worker ID: <span className="font-semibold">{selectedRequest.washer_id.slice(0, 8)}</span>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Amount: <span className="font-semibold">₦{selectedRequest.requestedAmount.toLocaleString()}</span>
+                Amount: <span className="font-semibold">₦{selectedRequest.amount.toLocaleString()}</span>
               </div>
             </div>
             

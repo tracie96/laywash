@@ -4,6 +4,7 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { PlusIcon, TrashBinIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
+import { useAuth } from "@/context/AuthContext";
 
 interface Service {
   id: string;
@@ -35,6 +36,7 @@ interface CreateServiceForm {
 }
 
 const OperationsServicesPage: React.FC = () => {
+  const { hasRole } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -330,13 +332,15 @@ const OperationsServicesPage: React.FC = () => {
             </select>
           </div>
 
-          <button
-            onClick={openModal}
-            className="inline-flex items-center px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors"
-          >
-            <PlusIcon className="w-4 h-4 mr-2" />
-            Add Service
-          </button>
+          {hasRole('super_admin') && (
+            <button
+              onClick={openModal}
+              className="inline-flex items-center px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 focus:ring-2 focus:ring-green-light-500 focus:ring-offset-2 transition-colors"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              Add Service
+            </button>
+          )}
         </div>
       </div>
 
@@ -459,11 +463,13 @@ const OperationsServicesPage: React.FC = () => {
       </div>
 
       {/* Create Service Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={closeModal}
-        className="max-w-3xl p-6"
-      >
+      {hasRole('super_admin') && (
+        <Modal
+          isOpen={showCreateModal}
+          onClose={closeModal}
+          className="max-w-3xl p-6"
+        >
+        
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Service</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -656,6 +662,7 @@ const OperationsServicesPage: React.FC = () => {
               </div>
             </form>
         </Modal>
+      )}
     </div>
   );
 };
