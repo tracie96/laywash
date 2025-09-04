@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { useAuth } from '../../../../context/AuthContext';
+import AssignMaterialsModal from '../../../../components/carwash/AssignMaterialsModal';
 
 interface CheckIn {
   id: string;
@@ -35,6 +36,14 @@ const MyCheckInsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
+  const [assignMaterialsModalOpen, setAssignMaterialsModalOpen] = useState(false);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
+  const [checkInMaterials, setCheckInMaterials] = useState<Record<string, Array<{
+    id: string;
+    material_name: string;
+    quantity_used: number;
+    usage_date: string;
+  }>>>({});
 
   const { user } = useAuth();
 
@@ -127,9 +136,34 @@ const MyCheckInsPage: React.FC = () => {
     }
   }, [filter, searchQuery, user?.id]);
 
+  const fetchCheckInMaterials = useCallback(async (checkInId: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/assign-materials?checkInId=${checkInId}&washerId=${user?.id}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setCheckInMaterials(prev => ({
+          ...prev,
+          [checkInId]: result.materials || []
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching check-in materials:', err);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     fetchMyCheckIns();
   }, [fetchMyCheckIns]);
+
+  // Fetch materials for all check-ins after they're loaded
+  useEffect(() => {
+    if (checkIns.length > 0 && user?.id) {
+      checkIns.forEach(checkIn => {
+        fetchCheckInMaterials(checkIn.id);
+      });
+    }
+  }, [checkIns, user?.id, fetchCheckInMaterials]);
 
   const handleMarkInProgress = async (checkInId: string) => {
     try {
@@ -237,6 +271,24 @@ const MyCheckInsPage: React.FC = () => {
 
   const getPaymentStatusColor = (status: string) => {
     return status === 'paid' ? 'success' as const : 'warning' as const;
+  };
+
+  const handleAssignMaterials = async (checkInId: string) => {
+    setSelectedCheckInId(checkInId);
+    setAssignMaterialsModalOpen(true);
+    
+    // Fetch current materials for this check-in
+    await fetchCheckInMaterials(checkInId);
+  };
+
+  const handleMaterialsAssigned = () => {
+    // Refresh the check-ins list to show updated information
+    fetchMyCheckIns();
+    
+    // Refresh materials for the current check-in
+    if (selectedCheckInId) {
+      fetchCheckInMaterials(selectedCheckInId);
+    }
   };
 
   if (loading) {
@@ -390,6 +442,71 @@ const MyCheckInsPage: React.FC = () => {
                       <p className="text-yellow-700 dark:text-yellow-200 mt-1">{checkIn.specialInstructions}</p>
                     </div>
                   )}
+
+                  {/* Materials Table */}
+                  <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Materials:</span>
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => fetchCheckInMaterials(checkIn.id)}
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-900/30"
+                        >
+                          Refresh
+                        </Button>
+                        <Button
+                          onClick={() => handleAssignMaterials(checkIn.id)}
+                          variant="outline"
+                          size="sm"
+                          className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                        >
+                          Assign Materials
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Materials Table */}
+                    {checkInMaterials[checkIn.id] && checkInMaterials[checkIn.id].length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100 dark:bg-gray-600">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Material
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Quantity
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Date Used
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
+                              {checkInMaterials[checkIn.id].map((material) => (
+                                <tr key={material.id} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-white">
+                                    {material.material_name}
+                                  </td>
+                                  <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                    {material.quantity_used}
+                                  </td>
+                                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                                    {new Date(material.usage_date).toLocaleDateString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        No materials assigned yet. Click &ldquo;Assign Materials&rdquo; to add materials to this check-in.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -445,6 +562,19 @@ const MyCheckInsPage: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Assign Materials Modal */}
+      {selectedCheckInId && (
+        <AssignMaterialsModal
+          isOpen={assignMaterialsModalOpen}
+          onClose={() => {
+            setAssignMaterialsModalOpen(false);
+            setSelectedCheckInId(null);
+          }}
+          checkInId={selectedCheckInId}
+          onMaterialsAssigned={handleMaterialsAssigned}
+        />
+      )}
     </div>
   );
 };

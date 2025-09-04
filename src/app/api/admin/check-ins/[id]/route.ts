@@ -128,7 +128,7 @@ export async function PATCH(
       );
     }
 
-    if (updateData.paymentMethod && !['cash', 'card', 'mobile_money'].includes(updateData.paymentMethod)) {
+    if (updateData.paymentMethod && !['cash', 'card', 'pos'].includes(updateData.paymentMethod)) {
       console.log('Invalid payment method value:', updateData.paymentMethod);
       return NextResponse.json(
         { success: false, error: 'Invalid payment method value' },
@@ -253,6 +253,37 @@ export async function PATCH(
     }
 
     console.log('Check-in updated successfully:', checkIn.id, 'New status:', checkIn.status);
+
+    // Update washer earnings when check-in is marked as paid
+    if (updateData.paymentStatus === 'paid' && checkIn.assigned_washer_id) {
+      try {
+        console.log('Updating washer earnings for check-in:', checkIn.id, 'washer:', checkIn.assigned_washer_id);
+        
+        // Call the washer earnings update API
+        const earningsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin/check-ins/update-washer-earnings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            checkInId: checkIn.id,
+            washerId: checkIn.assigned_washer_id
+          }),
+        });
+
+        const earningsResult = await earningsResponse.json();
+        
+        if (earningsResult.success) {
+          console.log('Washer earnings updated successfully:', earningsResult.earningsAdded);
+        } else {
+          console.error('Failed to update washer earnings:', earningsResult.error);
+          // Don't fail the check-in update if earnings update fails
+        }
+      } catch (earningsError) {
+        console.error('Error updating washer earnings:', earningsError);
+        // Don't fail the check-in update if earnings update fails
+      }
+    }
 
     if (updateData.status === 'completed' && checkIn.customers?.[0]?.id) {
       try {

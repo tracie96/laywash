@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       totalEarnings: parseFloat(request.total_earnings || '0'),
       materialDeductions: parseFloat(request.material_deductions || '0'),
       toolDeductions: parseFloat(request.tool_deductions || '0'),
-      requestedAmount: parseFloat(request.total_earnings || '0') - parseFloat(request.material_deductions || '0') - parseFloat(request.tool_deductions || '0'),
+      requestedAmount: parseFloat(request.amount || '0'),
       status: request.status,
       adminNotes: request.admin_notes,
       approvalDate: request.approval_date,
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
       .from('payment_request')
       .insert({
         washer_id: washerId,
+        amount: requestedAmount,
         total_earnings: currentEarnings,
         material_deductions: materialDeductions,
         tool_deductions: toolDeductions,
@@ -161,7 +162,7 @@ export async function POST(request: NextRequest) {
         totalEarnings: parseFloat(newRequest.total_earnings || '0'),
         materialDeductions: parseFloat(newRequest.material_deductions || '0'),
         toolDeductions: parseFloat(newRequest.tool_deductions || '0'),
-        requestedAmount: parseFloat(newRequest.total_earnings || '0') - parseFloat(newRequest.material_deductions || '0') - parseFloat(newRequest.tool_deductions || '0'),
+        requestedAmount: parseFloat(newRequest.amount || '0'),
         status: newRequest.status,
         createdAt: newRequest.created_at
       }

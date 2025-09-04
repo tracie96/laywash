@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       .from('car_check_ins')
       .select(`
         id,
-        total_amount,
+        company_income,
         payment_status,
         payment_method,
         check_in_time,
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       
       // Count by payment status
       if (checkIn.payment_status === 'paid') {
-        const amount = checkIn.total_amount || 0;
+        const amount = checkIn.company_income || 0;
         group.totalRevenue += amount;
         group.carWashRevenue += amount;
         
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
         }
       } else {
         group.pendingPayments += 1;
-        group.pendingAmount += checkIn.total_amount || 0;
+        group.pendingAmount += checkIn.company_income || 0;
       }
     });
 

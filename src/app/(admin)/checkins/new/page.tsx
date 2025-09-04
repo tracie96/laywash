@@ -144,14 +144,19 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const handleWorkerAssignment = (serviceId: string, workerId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.map(service => 
-        service.serviceId === serviceId 
-          ? { ...service, workerId }
-          : service
-      )
-    }));
+    console.log('Assigning worker:', { serviceId, workerId });
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        services: prev.services.map(service => 
+          service.serviceId === serviceId 
+            ? { ...service, workerId }
+            : service
+        )
+      };
+      console.log('Updated form data:', updated);
+      return updated;
+    });
   };
 
   const handleCustomPriceChange = (serviceId: string, customPrice: number) => {
@@ -245,26 +250,27 @@ const NewCheckInPage: React.FC = () => {
   const fetchWasherMaterials = useCallback(async (washerId: string) => {
     if (!washerId) return;
     
-    // Don't fetch if we already have materials for this washer
-    if (currentWasherId === washerId && washerMaterials.length > 0) return;
-    
+    console.log('Fetching materials for washer:', washerId);
     try {
       setIsLoadingMaterials(true);
       const response = await fetch(`/api/admin/washer-materials?washerId=${washerId}&isReturned=false`);
       const result = await response.json();
       
       if (result.success) {
+        console.log('Materials fetched successfully:', result.tools);
         setWasherMaterials(result.tools);
         setCurrentWasherId(washerId);
       } else {
         console.error('Failed to fetch washer materials:', result.error);
+        setWasherMaterials([]);
       }
     } catch (error) {
       console.error('Error fetching washer materials:', error);
+      setWasherMaterials([]);
     } finally {
       setIsLoadingMaterials(false);
     }
-  }, [currentWasherId, washerMaterials.length]);
+  }, []);
 
   // Load services and washers on component mount
   useEffect(() => {
@@ -274,10 +280,24 @@ const NewCheckInPage: React.FC = () => {
 
   // Effect to fetch materials when washer is assigned
   useEffect(() => {
-    if (formData.services.some(s => s.workerId) && washerMaterials.length === 0 && !isLoadingMaterials && currentWasherId !== formData.services.find(s => s.workerId)?.workerId) {
-      fetchWasherMaterials(formData.services.find(s => s.workerId)?.workerId || '');
+    const servicesWithWorkers = formData.services.filter(s => s.workerId);
+    console.log('useEffect triggered:', { 
+      servicesWithWorkers: servicesWithWorkers.length, 
+      currentWasherId, 
+      formDataServices: formData.services 
+    });
+    
+    if (servicesWithWorkers.length > 0) {
+      const firstWorkerId = servicesWithWorkers[0].workerId;
+      console.log('First worker ID:', firstWorkerId);
+      if (currentWasherId !== firstWorkerId) {
+        console.log('Fetching materials for new worker');
+        fetchWasherMaterials(firstWorkerId);
+      } else {
+        console.log('Already have materials for this worker');
+      }
     }
-  }, [formData.services, washerMaterials.length, isLoadingMaterials, currentWasherId, fetchWasherMaterials]);
+  }, [formData.services, currentWasherId, fetchWasherMaterials]);
 
   const searchCustomer = async () => {
     const query = searchQuery.trim();
@@ -913,6 +933,10 @@ const NewCheckInPage: React.FC = () => {
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                               Materials can be assigned here or handled by workers during the service
                             </p>
+                            {/* Debug info */}
+                            <div className="text-xs text-gray-500 mb-2">
+                              Debug: Worker ID: {selectedService.workerId}, Materials Count: {washerMaterials.length}, Loading: {isLoadingMaterials.toString()}
+                            </div>
                             {isLoadingMaterials ? (
                               <div className="text-center py-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Loading materials...</p>

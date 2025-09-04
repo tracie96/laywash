@@ -129,6 +129,23 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+console.log('toolName', toolName);
+    // Get replacement cost from services table where tool_name matches service name
+    const { data: service, error: serviceError } = await supabaseAdmin
+      .from('worker_tools')
+      .select('replacement_cost')
+      .eq('name', toolName)
+      .single();
+
+    if (serviceError) {
+      console.error('Error fetching service replacement cost:', serviceError);
+      return NextResponse.json(
+        { success: false, error: 'Service not found for tool' },
+        { status: 404 }
+      );
+    }
+
+    const replacementCost = service?.replacement_cost || 0;
 
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin
@@ -138,6 +155,7 @@ export async function POST(request: NextRequest) {
         tool_name: toolName,
         tool_type: toolType,
         quantity: quantity,
+        amount: replacementCost,
         notes: notes || null
       })
       .select(`

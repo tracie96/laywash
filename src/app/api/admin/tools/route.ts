@@ -68,7 +68,6 @@ export async function GET(request: NextRequest) {
 
     // Apply additional filters that can't be done at database level
     let filteredTools = transformedTools;
-    console.log({filteredTools});
     if (status === 'low_availability') {
       filteredTools = filteredTools.filter(tool => tool.amount < 3);
     } else if (status === 'out_of_stock') {

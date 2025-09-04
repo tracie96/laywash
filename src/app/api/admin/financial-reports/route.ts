@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         .from('car_check_ins')
         .select(`
           id,
-          total_amount,
+          company_income,
           payment_status,
           check_in_time,
           customer_id,
@@ -160,8 +160,8 @@ export async function GET(request: NextRequest) {
       
       // Only count completed payments as revenue
       if (checkIn.payment_status === 'paid') {
-        monthData.carWashRevenue += checkIn.total_amount || 0;
-        monthData.totalRevenue += checkIn.total_amount || 0;
+        monthData.carWashRevenue += checkIn.company_income || 0;
+        monthData.totalRevenue += checkIn.company_income || 0;
       }
       
       monthData.transactionCount += 1;

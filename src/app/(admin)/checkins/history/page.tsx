@@ -172,9 +172,6 @@ const CheckInHistoryPage: React.FC = () => {
             : checkIn
         ));
         
-        // Now update the washer's earnings
-        await updateWasherEarnings(selectedCheckInId);
-        
         // Show success message
         alert('Payment status updated successfully!');
         
@@ -193,38 +190,6 @@ const CheckInHistoryPage: React.FC = () => {
     }
   };
 
-  const updateWasherEarnings = async (checkInId: string) => {
-    try {
-      // Find the check-in to get the assigned washer ID
-      const checkIn = checkIns.find(c => c.id === checkInId);
-      if (!checkIn?.assignedWasherId) {
-        console.warn('No assigned washer found for check-in:', checkInId);
-        return;
-      }
-
-      // Call the API to update washer earnings
-      const response = await fetch('/api/admin/check-ins/update-washer-earnings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          checkInId: checkInId,
-          washerId: checkIn.assignedWasherId
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.error('Failed to update washer earnings:', result.error);
-        // Don't throw error here as payment was successful
-      }
-    } catch (error) {
-      console.error('Error updating washer earnings:', error);
-      // Don't throw error here as payment was successful
-    }
-  };
 
   const handlePaymentModalClose = () => {
     setShowPaymentModal(false);

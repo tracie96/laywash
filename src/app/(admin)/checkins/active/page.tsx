@@ -306,7 +306,6 @@ const ActiveCheckInsPage: React.FC = () => {
     const checkIn = checkIns.find(c => c.id === checkInId);
     console.log('Check-in data:', checkIn); // Debug log
     
-    // For instant wash customers, no passcode is required
     if (checkIn?.washType === 'instant') {
       console.log('Instant wash customer, marking as completed directly'); // Debug log
       handleStatusChange(checkInId, 'completed');

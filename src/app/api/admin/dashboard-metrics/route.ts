@@ -19,10 +19,9 @@ export async function GET() {
     const weekStart = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // 1. Fetch income metrics from car_check_ins
     const { data: incomeData, error: incomeError } = await supabaseAdmin
       .from('car_check_ins')
-      .select('total_amount, check_in_time, payment_status')
+      .select('company_income, check_in_time, payment_status')
       .eq('payment_status', 'paid')
       .gte('check_in_time', monthStart.toISOString());
 
@@ -31,7 +30,6 @@ export async function GET() {
       throw new Error('Failed to fetch income data');
     }
 
-    // 1.1. Fetch stock sales income from sales_transactions
     const { data: stockSalesData, error: stockSalesError } = await supabaseAdmin
       .from('sales_transactions')
       .select('total_amount, created_at, status')
@@ -40,20 +38,24 @@ export async function GET() {
 
     if (stockSalesError) {
       console.error('Error fetching stock sales data:', stockSalesError);
-      // Continue without stock sales data rather than failing completely
     }
 
-    // Calculate combined income metrics (car wash + stock sales)
     const calculateIncome = (data: Array<{ total_amount: number; [key: string]: string | number }>, dateField: string, startDate: Date) => {
       return data
         ?.filter(item => new Date(item[dateField]) >= startDate)
         .reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
     };
 
+    const calculateCarWashIncome = (data: Array<{ company_income: number | null; [key: string]: string | number | null }>, dateField: string, startDate: Date) => {
+      return data
+        ?.filter(item => item[dateField] && new Date(item[dateField] as string) >= startDate)
+        .reduce((sum, item) => sum + (item.company_income || 0), 0) || 0;
+    };
+
     // Car wash income
-    const dailyCarWashIncome = calculateIncome(incomeData, 'check_in_time', today);
-    const weeklyCarWashIncome = calculateIncome(incomeData, 'check_in_time', weekStart);
-    const monthlyCarWashIncome = calculateIncome(incomeData, 'check_in_time', monthStart);
+    const dailyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', today);
+    const weeklyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', weekStart);
+    const monthlyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', monthStart);
 
     // Stock sales income
     const dailyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', today);
@@ -131,7 +133,7 @@ export async function GET() {
       .from('car_check_ins')
       .select(`
         assigned_washer_id,
-        total_amount,
+        company_income,
         assigned_washer:users!car_check_ins_assigned_washer_id_fkey (
           id,
           name,
@@ -188,7 +190,7 @@ export async function GET() {
 
       const performance = washerPerformance.get(washerId);
       performance.carsWashed += 1;
-      performance.totalEarnings += checkIn.total_amount || 0;
+      performance.totalEarnings += checkIn.company_income || 0;
     });
 
     // Get top 5 performers
@@ -202,7 +204,7 @@ export async function GET() {
       .select(`
         id,
         status,
-        total_amount,
+        company_income,
         check_in_time,
         vehicle_model,
         customers (
@@ -231,7 +233,7 @@ export async function GET() {
           type = 'check_in';
           break;
         case 'completed':
-          description = `Payment completed: $${checkIn.total_amount || 0} for ${vehicleModel}`;
+          description = `Payment completed: $${checkIn.company_income || 0} for ${vehicleModel}`;
           type = 'payment';
           break;
         case 'in_progress':

@@ -21,6 +21,17 @@ interface CheckInServiceItem {
   serviceData: ServiceData;
 }
 
+// Database interface for check_in_materials table
+interface CheckInMaterialDB {
+  check_in_id: string;
+  washer_id: string;
+  material_id: string;
+  material_name: string;
+  quantity_used: number;
+  amount: number;
+  usage_date: string;
+}
+
 interface CheckInService {
   service_name: string;
   price: number;
@@ -305,7 +316,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate that the admin ID is a valid UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(currentAdminId)) {
       return NextResponse.json(
@@ -327,13 +337,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    // if (adminUser.role !== 'admin') {
-    //   return NextResponse.json(
-    //     { success: false, error: 'User does not have admin privileges' },
-    //     { status: 403 }
-    //   );
-    // }
 
     const body = await request.json();
     const {
@@ -408,14 +411,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Debug logging
-    console.log('Services data:', services);
-    console.log('First service worker ID:', services[0]?.workerId);
-    console.log('Current admin ID:', currentAdminId);
     
     const insertData = {
-      customer_id: customerId || null, // Allow null for new customers
+      customer_id: customerId || null,
       license_plate: licensePlate,
       vehicle_type: vehicleType,
       wash_type: washType,
@@ -423,8 +421,8 @@ export async function POST(request: NextRequest) {
       vehicle_model: vehicleModel,
       remarks,
       valuable_items: valuableItems,
-      assigned_washer_id: assignedWorkerId, // Use the validated worker ID
-      assigned_admin_id: currentAdminId, // Use the current admin ID
+      assigned_washer_id: assignedWorkerId,
+      assigned_admin_id: currentAdminId,
       estimated_completion_time: new Date(Date.now() + (estimatedDuration * 60 * 1000)).toISOString(),
       total_amount: totalAmount || 0,
       user_code: userCode,
@@ -437,7 +435,6 @@ export async function POST(request: NextRequest) {
     
     console.log('Insert data:', insertData);
 
-    // Create check-in record
     const { data: checkIn, error: checkInError } = await supabaseAdmin
       .from('car_check_ins')
       .insert(insertData)
@@ -451,20 +448,44 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    
-    console.log('Check-in created successfully:', checkIn);
-    console.log('Stored assigned_washer_id:', checkIn.assigned_washer_id);
-    console.log('Stored assigned_admin_id:', checkIn.assigned_admin_id);
 
-    // Create check-in services records
+
     if (services && services.length > 0) {
-      const checkInServices = services.map((service: CheckInServiceItem) => ({
-        check_in_id: checkIn.id,
-        service_id: service.serviceData.id,
-        service_name: service.serviceData.name,
-        price: service.serviceData.price,
-        duration: service.serviceData.duration
-      }));
+      // Fetch service details including company_commission_percentage from services table
+      const serviceIds = services.map((service: CheckInServiceItem) => service.serviceData.id);
+      
+      const { data: serviceDetails, error: serviceDetailsError } = await supabaseAdmin
+        .from('services')
+        .select('id, company_commission_percentage')
+        .in('id', serviceIds);
+
+      if (serviceDetailsError) {
+        console.error('Error fetching service details:', serviceDetailsError);
+        // Continue without company income calculation
+      }
+
+      let totalCompanyIncome = 0;
+      
+      const checkInServices = services.map((service: CheckInServiceItem) => {
+        let companyIncome = 0;
+        
+        // Find the service details to get commission percentage
+        const serviceDetail = serviceDetails?.find(s => s.id === service.serviceData.id);
+        
+        if (serviceDetail?.company_commission_percentage && service.serviceData.price) {
+          companyIncome = (service.serviceData.price * serviceDetail.company_commission_percentage) / 100;
+          totalCompanyIncome += companyIncome;
+        }
+        
+        return {
+          check_in_id: checkIn.id,
+          service_id: service.serviceData.id,
+          service_name: service.serviceData.name,
+          price: service.serviceData.price,
+          company_income: companyIncome,    
+          duration: service.serviceData.duration
+        };
+      });
 
       const { error: servicesError } = await supabaseAdmin
         .from('check_in_services')
@@ -473,6 +494,61 @@ export async function POST(request: NextRequest) {
       if (servicesError) {
         console.error('Error creating check-in services:', servicesError);
         // Note: We don't fail here as the check-in was created successfully
+      }
+
+      // Update the check-in with the calculated total company income
+      if (totalCompanyIncome > 0) {
+        const { error: updateError } = await supabaseAdmin
+          .from('car_check_ins')
+          .update({ company_income: totalCompanyIncome })
+          .eq('id', checkIn.id);
+
+        if (updateError) {
+          console.error('Error updating company income:', updateError);
+          // Note: We don't fail here as the check-in was created successfully
+        } else {
+          console.log(`Updated company income for check-in ${checkIn.id} to ${totalCompanyIncome}`);
+        }
+      }
+
+      // Store materials in check_in_materials table
+      const checkInMaterials: CheckInMaterialDB[] = [];
+      
+      for (const service of services) {
+        if (service.materials && service.materials.length > 0) {
+          for (const material of service.materials) {
+            checkInMaterials.push({
+              check_in_id: checkIn.id,
+              washer_id: service.workerId,
+              material_id: material.materialId,
+              material_name: material.materialName,
+              quantity_used: material.quantity,
+              amount: 0, // Default amount, can be updated later if needed
+              usage_date: new Date().toISOString()
+            });
+          }
+        }
+      }
+console.log('Check-in materials:', checkInMaterials);
+      if (checkInMaterials.length > 0) {
+        console.log('Inserting check-in materials:', checkInMaterials);
+        
+        // Insert materials, handling potential conflicts gracefully
+        const { error: materialsError } = await supabaseAdmin
+          .from('check_in_materials')
+          .insert(checkInMaterials);
+
+        if (materialsError) {
+          // If it's a unique constraint violation, log it but don't fail
+          if (materialsError.code === '23505') {
+            console.log('Some materials already exist for this check-in, skipping duplicates');
+          } else {
+            console.error('Error creating check-in materials:', materialsError);
+          }
+          // Note: We don't fail here as the check-in was created successfully
+        } else {
+          console.log('Successfully stored materials for check-in:', checkIn.id);
+        }
       }
     }
 

@@ -89,25 +89,41 @@ export async function POST(request: NextRequest) {
       toolName, 
       toolType, 
       quantity, 
-      price, // Changed from amount to price
       notes 
     } = await request.json();
 
     // Validate required input
-    if (!washerId || !toolName || !toolType || !quantity || price === undefined) {
+    if (!washerId || !toolName || !toolType || !quantity) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: washerId, toolName, toolType, quantity, and price are required' },
+        { success: false, error: 'Missing required fields: washerId, toolName, toolType, and quantity are required' },
         { status: 400 }
       );
     }
 
-    // Validate quantity and price
-    if (quantity <= 0 || price <= 0) {
+    // Validate quantity
+    if (quantity <= 0) {
       return NextResponse.json(
-        { success: false, error: 'Quantity and price must be greater than 0' },
+        { success: false, error: 'Quantity must be greater than 0' },
         { status: 400 }
       );
     }
+
+    // Get replacement cost from services table where tool_name matches service name
+    const { data: service, error: serviceError } = await supabaseAdmin
+      .from('services')
+      .select('replacement_cost')
+      .eq('name', toolName)
+      .single();
+
+    if (serviceError) {
+      console.error('Error fetching service replacement cost:', serviceError);
+      return NextResponse.json(
+        { success: false, error: 'Service not found for tool' },
+        { status: 404 }
+      );
+    }
+
+    const replacementCost = service?.replacement_cost || 0;
 
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin
@@ -117,7 +133,7 @@ export async function POST(request: NextRequest) {
         tool_name: toolName,
         tool_type: toolType,
         quantity: quantity,
-        price: price, // Changed from amount to price
+        amount: replacementCost, // Use replacement cost from services table
         notes: notes || null
       })
       .select(`
@@ -146,7 +162,7 @@ export async function POST(request: NextRequest) {
       toolName: tool.tool_name,
       toolType: tool.tool_type,
       quantity: tool.quantity,
-      price: tool.price, 
+      price: tool.amount, // Use amount field from database
       assignedDate: tool.assigned_date,
       returnedDate: tool.returned_date,
       isReturned: tool.is_returned,

@@ -220,12 +220,14 @@ export interface Database {
           estimated_completion_time: string | null;
           actual_completion_time: string | null;
           total_amount: number;
+          company_income: number | null;
           payment_status: 'pending' | 'paid';
           payment_method: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items: string | null;
           user_code: string | null;
           passcode: string | null;
           remarks: string | null;
+          wash_type: 'instant' | 'delayed';
           created_at: string;
           updated_at: string;
         };
@@ -243,12 +245,14 @@ export interface Database {
           estimated_completion_time?: string | null;
           actual_completion_time?: string | null;
           total_amount?: number;
+          company_income?: number | null;
           payment_status?: 'pending' | 'paid';
           payment_method?: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items?: string | null;
           user_code?: string | null;
           passcode?: string | null;
           remarks?: string | null;
+          wash_type?: 'instant' | 'delayed';
           created_at?: string;
           updated_at?: string;
         };
@@ -266,12 +270,14 @@ export interface Database {
           estimated_completion_time?: string | null;
           actual_completion_time?: string | null;
           total_amount?: number;
+          company_income?: number | null;
           payment_status?: 'pending' | 'paid';
           payment_method?: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items?: string | null;
           user_code?: string | null;
           passcode?: string | null;
           remarks?: string | null;
+          wash_type?: 'instant' | 'delayed';
           created_at?: string;
           updated_at?: string;
         };
@@ -298,6 +304,32 @@ export interface Database {
           address?: string;
           lga?: string;
           is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      check_in_services: {
+        Row: {
+          id: string;
+          check_in_id: string;
+          service_id: string;
+          price: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          check_in_id: string;
+          service_id: string;
+          price: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          check_in_id?: string;
+          service_id?: string;
+          price?: number;
           created_at?: string;
           updated_at?: string;
         };

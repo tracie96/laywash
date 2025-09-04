@@ -4,6 +4,7 @@ import PageBreadCrumb from '@/components/common/PageBreadCrumb';
 import { useAuth } from '@/context/AuthContext';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
+import { Modal } from '@/components/ui/modal';
 
 interface WorkerTool {
   id: string;
@@ -27,6 +28,17 @@ const MyToolsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'assigned' | 'returned'>('all');
+  
+  // Material assignment state
+  const [assignMaterialsModalOpen, setAssignMaterialsModalOpen] = useState(false);
+  const [checkInIdInput, setCheckInIdInput] = useState<string>('');
+  const [selectedMaterials, setSelectedMaterials] = useState<Array<{
+    materialId: string;
+    materialName: string;
+    quantityUsed: number;
+  }>>([]);
+  const [assigningMaterials, setAssigningMaterials] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   const fetchMyTools = useCallback(async () => {
     try {
@@ -63,6 +75,88 @@ const MyToolsPage: React.FC = () => {
 
   const getStatusColor = (isReturned: boolean) => {
     return isReturned ? 'success' : 'info';
+  };
+
+  // Material assignment functions
+  const handleMaterialToggle = (material: WorkerTool) => {
+    const existingIndex = selectedMaterials.findIndex(m => m.materialId === material.id);
+    
+    if (existingIndex >= 0) {
+      // Remove material
+      setSelectedMaterials(prev => prev.filter((_, index) => index !== existingIndex));
+    } else {
+      // Add material with default quantity 1
+      setSelectedMaterials(prev => [...prev, {
+        materialId: material.id,
+        materialName: material.toolName,
+        quantityUsed: 1
+      }]);
+    }
+  };
+
+  const handleQuantityChange = (materialId: string, quantity: number) => {
+    setSelectedMaterials(prev => prev.map(m => 
+      m.materialId === materialId 
+        ? { ...m, quantityUsed: Math.max(1, quantity) }
+        : m
+    ));
+  };
+
+  const handleAssignMaterials = async () => {
+    if (!checkInIdInput.trim()) {
+      setAssignError('Please enter a check-in ID');
+      return;
+    }
+
+    if (selectedMaterials.length === 0) {
+      setAssignError('Please select at least one material');
+      return;
+    }
+
+    try {
+      setAssigningMaterials(true);
+      setAssignError(null);
+
+      const response = await fetch('/api/admin/check-ins/assign-materials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          checkInId: checkInIdInput.trim(),
+          washerId: user?.id,
+          materials: selectedMaterials
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Success - refresh tools and close modal
+        await fetchMyTools();
+        setAssignMaterialsModalOpen(false);
+        setSelectedMaterials([]);
+        setCheckInIdInput('');
+        setAssignError(null);
+      } else {
+        throw new Error(result.error || 'Failed to assign materials');
+      }
+    } catch (err) {
+      console.error('Error assigning materials:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to assign materials';
+      setAssignError(errorMessage);
+    } finally {
+      setAssigningMaterials(false);
+    }
+  };
+
+  const isMaterialSelected = (materialId: string) => {
+    return selectedMaterials.some(m => m.materialId === materialId);
+  };
+
+  const getSelectedMaterialQuantity = (materialId: string) => {
+    const selected = selectedMaterials.find(m => m.materialId === materialId);
+    return selected ? selected.quantityUsed : 0;
   };
 
   const filteredTools = tools.filter(tool => {
@@ -150,6 +244,82 @@ const MyToolsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Material Assignment Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Assign Materials to Check-in</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Use your assigned materials for specific car wash jobs
+            </p>
+          </div>
+          <Button
+            onClick={() => setAssignMaterialsModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Assign Materials
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tools.filter(tool => !tool.isReturned).map((tool) => (
+            <div
+              key={tool.id}
+              className={`p-4 border rounded-lg transition-colors cursor-pointer ${
+                isMaterialSelected(tool.id)
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
+              onClick={() => handleMaterialToggle(tool)}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                  {tool.toolName}
+                </h4>
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  Available: {tool.quantity}
+                </span>
+              </div>
+              
+              {isMaterialSelected(tool.id) && (
+                <div className="flex items-center space-x-2">
+                  <label className="text-xs text-gray-600 dark:text-gray-400">
+                    Quantity:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={tool.quantity}
+                    value={getSelectedMaterialQuantity(tool.id)}
+                    onChange={(e) => handleQuantityChange(tool.id, parseInt(e.target.value) || 1)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {selectedMaterials.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+              Selected Materials ({selectedMaterials.length})
+            </h4>
+            <div className="space-y-1">
+              {selectedMaterials.map((material) => (
+                <div key={material.materialId} className="flex justify-between text-xs">
+                  <span className="text-blue-700 dark:text-blue-300">{material.materialName}</span>
+                  <span className="text-blue-900 dark:text-blue-100 font-medium">
+                    {material.quantityUsed}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -277,6 +447,89 @@ const MyToolsPage: React.FC = () => {
           {loading ? 'Refreshing...' : 'Refresh Tools'}
         </Button>
       </div>
+
+      {/* Assign Materials Modal */}
+      <Modal
+        isOpen={assignMaterialsModalOpen}
+        onClose={() => {
+          setAssignMaterialsModalOpen(false);
+          setSelectedMaterials([]);
+          setCheckInIdInput('');
+          setAssignError(null);
+        }}
+        className="max-w-md p-6"
+      >
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Assign Materials to Check-in
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Enter the check-in ID and confirm material assignment
+          </p>
+        </div>
+
+        {assignError && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-600 dark:text-red-400 text-sm">{assignError}</p>
+          </div>
+        )}
+
+        {/* Check-in ID Input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Check-in ID *
+          </label>
+          <input
+            type="text"
+            value={checkInIdInput}
+            onChange={(e) => setCheckInIdInput(e.target.value)}
+            placeholder="Enter check-in ID"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Selected Materials Summary */}
+        {selectedMaterials.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+              Materials to Assign ({selectedMaterials.length})
+            </h4>
+            <div className="space-y-1">
+              {selectedMaterials.map((material) => (
+                <div key={material.materialId} className="flex justify-between text-xs">
+                  <span className="text-gray-700 dark:text-gray-300">{material.materialName}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {material.quantityUsed}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3">
+          <Button
+            onClick={() => {
+              setAssignMaterialsModalOpen(false);
+              setSelectedMaterials([]);
+              setCheckInIdInput('');
+              setAssignError(null);
+            }}
+            variant="outline"
+            disabled={assigningMaterials}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAssignMaterials}
+            disabled={assigningMaterials || selectedMaterials.length === 0 || !checkInIdInput.trim()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {assigningMaterials ? 'Assigning...' : 'Assign Materials'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
             name,
             description,
             base_price,
-            category
+            category,
+            company_commission_percentage
           )
         )
       `)
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
     const transformedPayments = checkIns?.map(checkIn => ({
       id: checkIn.id,
       customerName: checkIn.customers?.name || 'Walk-in Customer',
-      amount: checkIn.total_amount,
+      amount: checkIn.company_income || 0,
       date: checkIn.check_in_time,
       status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
       paymentMethod: checkIn.payment_method || 'Not specified',
