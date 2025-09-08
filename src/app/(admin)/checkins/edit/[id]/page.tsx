@@ -54,6 +54,19 @@ interface ServiceWithWorker {
   serviceData: Service;
 }
 
+interface ExistingService {
+  service_id: string;
+  service_name: string;
+  price: number;
+  duration: number;
+}
+
+interface Tool {
+  id: string;
+  toolName: string;
+  quantity: number;
+}
+
 const EditCheckInPage: React.FC = () => {
   const params = useParams();
   const router = useRouter();
@@ -84,6 +97,7 @@ const EditCheckInPage: React.FC = () => {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [servicesWithWorkers, setServicesWithWorkers] = useState<ServiceWithWorker[]>([]);
   const [serviceMaterials, setServiceMaterials] = useState<Record<string, Array<Material>>>({});
+  const [existingServices, setExistingServices] = useState<ExistingService[]>([]);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +136,11 @@ const EditCheckInPage: React.FC = () => {
           passcode: checkIn.passcode || '',
           userCode: checkIn.userCode || ''
         });
+
+        // Store existing services for display (don't pre-select them)
+        if (checkIn.existingServices && checkIn.existingServices.length > 0) {
+          setExistingServices(checkIn.existingServices);
+        }
       } else {
         setError(data.error || 'Failed to fetch check-in data');
       }
@@ -162,13 +181,23 @@ const EditCheckInPage: React.FC = () => {
   // Fetch materials for a specific service and worker
   const fetchServiceMaterials = useCallback(async (serviceId: string, workerId: string) => {
     try {
-      const response = await fetch(`/api/admin/washer-materials?washerId=${workerId}&serviceId=${serviceId}`);
+      const response = await fetch(`/api/admin/washer-materials?washerId=${workerId}`);
       const data = await response.json();
       if (data.success) {
+        // Transform tools to materials format
+        const materials = data.tools?.map((tool: Tool) => ({
+          id: tool.id,
+          material_name: tool.toolName,
+          current_quantity: tool.quantity,
+          unit: 'piece' // Default unit, could be made configurable
+        })) || [];
+        
         setServiceMaterials(prev => ({
           ...prev,
-          [serviceId]: data.materials
+          [serviceId]: materials
         }));
+      } else {
+        console.error('Failed to fetch materials:', data.error);
       }
     } catch (err) {
       console.error('Error fetching service materials:', err);
@@ -305,9 +334,9 @@ const EditCheckInPage: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        setSuccess(`Successfully created ${result.newCheckIns.length} new check-in(s) for the additional services!`);
+        setSuccess(`Successfully added ${result.newCheckIns.length} new service(s) to the check-in!`);
         setTimeout(() => {
-          router.push('/operations/checkins');
+          router.push('/checkins/active');
         }, 2000);
       } else {
         setError(result.error || 'Failed to add services to check-in');
@@ -339,10 +368,10 @@ const EditCheckInPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Create New Check-ins for Additional Services
+                Add Services to Check-in
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Create separate check-in records for additional services with assigned workers
+                Add additional services to this check-in. Existing services cannot be modified.
               </p>
             </div>
             <Button
@@ -383,13 +412,48 @@ const EditCheckInPage: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Services Selection */}
+          {/* Existing Services Display */}
+          {existingServices.length > 0 && (
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Current Services (Cannot be modified)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {existingServices.map((service, index) => (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <div className="h-4 w-4 bg-green-500 rounded flex items-center justify-center">
+                      <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {service.service_name}
+                        </span>
+                        <span className="text-green-600 dark:text-green-400 font-semibold">
+                          ₦{service.price.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Duration: {service.duration} minutes
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Available Services Selection */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Select Additional Services
+              Add Additional Services
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {services.map((service) => (
+              {services
+                .filter(service => !existingServices.some(existing => existing.service_id === service.id))
+                .map((service) => (
                 <div key={service.id} className="flex items-center space-x-3">
                   <input
                     type="checkbox"
@@ -414,6 +478,13 @@ const EditCheckInPage: React.FC = () => {
                 </div>
               ))}
             </div>
+            {services.filter(service => !existingServices.some(existing => existing.service_id === service.id)).length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">
+                  All available services are already included in this check-in.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Worker Assignment */}
@@ -453,6 +524,7 @@ const EditCheckInPage: React.FC = () => {
                       />
                     </div>
 
+
                     {/* Materials for this service */}
                     {service.workerId && serviceMaterials[service.serviceId] && (
                       <div className="mt-4">
@@ -485,6 +557,15 @@ const EditCheckInPage: React.FC = () => {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Show message when worker is assigned but no materials */}
+                    {service.workerId && !serviceMaterials[service.serviceId] && (
+                      <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          Loading materials for this worker-service combination...
+                        </p>
                       </div>
                     )}
                   </div>
@@ -544,7 +625,7 @@ const EditCheckInPage: React.FC = () => {
               disabled={isSubmitting || servicesWithWorkers.length === 0}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isSubmitting ? 'Creating Check-ins...' : 'Create New Check-ins'}
+              {isSubmitting ? 'Adding Services...' : 'Add Services'}
             </Button>
           </div>
         </form>

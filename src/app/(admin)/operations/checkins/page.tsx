@@ -38,6 +38,22 @@ const OperationsCheckInsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounce search term
+  useEffect(() => {
+    if (searchTerm !== debouncedSearchTerm) {
+      setIsSearching(true);
+    }
+    
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setIsSearching(false);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm]);
 
   const fetchCheckIns = useCallback(async () => {
     try {
@@ -45,7 +61,7 @@ const OperationsCheckInsPage: React.FC = () => {
       setError(null);
       
       const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
       if (filter !== 'all') params.append('status', filter);
       if (paymentFilter !== 'all') params.append('paymentStatus', paymentFilter);
       
@@ -63,7 +79,7 @@ const OperationsCheckInsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter, paymentFilter]);
+  }, [debouncedSearchTerm, filter, paymentFilter]);
 
   useEffect(() => {
     fetchCheckIns();
@@ -287,18 +303,22 @@ const OperationsCheckInsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <input
               type="text"
               placeholder="Search by customer name, license plate, or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
             />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            )}
           </div>
 
           {/* Status Filter */}
@@ -519,16 +539,7 @@ const OperationsCheckInsPage: React.FC = () => {
                   >
                     View Details
                   </Button>
-                  {(checkIn.status === 'pending' || checkIn.status === 'in_progress') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => window.location.href = `/checkins/edit/${checkIn.id}`}
-                      className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                    >
-                      Add Services
-                    </Button>
-                  )}
+               
                   {checkIn.status === 'pending' && (
                     <Button
                       size="sm"

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { Modal } from '@/components/ui/modal';
@@ -63,7 +63,7 @@ const CheckInHistoryPage: React.FC = () => {
   };
 
   // Fetch earnings data from API
-  const fetchEarnings = async () => {
+  const fetchEarnings = useCallback(async () => {
     try {
       setIsLoadingEarnings(true);
       
@@ -87,7 +87,7 @@ const CheckInHistoryPage: React.FC = () => {
     } finally {
       setIsLoadingEarnings(false);
     }
-  };
+  }, [startDate, endDate]);
 
   // Fetch real data from API
   useEffect(() => {
@@ -150,12 +150,12 @@ const CheckInHistoryPage: React.FC = () => {
 
     fetchCheckIns();
     fetchEarnings(); // Also fetch earnings on initial load
-  }, []);
+  }, [fetchEarnings]);
 
   // Refetch earnings when date filters change
   useEffect(() => {
     fetchEarnings();
-  }, [startDate, endDate]);
+  }, [fetchEarnings]);
 
   const filteredCheckIns = checkIns.filter(checkIn => {
     // First filter by status

@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       maxWashersPerService: service.max_washers_per_service,
       commissionNotes: service.commission_notes || '',
       isActive: service.is_active,
-      popularity: calculatePopularity(service), // This would need to be calculated based on usage
+      popularity: Math.floor(Math.random() * 45) + 50, // Random popularity for now
       createdAt: service.created_at,
       updatedAt: service.updated_at
     })) || [];
@@ -227,13 +227,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper function to calculate service popularity (placeholder implementation)
-function calculatePopularity(service: { id: string }): number {
-  console.log('service', service);
-  // This would typically be calculated based on:
-  // - Number of times the service has been selected
-  // - Revenue generated from the service
-  // - Customer ratings/feedback
-  // For now, return a random value between 50-95
-  return Math.floor(Math.random() * 45) + 50;
-}

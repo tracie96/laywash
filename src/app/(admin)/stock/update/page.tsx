@@ -29,13 +29,39 @@ interface InventoryApiResponse {
   lastUpdated: string;
 }
 
+interface CreateStockForm {
+  name: string;
+  description: string;
+  category: string;
+  currentStock: number;
+  minStockLevel: number;
+  maxStockLevel: number;
+  unit: string;
+  price: number;
+  supplier: string;
+}
+
 const StockUpdatePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
   const [updateType, setUpdateType] = useState<'in' | 'out'>('in');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateStockForm>({
+    name: '',
+    description: '',
+    category: '',
+    currentStock: 0,
+    minStockLevel: 0,
+    maxStockLevel: 0,
+    unit: '',
+    price: 0,
+    supplier: ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch real stock data from API
   const fetchStockItems = async () => {
@@ -81,6 +107,62 @@ const StockUpdatePage: React.FC = () => {
       setUpdateType('in');
     }
   }, [user, updateType]);
+
+  const handleCreateItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!createForm.name || !createForm.category || !createForm.unit || !createForm.supplier) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (createForm.currentStock < 0 || createForm.minStockLevel < 0 || createForm.maxStockLevel < 0 || createForm.price <= 0) {
+      setError('Please enter valid numeric values');
+      return;
+    }
+
+    if (createForm.minStockLevel >= createForm.maxStockLevel) {
+      setError('Minimum stock level must be less than maximum stock level');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createForm),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowCreateModal(false);
+        setCreateForm({
+          name: '',
+          description: '',
+          category: '',
+          currentStock: 0,
+          minStockLevel: 0,
+          maxStockLevel: 0,
+          unit: '',
+          price: 0,
+          supplier: ''
+        });
+        fetchStockItems(); // Refresh the list
+        alert('Item created successfully!');
+      } else {
+        setError(data.error || 'Failed to create inventory item');
+      }
+    } catch {
+      setError('Failed to create inventory item');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleUpdateStock = async () => {
     if (!selectedItem || !updateQuantity) return;
@@ -182,16 +264,26 @@ const StockUpdatePage: React.FC = () => {
               </p>
             )}
           </div>
-          {user?.role === 'super_admin' && (
-            <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-2">
-              <div className="flex items-center text-green-800 dark:text-green-200">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-medium">Full Access</span>
+          <div className="flex items-center space-x-3">
+            {hasAnyRole(['super_admin', 'admin']) && (
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Add Item
+              </Button>
+            )}
+            {user?.role === 'super_admin' && (
+              <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-2">
+                <div className="flex items-center text-green-800 dark:text-green-200">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-medium">Full Access</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -344,6 +436,182 @@ const StockUpdatePage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Create Item Modal */}
+      {hasAnyRole(['super_admin', 'admin']) && (
+        <Modal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          className="w-full max-w-md mx-4"
+        >
+          <div className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Inventory Item</h3>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-800 dark:text-red-200">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateItem} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter item name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter item description"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={createForm.category}
+                  onChange={(e) => setCreateForm({...createForm, category: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Cleaning Supplies"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Current Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={createForm.currentStock}
+                    onChange={(e) => setCreateForm({...createForm, currentStock: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Unit
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.unit}
+                    onChange={(e) => setCreateForm({...createForm, unit: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Liters, Pieces"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Min Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={createForm.minStockLevel}
+                    onChange={(e) => setCreateForm({...createForm, minStockLevel: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Max Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={createForm.maxStockLevel}
+                    onChange={(e) => setCreateForm({...createForm, maxStockLevel: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Price per Unit
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={createForm.price}
+                    onChange={(e) => setCreateForm({...createForm, price: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Supplier
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.supplier}
+                    onChange={(e) => setCreateForm({...createForm, supplier: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter supplier name"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                >
+                  {submitting ? 'Creating...' : 'Create Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

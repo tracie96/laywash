@@ -61,6 +61,13 @@ export async function GET(
           email,
           phone,
           date_of_birth
+        ),
+        check_in_services (
+          id,
+          service_id,
+          service_name,
+          price,
+          duration
         )
       `)
       .eq('id', id)
@@ -116,7 +123,8 @@ export async function GET(
       assignedWasherId: checkIn.assigned_washer_id,
       assignedAdminId: checkIn.assigned_admin_id,
       createdAt: checkIn.created_at,
-      updatedAt: checkIn.updated_at
+      updatedAt: checkIn.updated_at,
+      existingServices: checkIn.check_in_services || []
     };
 
     return NextResponse.json({

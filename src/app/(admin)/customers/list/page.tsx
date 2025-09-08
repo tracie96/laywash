@@ -12,8 +12,8 @@ const CustomerListPage: React.FC = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'totalVisits' | 'totalSpent' | 'registrationDate'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'totalVisits' | 'totalSpent' | 'registrationDate'>('totalSpent');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Fetch customers on component mount and when filters change
   useEffect(() => {
@@ -77,8 +77,23 @@ const CustomerListPage: React.FC = () => {
   };
 
   const getSortIcon = (field: typeof sortBy) => {
-    if (sortBy !== field) return '↕️';
-    return sortOrder === 'asc' ? '↑' : '↓';
+    if (sortBy !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+    
+    return sortOrder === 'asc' ? (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+      </svg>
+    );
   };
 
   const stats = calculateStats();
@@ -200,7 +215,7 @@ const CustomerListPage: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <input
@@ -245,6 +260,29 @@ const CustomerListPage: React.FC = () => {
               Unregistered ({stats.unregistered})
             </button>
           </div>
+
+          {/* Sorting Controls */}
+          <div className="flex gap-2">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'totalVisits' | 'totalSpent' | 'registrationDate')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="totalVisits">Sort by Total Visits</option>
+              <option value="totalSpent">Sort by Total Spent</option>
+              <option value="registrationDate">Sort by Registration Date</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -254,14 +292,14 @@ const CustomerListPage: React.FC = () => {
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('name')}
-                    className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center space-x-1">
                     <span>Customer</span>
                     {getSortIcon('name')}
-                  </button>
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Vehicle
@@ -269,23 +307,23 @@ const CustomerListPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('totalVisits')}
-                    className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => handleSort('totalVisits')}
+                >
+                  <div className="flex items-center space-x-1">
                     <span>Visits</span>
                     {getSortIcon('totalVisits')}
-                  </button>
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('totalSpent')}
-                    className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => handleSort('totalSpent')}
+                >
+                  <div className="flex items-center space-x-1">
                     <span>Total Spent</span>
                     {getSortIcon('totalSpent')}
-                  </button>
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status

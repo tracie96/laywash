@@ -34,7 +34,7 @@ export const LocationSelect: React.FC<LocationSelectProps> = ({
       const result = await response.json();
       
       if (result.success) {
-        setLocations(result.data);
+        setLocations(result.locations || []);
       } else {
         setError('Failed to fetch locations');
       }

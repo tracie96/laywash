@@ -76,6 +76,8 @@ const OperationsCustomersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'registered' | 'unregistered'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'totalVisits' | 'totalSpent' | 'lastVisit'>('totalSpent');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -382,6 +384,35 @@ console.log(customers);
     return isRegistered ? "Registered" : "Walk-in";
   };
 
+  const handleSort = (column: 'name' | 'totalVisits' | 'totalSpent' | 'lastVisit') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (column: 'name' | 'totalVisits' | 'totalSpent' | 'lastVisit') => {
+    if (sortBy !== column) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+    
+    return sortOrder === 'asc' ? (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+      </svg>
+    );
+  };
+
   const totalCustomers = customers.length;
   const registeredCustomers = customers.filter(c => c.isRegistered).length;
   const totalRevenue = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
@@ -390,6 +421,36 @@ console.log(customers);
     if (filterType === 'registered' && !customer.isRegistered) return false;
     if (filterType === 'unregistered' && customer.isRegistered) return false;
     return true;
+  }).sort((a, b) => {
+    let aValue: string | number;
+    let bValue: string | number;
+
+    switch (sortBy) {
+      case 'name':
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case 'totalVisits':
+        aValue = a.totalVisits || 0;
+        bValue = b.totalVisits || 0;
+        break;
+      case 'totalSpent':
+        aValue = a.totalSpent || 0;
+        bValue = b.totalSpent || 0;
+        break;
+      case 'lastVisit':
+        aValue = a.lastVisit ? new Date(a.lastVisit).getTime() : 0;
+        bValue = b.lastVisit ? new Date(b.lastVisit).getTime() : 0;
+        break;
+      default:
+        return 0;
+    }
+
+    if (sortOrder === 'asc') {
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    } else {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
   });
 
   if (loading) {
@@ -473,6 +534,26 @@ console.log(customers);
               <option value="registered">Registered Only</option>
               <option value="unregistered">Walk-in Only</option>
             </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'totalVisits' | 'totalSpent' | 'lastVisit')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="totalVisits">Sort by Total Visits</option>
+              <option value="totalSpent">Sort by Total Spent</option>
+              <option value="lastVisit">Sort by Last Visit</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
           </div>
 
           <button
@@ -540,11 +621,35 @@ console.log(customers);
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Name</span>
+                      {getSortIcon('name')}
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vehicle</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Visits</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Spent</th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => handleSort('totalVisits')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Total Visits</span>
+                      {getSortIcon('totalVisits')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => handleSort('totalSpent')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Total Spent</span>
+                      {getSortIcon('totalSpent')}
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>

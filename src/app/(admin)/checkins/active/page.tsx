@@ -840,6 +840,17 @@ const ActiveCheckInsPage: React.FC = () => {
                       </Button>
                     </>
                   )}
+                  {checkIn.status === 'pending' && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = `/checkins/edit/${checkIn.id}`;
+                      }}
+                      className="flex-shrink-0 bg-yellow-600 hover:bg-yellow-700 text-white"
+                    >
+                      Edit
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     onClick={() => {
