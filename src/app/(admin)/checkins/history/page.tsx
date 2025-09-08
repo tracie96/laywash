@@ -52,10 +52,41 @@ const CheckInHistoryPage: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
 
+  // Earnings state
+  const [totalEarnings, setTotalEarnings] = useState<number>(0);
+  const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
+
   // Helper function to get current date in YYYY-MM-DD format
   const getCurrentDate = () => {
     const today = new Date();
     return today.toISOString().split('T')[0];
+  };
+
+  // Fetch earnings data from API
+  const fetchEarnings = async () => {
+    try {
+      setIsLoadingEarnings(true);
+      
+      // Build query parameters for date filtering
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      const response = await fetch(`/api/admin/earnings?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch earnings');
+      }
+
+      if (data.success && data.data) {
+        setTotalEarnings(data.data.totalEarnings);
+      }
+    } catch (error) {
+      console.error('Error fetching earnings:', error);
+    } finally {
+      setIsLoadingEarnings(false);
+    }
   };
 
   // Fetch real data from API
@@ -118,7 +149,13 @@ const CheckInHistoryPage: React.FC = () => {
     };
 
     fetchCheckIns();
+    fetchEarnings(); // Also fetch earnings on initial load
   }, []);
+
+  // Refetch earnings when date filters change
+  useEffect(() => {
+    fetchEarnings();
+  }, [startDate, endDate]);
 
   const filteredCheckIns = checkIns.filter(checkIn => {
     // First filter by status
@@ -182,6 +219,9 @@ const CheckInHistoryPage: React.FC = () => {
             : checkIn
         ));
         
+        // Refetch earnings to update the total
+        fetchEarnings();
+        
         // Show success message
         alert('Payment status updated successfully!');
         
@@ -243,11 +283,6 @@ const CheckInHistoryPage: React.FC = () => {
     }
   };
 
-  const calculateTotalEarnings = () => {
-    return filteredCheckIns
-      .filter(checkIn => checkIn.status === 'paid')
-      .reduce((total, checkIn) => total + checkIn.totalPrice, 0);
-  };
 
   const calculateAverageDuration = () => {
     const completedCheckIns = filteredCheckIns.filter(checkIn => 
@@ -303,7 +338,11 @@ const CheckInHistoryPage: React.FC = () => {
                 Total Earnings
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${calculateTotalEarnings()}
+                {isLoadingEarnings ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : (
+                  `NGN ${totalEarnings.toLocaleString()}`
+                )}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -622,7 +661,7 @@ const CheckInHistoryPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Price</p>
-                      <p className="font-medium text-gray-900 dark:text-white">${checkIn.totalPrice}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">NGN {checkIn.totalPrice}</p>
                     </div>
                   </div>
                 </div>
@@ -843,7 +882,7 @@ const CheckInHistoryPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Price</p>
-                    <p className="text-xl font-bold text-green-600 dark:text-green-400">${selectedCheckIn.totalPrice}</p>
+                    <p className="text-xl font-bold text-green-600 dark:text-green-400">NGN {selectedCheckIn.totalPrice}</p>
                   </div>
                   {selectedCheckIn.specialInstructions && (
                     <div>

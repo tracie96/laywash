@@ -160,13 +160,12 @@ const CheckInDetailModal: React.FC<CheckInDetailModalProps> = ({
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Price</label>
                 <p className="text-gray-900 dark:text-white text-lg font-semibold">
-                  ${checkIn.totalPrice.toFixed(2)}
+                  NGN {checkIn.totalPrice.toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Timing & Assignment */}
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
               <TimeIcon className="w-5 h-5 mr-2" />

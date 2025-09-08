@@ -452,7 +452,7 @@ const UsersWashersPage: React.FC = () => {
                     </td>
                 
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      ${washer.totalEarnings.toFixed(2)}
+                      NGN {washer.totalEarnings.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <LocationDisplay locationId={washer.assigned_location} />

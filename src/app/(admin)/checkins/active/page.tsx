@@ -679,7 +679,7 @@ const ActiveCheckInsPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Price</p>
-                      <p className="font-medium text-gray-900 dark:text-white">${checkIn.totalPrice}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">NGN {checkIn.totalPrice}</p>
                     </div>
                   </div>
                 </div>

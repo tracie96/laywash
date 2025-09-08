@@ -57,6 +57,7 @@ const PaymentRequestsPage: React.FC = () => {
     assignedDate: string;
     notes?: string;
   }>>([]);
+  const [hasUnreturnedTools, setHasUnreturnedTools] = useState(false);
 
   const { user } = useAuth();
 
@@ -118,6 +119,7 @@ const PaymentRequestsPage: React.FC = () => {
         if (result.success) {
           setCalculatedDeductions(result.deductions);
           setUnreturnedItems(result.unreturnedItems);
+          setHasUnreturnedTools(result.hasUnreturnedTools || false);
           
           // Update form data with calculated deductions
           setFormData(prev => ({
@@ -143,6 +145,12 @@ const PaymentRequestsPage: React.FC = () => {
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if there are unreturned tools
+    if (hasUnreturnedTools) {
+      alert('❌ Cannot create payment request. You must return all assigned tools first.');
+      return;
+    }
     
     const requestedAmount = parseFloat(formData.requestedAmount);
     const materialDeductions = calculatedDeductions.materialDeductions;
@@ -197,10 +205,16 @@ const PaymentRequestsPage: React.FC = () => {
         // Refresh the list and earnings
         await fetchPaymentRequests();
         await fetchCurrentEarnings();
+        await fetchCalculatedDeductions(); // Refresh deductions to update unreturned tools status
         
         alert('Payment request created successfully!');
       } else {
-        alert(result.error || 'Failed to create payment request');
+        // Show more detailed error message for unreturned tools
+        if (result.error && result.error.includes('return all assigned tools')) {
+          alert(`❌ ${result.error}\n\nPlease return all tools before creating a payment request.`);
+        } else {
+          alert(result.error || 'Failed to create payment request');
+        }
       }
     } catch (err) {
       console.error('Error creating payment request:', err);
@@ -288,13 +302,37 @@ const PaymentRequestsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Create Request Button */}
       <div className="mb-6">
+        {hasUnreturnedTools && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                  Cannot Create Payment Request
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  <p>You must return all assigned tools before creating a payment request.</p>
+                  <p className="mt-1">Unreturned tools: {unreturnedItems.map(item => item.toolName).join(', ')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <Button
           onClick={openCreateForm}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          disabled={hasUnreturnedTools}
+          className={`${hasUnreturnedTools 
+            ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
         >
-          Create Payment Request
+          {hasUnreturnedTools ? 'Return Tools First' : 'Create Payment Request'}
         </Button>
       </div>
 
@@ -518,10 +556,13 @@ const PaymentRequestsPage: React.FC = () => {
               <div className="flex space-x-3 pt-4">
                 <Button
                   type="submit"
-                  disabled={formSubmitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={formSubmitting || hasUnreturnedTools}
+                  className={`flex-1 ${hasUnreturnedTools 
+                    ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
-                  {formSubmitting ? 'Creating...' : 'Create Request'}
+                  {formSubmitting ? 'Creating...' : hasUnreturnedTools ? 'Return Tools First' : 'Create Request'}
                 </Button>
                 <Button
                   type="button"
