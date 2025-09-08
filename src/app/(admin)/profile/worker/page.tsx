@@ -118,7 +118,7 @@ const WorkerProfilePage: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
-        setError('Failed to load profile');
+        setError('Failed to fetch profile');
       } finally {
         setLoading(false);
       }
@@ -126,6 +126,41 @@ const WorkerProfilePage: React.FC = () => {
 
     fetchProfile();
     fetchWeeklyEarnings();
+    
+    // Listen for earnings updates from other pages
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'washer_earnings_updated') {
+        console.log('Washer earnings updated, refreshing profile...');
+        fetchProfile();
+        fetchWeeklyEarnings();
+      }
+    };
+    
+    // Listen for localStorage changes (from same tab)
+    const handleEarningsUpdate = () => {
+      const lastUpdate = localStorage.getItem('washer_earnings_updated');
+      if (lastUpdate) {
+        const updateTime = parseInt(lastUpdate);
+        const now = Date.now();
+        // If update was within last 5 seconds, refresh data
+        if (now - updateTime < 5000) {
+          console.log('Recent washer earnings update detected, refreshing profile...');
+          fetchProfile();
+          fetchWeeklyEarnings();
+        }
+      }
+    };
+    
+    // Check for recent updates every 2 seconds
+    const interval = setInterval(handleEarningsUpdate, 2000);
+    
+    // Listen for storage events from other tabs
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [user?.id, fetchWeeklyEarnings]);
 
   // Auto-fetch when selected weeks change (but not for custom range)

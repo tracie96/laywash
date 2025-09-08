@@ -17,6 +17,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    console.log('=== GET CHECK-IN API CALLED ===');
     
     // Get current admin user from request header
     const currentAdminId = request.headers.get('X-Admin-ID');
@@ -147,10 +148,34 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
+    
+    // Test if request body is being consumed
+    console.log('Request method:', request.method);
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
+    console.log('Request URL:', request.url);
+    
     const updateData = await request.json();
     
+    console.log('=== PATCH CHECK-IN UPDATE API CALLED ===');
+    console.log('Check-in ID:', id);
     console.log('Received update data:', updateData);
     console.log('User ID from request:', updateData?.userId);
+    console.log('Raw updateData keys:', Object.keys(updateData));
+    console.log('updateData.paymentStatus:', updateData);
+    console.log('updateData.paymentMethod:', updateData.paymentMethod);
+    
+    // Check if payment fields exist
+    if (updateData.paymentStatus) {
+      console.log('✅ paymentStatus found:', updateData.paymentStatus);
+    } else {
+      console.log('❌ paymentStatus NOT found in updateData');
+    }
+    
+    if (updateData.paymentMethod) {
+      console.log('✅ paymentMethod found:', updateData.paymentMethod);
+    } else {
+      console.log('❌ paymentMethod NOT found in updateData');
+    }
 
     // Get user role for authorization checks
     let userRole = null;
@@ -277,7 +302,8 @@ export async function PATCH(
 
     // Transform frontend field names to database field names
     const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean; reason?: string } = {};
-    
+    console.log('dbUpdateData keys:', Object.keys(dbUpdateData));
+
     // Handle status updates (for admins)
     if (updateData.status !== undefined) dbUpdateData.status = updateData.status;
     
@@ -293,8 +319,23 @@ export async function PATCH(
     }
     
     // Handle other fields
-    if (updateData.paymentStatus !== undefined) dbUpdateData.payment_status = updateData.paymentStatus;
-    if (updateData.paymentMethod !== undefined) dbUpdateData.payment_method = updateData.paymentMethod;
+    console.log('=== TRANSFORMING PAYMENT FIELDS ===');
+    console.log('updateData.paymentStatus:', updateData.paymentStatus);
+    console.log('updateData.paymentMethod:', updateData.paymentMethod);
+    
+    if (updateData.paymentStatus !== undefined) {
+      dbUpdateData.payment_status = updateData.paymentStatus;
+      console.log('✅ Set dbUpdateData.payment_status to:', updateData.paymentStatus);
+    } else {
+      console.log('❌ updateData.paymentStatus is undefined');
+    }
+    
+    if (updateData.paymentMethod !== undefined) {
+      dbUpdateData.payment_method = updateData.paymentMethod;
+      console.log('✅ Set dbUpdateData.payment_method to:', updateData.paymentMethod);
+    } else {
+      console.log('❌ updateData.paymentMethod is undefined');
+    }
     if (updateData.assignedWasherId !== undefined) dbUpdateData.assigned_washer_id = updateData.assignedWasherId;
     if (updateData.assignedAdminId !== undefined) dbUpdateData.assigned_admin_id = updateData.assignedAdminId;
     if (updateData.remarks !== undefined) dbUpdateData.remarks = updateData.remarks;
@@ -318,6 +359,8 @@ export async function PATCH(
 
     console.log('Final database update data:', dbUpdateData);
     console.log('Update data keys:', Object.keys(dbUpdateData));
+    console.log('Final payment_status value:', dbUpdateData.payment_status);
+    console.log('Final payment_method value:', dbUpdateData.payment_method);
 
     // Update the check-in
     const { data: checkIn, error } = await supabaseAdmin
@@ -383,13 +426,20 @@ export async function PATCH(
     }
 
     console.log('Check-in updated successfully:', checkIn.id, 'New status:', checkIn.status);
-
+console.log('dbUpdateData', dbUpdateData);
+console.log('checkIn', checkIn);
     // Update washer earnings when check-in is marked as paid
-    if (updateData.paymentStatus === 'paid' && checkIn.assigned_washer_id) {
+    console.log('=== CHECKING EARNINGS UPDATE CONDITIONS ===');
+    console.log('Payment status from updateData:', updateData.paymentStatus);
+    console.log('Payment status from dbUpdateData:', dbUpdateData.payment_status);
+    console.log('Assigned washer ID:', checkIn.assigned_washer_id);
+    console.log('Check-in ID:', checkIn.id);
+    
+    if (dbUpdateData.payment_status === 'paid' && checkIn.assigned_washer_id) {
       try {
-        console.log('Updating washer earnings for check-in:', checkIn.id, 'washer:', checkIn.assigned_washer_id);
+        console.log('✅ CONDITIONS MET - Updating washer earnings for check-in:', checkIn.id, 'washer:', checkIn.assigned_washer_id);
         
-        // Call the washer earnings update API
+        // Call the washer earnings update API and wait for completion
         const earningsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin/check-ins/update-washer-earnings`, {
           method: 'POST',
           headers: {
@@ -407,12 +457,24 @@ export async function PATCH(
           console.log('Washer earnings updated successfully:', earningsResult.earningsAdded);
         } else {
           console.error('Failed to update washer earnings:', earningsResult.error);
-          // Don't fail the check-in update if earnings update fails
+          // Return error to prevent inconsistent state
+          return NextResponse.json(
+            { success: false, error: `Payment status updated but failed to update washer earnings: ${earningsResult.error}` },
+            { status: 500 }
+          );
         }
       } catch (earningsError) {
         console.error('Error updating washer earnings:', earningsError);
-        // Don't fail the check-in update if earnings update fails
+        // Return error to prevent inconsistent state
+        return NextResponse.json(
+          { success: false, error: `Payment status updated but failed to update washer earnings: ${earningsError}` },
+          { status: 500 }
+        );
       }
+    } else {
+      console.log('❌ CONDITIONS NOT MET - Skipping earnings update');
+      console.log('Reason: payment_status is', dbUpdateData.payment_status, '(needs to be "paid")');
+      console.log('Reason: assigned_washer_id is', checkIn.assigned_washer_id, '(needs to exist)');
     }
 
     if (updateData.status === 'completed' && checkIn.customers?.[0]?.id) {

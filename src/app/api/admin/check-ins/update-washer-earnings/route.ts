@@ -14,6 +14,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 export async function POST(request: NextRequest) {
   try {
     const { checkInId, washerId } = await request.json();
+    
+    console.log('=== UPDATE WASHER EARNINGS API CALLED ===');
+    console.log('Check-in ID:', checkInId);
+    console.log('Washer ID:', washerId);
 
     if (!checkInId || !washerId) {
       return NextResponse.json(
@@ -23,6 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the check-in with services and their commission percentages
+    console.log('Fetching check-in data for ID:', checkInId);
     const { data: checkInData, error: checkInError } = await supabaseAdmin
       .from('car_check_ins')
       .select(`
@@ -35,6 +40,9 @@ export async function POST(request: NextRequest) {
       `)
       .eq('id', checkInId)
       .single();
+      
+    console.log('Check-in data result:', checkInData);
+    console.log('Check-in error:', checkInError);
 
     if (checkInError) {
       console.error('Error fetching check-in data:', checkInError);
@@ -53,11 +61,15 @@ export async function POST(request: NextRequest) {
 
     // Get services data separately to debug the relationship
     const serviceIds = checkInData.check_in_services.map(cis => cis.service_id);
+    console.log('Service IDs found:', serviceIds);
 
     const { data: servicesData, error: servicesError } = await supabaseAdmin
       .from('services')
       .select('id, name, washer_commission_percentage, company_commission_percentage')
       .in('id', serviceIds);
+      
+    console.log('Services data result:', servicesData);
+    console.log('Services error:', servicesError);
 
     if (servicesError) {
       console.error('Error fetching services data:', servicesError);
@@ -106,11 +118,15 @@ export async function POST(request: NextRequest) {
     }
 
     // First, get the current total earnings
+    console.log('Fetching current washer profile for user_id:', washerId);
     const { data: currentProfile, error: fetchError } = await supabaseAdmin
       .from('car_washer_profiles')
       .select('total_earnings')
       .eq('user_id', washerId)
       .single();
+      
+    console.log('Current profile result:', currentProfile);
+    console.log('Current profile error:', fetchError);
 
     if (fetchError) {
       console.error('Error fetching current washer profile:', fetchError);
@@ -123,8 +139,15 @@ export async function POST(request: NextRequest) {
     // Calculate new total earnings
     const currentEarnings = currentProfile?.total_earnings || 0;
     const newTotalEarnings = currentEarnings + totalEarnings;
+    
+    console.log('Current earnings:', currentEarnings);
+    console.log('New total earnings:', newTotalEarnings);
+    console.log('Washer ID:', washerId);
+    console.log('Total earnings:', totalEarnings);
+    console.log('Total company income:', totalCompanyIncome);
 
     // Update the washer's total earnings in car_washer_profile
+    console.log('Updating washer profile with new total earnings:', newTotalEarnings);
     const { error: updateError } = await supabaseAdmin
       .from('car_washer_profiles')
       .update({
@@ -132,6 +155,8 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('user_id', washerId);
+      
+    console.log('Update error:', updateError);
 
     if (updateError) {
       console.error('Error updating washer earnings:', updateError);
@@ -140,6 +165,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    console.log('✅ Successfully updated washer earnings in database');
 
     // Update the company_income field in car_check_ins table
     const { error: companyIncomeUpdateError } = await supabaseAdmin

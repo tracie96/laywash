@@ -41,6 +41,39 @@ const UsersWashersPage: React.FC = () => {
 
   useEffect(() => {
     fetchWashers();
+    
+    // Listen for earnings updates from other pages
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'washer_earnings_updated') {
+        console.log('Washer earnings updated, refreshing data...');
+        fetchWashers();
+      }
+    };
+    
+    // Listen for localStorage changes (from same tab)
+    const handleEarningsUpdate = () => {
+      const lastUpdate = localStorage.getItem('washer_earnings_updated');
+      if (lastUpdate) {
+        const updateTime = parseInt(lastUpdate);
+        const now = Date.now();
+        // If update was within last 5 seconds, refresh data
+        if (now - updateTime < 5000) {
+          console.log('Recent washer earnings update detected, refreshing data...');
+          fetchWashers();
+        }
+      }
+    };
+    
+    // Check for recent updates every 2 seconds
+    const interval = setInterval(handleEarningsUpdate, 2000);
+    
+    // Listen for storage events from other tabs
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const fetchWashers = async () => {

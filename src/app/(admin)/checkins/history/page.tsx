@@ -197,7 +197,6 @@ const CheckInHistoryPage: React.FC = () => {
     try {
       setIsUpdatingPayment(selectedCheckInId);
       
-      // First, update the payment status
       const response = await fetch(`/api/admin/check-ins/${selectedCheckInId}`, {
         method: 'PATCH',
         headers: {
@@ -221,6 +220,9 @@ const CheckInHistoryPage: React.FC = () => {
         
         // Refetch earnings to update the total
         fetchEarnings();
+        
+        // Notify other pages that washer earnings have been updated
+        localStorage.setItem('washer_earnings_updated', Date.now().toString());
         
         // Show success message
         alert('Payment status updated successfully!');
