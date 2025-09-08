@@ -12,6 +12,7 @@ interface Worker {
   address: string;
   totalEarnings: number;
   isAvailable: boolean;
+  isActive: boolean;
   assignedAdminId: string;
   assignedAdminName: string;
   totalCheckIns: number;
@@ -25,7 +26,7 @@ const WorkerListPage: React.FC = () => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [filter, setFilter] = useState<'all' | 'available' | 'unavailable' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'totalEarnings' | 'completedCheckIns' | 'averageRating'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
@@ -61,8 +62,9 @@ const WorkerListPage: React.FC = () => {
   const filteredAndSortedWorkers = workers
     .filter(worker => {
       const matchesFilter = filter === 'all' || 
-        (filter === 'available' && worker.isAvailable) ||
-        (filter === 'unavailable' && !worker.isAvailable);
+        (filter === 'available' && worker.isActive && worker.isAvailable) ||
+        (filter === 'unavailable' && worker.isActive && !worker.isAvailable) ||
+        (filter === 'inactive' && !worker.isActive);
       
       const matchesSearch = searchTerm === '' || 
         worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,8 +112,9 @@ const WorkerListPage: React.FC = () => {
     
     const stats = {
       total: workers.length,
-      available: workers.filter(w => w.isAvailable).length,
-      unavailable: workers.filter(w => !w.isAvailable).length,
+      available: workers.filter(w => w.isActive && w.isAvailable).length,
+      unavailable: workers.filter(w => w.isActive && !w.isAvailable).length,
+      inactive: workers.filter(w => !w.isActive).length,
       totalEarnings,
       totalCheckIns: workers.reduce((sum, w) => sum + w.completedCheckIns, 0),
       averageRating: workers.length > 0 ? workers.reduce((sum, w) => sum + w.averageRating, 0) / workers.length : 0
@@ -135,7 +138,10 @@ const WorkerListPage: React.FC = () => {
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
-  const getAvailabilityBadge = (isAvailable: boolean) => {
+  const getAvailabilityBadge = (isActive: boolean, isAvailable: boolean) => {
+    if (!isActive) {
+      return <Badge color="error">Inactive</Badge>;
+    }
     return isAvailable ? 
       <Badge color="success">Available</Badge> : 
       <Badge color="warning">Unavailable</Badge>;
@@ -175,6 +181,68 @@ const WorkerListPage: React.FC = () => {
     } catch (error) {
       console.error('Error updating worker availability:', error);
       setError('Failed to update worker availability');
+    }
+  };
+
+  const handleDeactivateWorker = async (workerId: string, workerName: string) => {
+    const confirmDeactivate = window.confirm(
+      `Are you sure you want to deactivate ${workerName}? They will no longer be able to access the system or receive new assignments.`
+    );
+    
+    if (!confirmDeactivate) return;
+
+    try {
+      const response = await fetch(`/api/admin/washers/${workerId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: false }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the workers list
+        await fetchWorkers();
+        alert(`${workerName} has been successfully deactivated.`);
+      } else {
+        alert(`Failed to deactivate ${workerName}: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error deactivating worker:', err);
+      alert(`Failed to deactivate ${workerName}. Please try again.`);
+    }
+  };
+
+  const handleActivateWorker = async (workerId: string, workerName: string) => {
+    const confirmActivate = window.confirm(
+      `Are you sure you want to activate ${workerName}? They will be able to access the system and receive new assignments.`
+    );
+    
+    if (!confirmActivate) return;
+
+    try {
+      const response = await fetch(`/api/admin/washers/${workerId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: true }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the workers list
+        await fetchWorkers();
+        alert(`${workerName} has been successfully activated.`);
+      } else {
+        alert(`Failed to activate ${workerName}: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error activating worker:', err);
+      alert(`Failed to activate ${workerName}. Please try again.`);
     }
   };
 
@@ -243,7 +311,7 @@ const WorkerListPage: React.FC = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -275,6 +343,24 @@ const WorkerListPage: React.FC = () => {
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Inactive Workers
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.inactive}
+              </p>
+            </div>
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
@@ -362,6 +448,16 @@ const WorkerListPage: React.FC = () => {
               }`}
             >
               Unavailable ({stats.unavailable})
+            </button>
+            <button
+              onClick={() => setFilter('inactive')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                filter === 'inactive'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Inactive ({stats.inactive})
             </button>
           </div>
         </div>
@@ -464,7 +560,7 @@ const WorkerListPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getAvailabilityBadge(worker.isAvailable)}
+                      {getAvailabilityBadge(worker.isActive, worker.isAvailable)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
@@ -482,14 +578,35 @@ const WorkerListPage: React.FC = () => {
                         >
                           Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleToggleAvailability(worker.id, worker.isAvailable)}
-                          className={worker.isAvailable ? 'text-orange-600 hover:text-orange-700' : 'text-green-600 hover:text-green-700'}
-                        >
-                          {worker.isAvailable ? 'Set Unavailable' : 'Set Available'}
-                        </Button>
+                        {worker.isActive ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleToggleAvailability(worker.id, worker.isAvailable)}
+                              className={worker.isAvailable ? 'text-orange-600 hover:text-orange-700' : 'text-green-600 hover:text-green-700'}
+                            >
+                              {worker.isAvailable ? 'Set Unavailable' : 'Set Available'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeactivateWorker(worker.id, worker.name)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Deactivate
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleActivateWorker(worker.id, worker.name)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            Activate
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

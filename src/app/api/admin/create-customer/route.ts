@@ -87,11 +87,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert vehicles into the vehicles table
-    const vehiclesToInsert = vehicles.map((vehicle: { licensePlate: string; vehicleType: string; vehicleModel: string | null; vehicleColor: string; isPrimary: boolean | undefined; }, index: number) => ({
+    const vehiclesToInsert = vehicles.map((vehicle: { licensePlate: string; vehicleType: string; vehicleMake: string | null; vehicleModel: string | null; vehicleColor: string; isPrimary: boolean | undefined; }, index: number) => ({
       customer_id: customer.id,
       license_plate: vehicle.licensePlate,
       vehicle_type: vehicle.vehicleType,
-      vehicle_model: vehicle.vehicleModel || null,
+      vehicle_make: vehicle.vehicleMake?.trim() || null,
+      vehicle_model: vehicle.vehicleModel?.trim() || null,
       vehicle_color: vehicle.vehicleColor,
       is_primary: vehicle.isPrimary || index === 0, // First vehicle is primary by default
     }));

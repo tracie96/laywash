@@ -61,6 +61,7 @@ export interface Customer {
     id: string;
     license_plate: string;
     vehicle_type: string;
+    vehicle_make?: string;
     vehicle_model?: string;
     vehicle_color: string;
     is_primary: boolean;

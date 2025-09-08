@@ -28,6 +28,14 @@ const LocationsPage: React.FC = () => {
     phone?: string;
     is_active: boolean;
   }>>([]);
+  const [admins, setAdmins] = useState<Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    is_active: boolean;
+  }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -228,16 +236,27 @@ const LocationsPage: React.FC = () => {
   const openViewModal = async (location: Location) => {
     setViewingLocation(location);
     try {
-      const response = await fetch(`/api/admin/locations/${location.id}/workers`);
-      const result = await response.json();
-      if (result.success) {
-        setWorkers(result.data);
+      // Fetch workers
+      const workersResponse = await fetch(`/api/admin/locations/${location.id}/workers`);
+      const workersResult = await workersResponse.json();
+      if (workersResult.success) {
+        setWorkers(workersResult.data);
       } else {
         setWorkers([]);
       }
+
+      // Fetch admins
+      const adminsResponse = await fetch(`/api/admin/locations/${location.id}/admins`);
+      const adminsResult = await adminsResponse.json();
+      if (adminsResult.success) {
+        setAdmins(adminsResult.data);
+      } else {
+        setAdmins([]);
+      }
     } catch (err) {
-      console.error('Error fetching workers:', err);
+      console.error('Error fetching location data:', err);
       setWorkers([]);
+      setAdmins([]);
     }
     viewModal.openModal();
   };
@@ -685,6 +704,63 @@ const LocationsPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Admins List */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Admins at this Location</h4>
+                  {admins.length > 0 ? (
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Phone
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {admins.map((admin) => (
+                            <tr key={admin.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {admin.first_name} {admin.last_name}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{admin.email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{admin.phone || 'N/A'}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  admin.is_active
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {admin.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No admins assigned to this location</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Workers List */}

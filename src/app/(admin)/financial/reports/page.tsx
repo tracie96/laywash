@@ -19,6 +19,10 @@ interface FinancialReport {
   customerBonuses: number;
   adminSalaries: number;
   
+  // Worker Wages
+  totalWages: number;
+  pendingWages: number;
+  
   // Net profit
   netProfit: number;
   profitMargin: number;
@@ -96,6 +100,8 @@ const FinancialReportsPage: React.FC = () => {
     washerBonuses: acc.washerBonuses + report.washerBonuses,
     customerBonuses: acc.customerBonuses + report.customerBonuses,
     adminSalaries: acc.adminSalaries + report.adminSalaries,
+    totalWages: acc.totalWages + report.totalWages,
+    pendingWages: acc.pendingWages + report.pendingWages,
     netProfit: acc.netProfit + report.netProfit,
     customerCount: Math.max(acc.customerCount, report.customerCount), // Max per period
     transactionCount: acc.transactionCount + report.transactionCount,
@@ -110,6 +116,8 @@ const FinancialReportsPage: React.FC = () => {
     washerBonuses: 0,
     customerBonuses: 0,
     adminSalaries: 0,
+    totalWages: 0,
+    pendingWages: 0,
     netProfit: 0,
     customerCount: 0,
     transactionCount: 0,
@@ -294,6 +302,47 @@ const FinancialReportsPage: React.FC = () => {
               <span className="text-gray-500 dark:text-gray-400">Product Sales:</span>
               <span className="text-purple-600 dark:text-purple-400">{totals.productSaleCount}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Worker Wages Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Wages</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalWages.toFixed(2)}</p>
+            </div>
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Sum of total_earnings + amount requested from payment requests
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Wages</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.pendingWages.toFixed(2)}</p>
+            </div>
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Sum of total_earnings and amount requested for approved payment requests
+            </p>
           </div>
         </div>
       </div>

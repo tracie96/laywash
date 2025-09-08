@@ -350,8 +350,6 @@ export async function POST(request: NextRequest) {
       remarks,
       passcode,
       valuableItems,
-      estimatedDuration,
-      totalAmount,
       userCode,
       reason
     } = body;
@@ -364,42 +362,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate that at least one service has a worker assigned
-    if (!services.some((service: CheckInServiceItem) => service.workerId)) {
+    // Validate that all services have workers assigned
+    const servicesWithoutWorkers = services.filter((service: CheckInServiceItem) => !service.workerId);
+    if (servicesWithoutWorkers.length > 0) {
       return NextResponse.json(
-        { success: false, error: 'At least one service must have a worker assigned' },
+        { success: false, error: 'All services must have a worker assigned' },
         { status: 400 }
       );
     }
     
-    // Get the first assigned worker ID
-    const assignedWorkerId = services.find((service: CheckInServiceItem) => service.workerId)?.workerId;
-    if (!assignedWorkerId) {
-      return NextResponse.json(
-        { success: false, error: 'No worker ID found in services' },
-        { status: 400 }
-      );
+    // Get all unique worker IDs
+    const workerIds = [...new Set(services.map((service: CheckInServiceItem) => service.workerId))];
+    
+    // Validate all worker ID formats
+    for (const workerId of workerIds) {
+      if (!uuidRegex.test(workerId as string)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid worker ID format: ${workerId}` },
+          { status: 400 }
+        );
+      }
     }
     
-    // Validate worker ID format
-    if (!uuidRegex.test(assignedWorkerId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid worker ID format' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate that the worker exists
-    const { data: worker, error: workerError } = await supabaseAdmin
+    // Validate that all workers exist
+    const { data: workers, error: workersError } = await supabaseAdmin
       .from('users')
       .select('id, role')
-      .eq('id', assignedWorkerId)
-      .eq('role', 'car_washer')
-      .single();
+      .in('id', workerIds)
+      .eq('role', 'car_washer');
       
-    if (workerError || !worker) {
+    if (workersError || !workers || workers.length !== workerIds.length) {
       return NextResponse.json(
-        { success: false, error: 'Worker not found or invalid role' },
+        { success: false, error: 'One or more workers not found or invalid role' },
         { status: 400 }
       );
     }
@@ -412,121 +406,121 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const insertData = {
-      customer_id: customerId || null,
-      license_plate: licensePlate,
-      vehicle_type: vehicleType,
-      wash_type: washType,
-      vehicle_color: vehicleColor,
-      vehicle_model: vehicleModel,
-      remarks,
-      valuable_items: valuableItems,
-      assigned_washer_id: assignedWorkerId,
-      assigned_admin_id: currentAdminId,
-      estimated_completion_time: new Date(Date.now() + (estimatedDuration * 60 * 1000)).toISOString(),
-      total_amount: totalAmount || 0,
-      user_code: userCode,
-      passcode: passcode,
-      reason,
-      status: 'pending',
-      payment_status: 'pending',
-      check_in_time: new Date().toISOString()
-    };
+    // Create separate check-ins for each service
+    const createdCheckIns = [];
     
-    console.log('Insert data:', insertData);
+    for (const service of services) {
+      const serviceDuration = service.serviceData.duration || 30; // Default 30 minutes if not specified
+      const serviceAmount = service.serviceData.price || 0;
+      
+      const insertData = {
+        customer_id: customerId || null,
+        license_plate: licensePlate,
+        vehicle_type: vehicleType,
+        wash_type: washType,
+        vehicle_color: vehicleColor,
+        vehicle_model: vehicleModel,
+        remarks,
+        valuable_items: valuableItems,
+        assigned_washer_id: service.workerId,
+        assigned_admin_id: currentAdminId,
+        estimated_completion_time: new Date(Date.now() + (serviceDuration * 60 * 1000)).toISOString(),
+        total_amount: serviceAmount,
+        user_code: userCode,
+        passcode: passcode,
+        reason,
+        status: 'pending',
+        payment_status: 'pending',
+        check_in_time: new Date().toISOString()
+      };
+      
+      console.log('Creating check-in for service:', service.serviceData.name, 'with worker:', service.workerId);
 
-    const { data: checkIn, error: checkInError } = await supabaseAdmin
-      .from('car_check_ins')
-      .insert(insertData)
-      .select()
-      .single();
+      const { data: checkIn, error: checkInError } = await supabaseAdmin
+        .from('car_check_ins')
+        .insert(insertData)
+        .select()
+        .single();
 
-    if (checkInError) {
-      console.error('Error creating check-in:', checkInError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to create check-in' },
-        { status: 500 }
-      );
+      if (checkInError) {
+        console.error('Error creating check-in for service:', service.serviceData.name, checkInError);
+        return NextResponse.json(
+          { success: false, error: `Failed to create check-in for service: ${service.serviceData.name}` },
+          { status: 500 }
+        );
+      }
+      
+      createdCheckIns.push({ checkIn, service });
     }
 
 
-    if (services && services.length > 0) {
+    // Create service records for each check-in
+    for (const { checkIn, service } of createdCheckIns) {
       // Fetch service details including company_commission_percentage from services table
-      const serviceIds = services.map((service: CheckInServiceItem) => service.serviceData.id);
-      
       const { data: serviceDetails, error: serviceDetailsError } = await supabaseAdmin
         .from('services')
         .select('id, company_commission_percentage')
-        .in('id', serviceIds);
+        .eq('id', service.serviceData.id)
+        .single();
 
       if (serviceDetailsError) {
-        console.error('Error fetching service details:', serviceDetailsError);
+        console.error('Error fetching service details for:', service.serviceData.name, serviceDetailsError);
         // Continue without company income calculation
       }
 
-      let totalCompanyIncome = 0;
+      let companyIncome = 0;
       
-      const checkInServices = services.map((service: CheckInServiceItem) => {
-        let companyIncome = 0;
-        
-        // Find the service details to get commission percentage
-        const serviceDetail = serviceDetails?.find(s => s.id === service.serviceData.id);
-        
-        if (serviceDetail?.company_commission_percentage && service.serviceData.price) {
-          companyIncome = (service.serviceData.price * serviceDetail.company_commission_percentage) / 100;
-          totalCompanyIncome += companyIncome;
-        }
-        
-        return {
-          check_in_id: checkIn.id,
-          service_id: service.serviceData.id,
-          service_name: service.serviceData.name,
-          price: service.serviceData.price,
-          company_income: companyIncome,    
-          duration: service.serviceData.duration
-        };
-      });
+      if (serviceDetails?.company_commission_percentage && service.serviceData.price) {
+        companyIncome = (service.serviceData.price * serviceDetails.company_commission_percentage) / 100;
+      }
+      
+      const checkInService = {
+        check_in_id: checkIn.id,
+        service_id: service.serviceData.id,
+        service_name: service.serviceData.name,
+        price: service.serviceData.price,
+        company_income: companyIncome,    
+        duration: service.serviceData.duration
+      };
 
       const { error: servicesError } = await supabaseAdmin
         .from('check_in_services')
-        .insert(checkInServices);
+        .insert(checkInService);
 
       if (servicesError) {
-        console.error('Error creating check-in services:', servicesError);
+        console.error('Error creating check-in service for:', service.serviceData.name, servicesError);
         // Note: We don't fail here as the check-in was created successfully
       }
 
-      // Update the check-in with the calculated total company income
-      if (totalCompanyIncome > 0) {
+      // Update the check-in with the calculated company income
+      if (companyIncome > 0) {
         const { error: updateError } = await supabaseAdmin
           .from('car_check_ins')
-          .update({ company_income: totalCompanyIncome })
+          .update({ company_income: companyIncome })
           .eq('id', checkIn.id);
 
         if (updateError) {
           console.error('Error updating company income:', updateError);
           // Note: We don't fail here as the check-in was created successfully
         } else {
-          console.log(`Updated company income for check-in ${checkIn.id} to ${totalCompanyIncome}`);
+          console.log(`Updated company income for check-in ${checkIn.id} to ${companyIncome}`);
         }
       }
 
-      // Store materials in check_in_materials table
+      // Store materials for this specific service in check_in_materials table
       const checkInMaterials: CheckInMaterialDB[] = [];
       
-      for (const service of services) {
-        if (service.materials && service.materials.length > 0) {
-          for (const material of service.materials) {
-            checkInMaterials.push({
-              check_in_id: checkIn.id,
-              washer_id: service.workerId,
-              material_id: material.materialId,
-              material_name: material.materialName,
-              quantity_used: material.quantity,
-              amount: 0, // Default amount, can be updated later if needed
-              usage_date: new Date().toISOString()
-            });
-          }
+      if (service.materials && service.materials.length > 0) {
+        for (const material of service.materials) {
+          checkInMaterials.push({
+            check_in_id: checkIn.id,
+            washer_id: service.workerId,
+            material_id: material.materialId,
+            material_name: material.materialName,
+            quantity_used: material.quantity,
+            amount: 0, // Default amount, can be updated later if needed
+            usage_date: new Date().toISOString()
+          });
         }
       }
 console.log('Check-in materials:', checkInMaterials);
@@ -554,8 +548,11 @@ console.log('Check-in materials:', checkInMaterials);
 
     return NextResponse.json({
       success: true,
-      checkIn: {
+      message: `Successfully created ${createdCheckIns.length} check-in(s)`,
+      checkIns: createdCheckIns.map(({ checkIn, service }) => ({
         id: checkIn.id,
+        serviceName: service.serviceData.name,
+        workerId: service.workerId,
         customerId: checkIn.customer_id,
         licensePlate: checkIn.license_plate,
         vehicleType: checkIn.vehicle_type,
@@ -566,7 +563,7 @@ console.log('Check-in materials:', checkInMaterials);
         valuableItems: checkIn.valuable_items,
         assignedWasherId: checkIn.assigned_washer_id,
         assignedAdminId: checkIn.assigned_admin_id,
-        estimatedDuration: estimatedDuration, // Return the original duration value in minutes
+        estimatedDuration: service.serviceData.duration,
         totalAmount: checkIn.total_amount,
         userCode: checkIn.user_code,
         reason: checkIn.reason,
@@ -574,7 +571,7 @@ console.log('Check-in materials:', checkInMaterials);
         paymentStatus: checkIn.payment_status,
         checkInTime: checkIn.check_in_time,
         createdAt: checkIn.created_at
-      }
+      }))
     });
 
   } catch (error) {

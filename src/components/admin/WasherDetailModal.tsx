@@ -25,6 +25,7 @@ interface WasherProfile {
   phone: string;
   totalEarnings: number;
   isAvailable: boolean;
+  isActive: boolean;
   assignedAdminId: string | null;
   assignedAdminName: string;
   totalCheckIns: number;
@@ -109,12 +110,17 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const getAvailabilityBadge = (isAvailable: boolean) => {
+  const getAvailabilityBadge = (isActive: boolean, isAvailable: boolean) => {
+    if (!isActive) {
+      return <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+        Inactive
+      </span>;
+    }
     return isAvailable ? 
       <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
         Available
       </span> : 
-      <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+      <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
         Unavailable
       </span>;
   };
@@ -174,7 +180,7 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
                 Car Washer • {washer.assignedAdminName}
               </p>
               <div className="flex items-center mt-2 space-x-3">
-                {getAvailabilityBadge(washer.isAvailable)}
+                {getAvailabilityBadge(washer.isActive, washer.isAvailable)}
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Member since {formatDate(washer.createdAt)}
                 </span>

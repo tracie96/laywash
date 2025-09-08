@@ -273,13 +273,13 @@ const MyCheckInsPage: React.FC = () => {
     return status === 'paid' ? 'success' as const : 'warning' as const;
   };
 
-  const handleAssignMaterials = async (checkInId: string) => {
-    setSelectedCheckInId(checkInId);
-    setAssignMaterialsModalOpen(true);
+  // const handleAssignMaterials = async (checkInId: string) => {
+  //   setSelectedCheckInId(checkInId);
+  //   setAssignMaterialsModalOpen(true);
     
-    // Fetch current materials for this check-in
-    await fetchCheckInMaterials(checkInId);
-  };
+  //   // Fetch current materials for this check-in
+  //   await fetchCheckInMaterials(checkInId);
+  // };
 
   const handleMaterialsAssigned = () => {
     // Refresh the check-ins list to show updated information
@@ -456,14 +456,14 @@ const MyCheckInsPage: React.FC = () => {
                         >
                           Refresh
                         </Button>
-                        <Button
+                        {/* <Button
                           onClick={() => handleAssignMaterials(checkIn.id)}
                           variant="outline"
                           size="sm"
                           className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/30"
                         >
                           Assign Materials
-                        </Button>
+                        </Button> */}
                       </div>
                     </div>
                     

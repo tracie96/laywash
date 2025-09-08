@@ -14,6 +14,12 @@ interface Customer {
   registrationDate?: string;
   totalVisits: number;
   totalSpent: number;
+  averageSpending?: number;
+  lastVisit?: string;
+  mostUsedServices?: Array<{
+    service: string;
+    count: number;
+  }>;
   createdAt: string;
   updatedAt: string;
   vehicles?: Array<{
@@ -21,12 +27,47 @@ interface Customer {
     customer_id: string;
     license_plate: string;
     vehicle_type: string;
+    vehicle_make?: string;
     vehicle_model?: string;
     vehicle_color: string;
     is_primary: boolean;
     created_at: string;
     updated_at: string;
   }>;
+}
+
+interface CheckIn {
+  id: string;
+  licensePlate: string;
+  vehicleType: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+  status: string;
+  checkInTime: string;
+  completedTime?: string;
+  estimatedDuration?: number;
+  totalAmount: number;
+  paymentStatus: string;
+  paymentMethod?: string;
+  specialInstructions?: string;
+  valuableItems?: string;
+  washType: string;
+  assignedWasher: string;
+  services: Array<{
+    id: string;
+    name: string;
+    price: number;
+    duration: number;
+    service?: {
+      id: string;
+      name: string;
+      description?: string;
+      base_price?: number;
+      category?: string;
+    };
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const OperationsCustomersPage: React.FC = () => {
@@ -41,6 +82,8 @@ const OperationsCustomersPage: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomerCheckIns, setSelectedCustomerCheckIns] = useState<CheckIn[]>([]);
+  const [customerDetailsLoading, setCustomerDetailsLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -48,7 +91,6 @@ const OperationsCustomersPage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    dob: '',
     phone: '',
     dateOfBirth: ''
   });
@@ -56,12 +98,14 @@ const OperationsCustomersPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<Array<{
     licensePlate: string;
     vehicleType: string;
+    vehicleMake: string;
     vehicleModel: string;
     vehicleColor: string;
     isPrimary: boolean;
   }>>([{
     licensePlate: '',
     vehicleType: '',
+    vehicleMake: '',
     vehicleModel: '',
     vehicleColor: '',
     isPrimary: true
@@ -113,6 +157,7 @@ console.log(customers);
     setVehicles(prev => [...prev, {
       licensePlate: '',
       vehicleType: '',
+      vehicleMake: '',
       vehicleModel: '',
       vehicleColor: '',
       isPrimary: false
@@ -137,12 +182,12 @@ console.log(customers);
       name: '',
       email: '',
       phone: '',
-      dob: '',
       dateOfBirth: ''
     });
     setVehicles([{
       licensePlate: '',
       vehicleType: '',
+      vehicleMake: '',
       vehicleModel: '',
       vehicleColor: '',
       isPrimary: true
@@ -156,9 +201,29 @@ console.log(customers);
     resetForm();
   };
 
+  const fetchCustomerDetails = async (customerId: string) => {
+    try {
+      setCustomerDetailsLoading(true);
+      const response = await fetch(`/api/admin/customers/${customerId}/details`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedCustomer(data.customer);
+        setSelectedCustomerCheckIns(data.checkIns);
+      } else {
+        console.error('Failed to fetch customer details:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+    } finally {
+      setCustomerDetailsLoading(false);
+    }
+  };
+
   const handleViewCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setShowViewModal(true);
+    fetchCustomerDetails(customer.id);
   };
 
   const handleEditCustomer = (customer: Customer) => {
@@ -168,7 +233,6 @@ console.log(customers);
       name: customer.name,
       email: customer.email || '',
       phone: customer.phone,
-      dob: '', 
       dateOfBirth: customer.dateOfBirth || ''
     });
     
@@ -177,6 +241,7 @@ console.log(customers);
       setVehicles(customer.vehicles.map(v => ({
         licensePlate: v.license_plate,
         vehicleType: v.vehicle_type,
+        vehicleMake: (v as typeof v & { vehicle_make?: string }).vehicle_make || '',
         vehicleModel: v.vehicle_model || '',
         vehicleColor: v.vehicle_color,
         isPrimary: v.is_primary
@@ -186,6 +251,7 @@ console.log(customers);
       setVehicles([{
         licensePlate: '',
         vehicleType: '',
+        vehicleMake: '',
         vehicleModel: '',
         vehicleColor: '',
         isPrimary: true
@@ -197,6 +263,7 @@ console.log(customers);
   const handleCloseViewModal = () => {
     setShowViewModal(false);
     setSelectedCustomer(null);
+    setSelectedCustomerCheckIns([]);
   };
 
   const handleCloseEditModal = () => {
@@ -251,9 +318,19 @@ console.log(customers);
     setEditError(null);
 
     try {
+      // Get the primary vehicle (first vehicle in the array)
+      const primaryVehicle = vehicles[0];
+      
       const customerData = {
-        ...formData,
-        vehicles: vehicles
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        licensePlate: primaryVehicle.licensePlate,
+        vehicleType: primaryVehicle.vehicleType,
+        vehicleMake: primaryVehicle.vehicleMake,
+        vehicleModel: primaryVehicle.vehicleModel,
+        vehicleColor: primaryVehicle.vehicleColor
       };
 
       const response = await fetch(`/api/admin/customers/${selectedCustomer.id}`, {
@@ -743,6 +820,20 @@ console.log(customers);
                             </select>
                           </div>
 
+                          {/* Vehicle Make */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Make
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleMake}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleMake', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle make (optional)"
+                            />
+                          </div>
+
                           {/* Vehicle Model */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -808,7 +899,7 @@ console.log(customers);
       </Modal>
 
       {/* View Customer Modal */}
-      <Modal isOpen={showViewModal} onClose={handleCloseViewModal} className="max-w-2xl">
+      <Modal isOpen={showViewModal} onClose={handleCloseViewModal} className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {selectedCustomer && (
             <div>
@@ -875,6 +966,12 @@ console.log(customers);
                               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Vehicle Type</label>
                               <p className="text-sm text-gray-900 dark:text-white">{vehicle.vehicle_type}</p>
                             </div>
+                            {vehicle.vehicle_make && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Make</label>
+                                <p className="text-sm text-gray-900 dark:text-white">{vehicle.vehicle_make}</p>
+                              </div>
+                            )}
                             {vehicle.vehicle_model && (
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Model</label>
@@ -898,8 +995,8 @@ console.log(customers);
 
                 {/* Account Status Section */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Account Status</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Account Status & Statistics</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedCustomer.isRegistered)}`}>
@@ -908,14 +1005,39 @@ console.log(customers);
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Visits</label>
-                      <p className="text-gray-900 dark:text-white">{selectedCustomer.totalVisits}</p>
+                      <p className="text-gray-900 dark:text-white font-semibold">{selectedCustomer.totalVisits}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Spent</label>
                       <p className="text-gray-900 dark:text-white font-semibold">${selectedCustomer?.totalSpent?.toFixed(2)}</p>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Average Spending</label>
+                      <p className="text-gray-900 dark:text-white font-semibold">${selectedCustomer?.averageSpending?.toFixed(2) || '0.00'}</p>
+                    </div>
+                    {selectedCustomer.lastVisit && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Visit</label>
+                        <p className="text-gray-900 dark:text-white">{new Date(selectedCustomer.lastVisit).toLocaleDateString()}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Most Used Services Section */}
+                {selectedCustomer.mostUsedServices && selectedCustomer.mostUsedServices.length > 0 && (
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Most Used Services</h4>
+                    <div className="space-y-2">
+                      {selectedCustomer.mostUsedServices.map((service, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="text-gray-900 dark:text-white">{service.service}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{service.count} times</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Registration Info Section */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
@@ -930,6 +1052,74 @@ console.log(customers);
                       <p className="text-gray-900 dark:text-white">{new Date(selectedCustomer.updatedAt).toLocaleDateString()}</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Check-in History Section */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Recent Check-ins</h4>
+                  {customerDetailsLoading ? (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-light-600"></div>
+                    </div>
+                  ) : selectedCustomerCheckIns.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {selectedCustomerCheckIns.slice(0, 10).map((checkIn) => (
+                        <div key={checkIn.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-900 dark:text-white">
+                                {checkIn.licensePlate} - {checkIn.vehicleType}
+                              </h5>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                {new Date(checkIn.checkInTime).toLocaleDateString()} at {new Date(checkIn.checkInTime).toLocaleTimeString()}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                checkIn.status === 'completed' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                  : checkIn.status === 'in_progress'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                              }`}>
+                                {checkIn.status.replace('_', ' ').toUpperCase()}
+                              </span>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
+                                ${checkIn.totalAmount.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {checkIn.services.length > 0 && (
+                            <div className="mb-2">
+                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Services:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {checkIn.services.map((service, index) => (
+                                  <span key={index} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded">
+                                    {service.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between items-center text-xs text-gray-600 dark:text-gray-400">
+                            <span>Washer: {checkIn.assignedWasher}</span>
+                            <span>Payment: {checkIn.paymentStatus}</span>
+                          </div>
+                          
+                          {checkIn.specialInstructions && (
+                            <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs">
+                              <p className="font-medium text-yellow-800 dark:text-yellow-300">Special Instructions:</p>
+                              <p className="text-yellow-700 dark:text-yellow-400">{checkIn.specialInstructions}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400">No check-ins found</p>
+                  )}
                 </div>
               </div>
 
@@ -1136,6 +1326,20 @@ console.log(customers);
                               <option value="Motorcycle">Motorcycle</option>
                               <option value="Other">Other</option>
                             </select>
+                          </div>
+
+                          {/* Vehicle Make */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Vehicle Make
+                            </label>
+                            <input
+                              type="text"
+                              value={vehicle.vehicleMake}
+                              onChange={(e) => handleVehicleChange(index, 'vehicleMake', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                              placeholder="Enter vehicle make (optional)"
+                            />
                           </div>
 
                           {/* Vehicle Model */}

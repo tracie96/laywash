@@ -44,6 +44,9 @@ const CheckInHistoryPage: React.FC = () => {
   // Date search state
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  
+  // Name search state
+  const [nameSearch, setNameSearch] = useState<string>('');
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -127,6 +130,13 @@ const CheckInHistoryPage: React.FC = () => {
     }
     
     if (!statusMatch) return false;
+    
+    // Then filter by name search if name is provided
+    if (nameSearch.trim()) {
+      const searchTerm = nameSearch.toLowerCase().trim();
+      const customerName = checkIn.customerName.toLowerCase();
+      if (!customerName.includes(searchTerm)) return false;
+    }
     
     // Then filter by date range if dates are selected
     if (startDate || endDate) {
@@ -346,6 +356,40 @@ const CheckInHistoryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Name Search */}
+      <div className="mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Search by Customer Name
+          </h3>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Enter customer name to search..."
+                value={nameSearch}
+                onChange={(e) => setNameSearch(e.target.value)}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={() => setNameSearch('')}
+                variant="outline"
+                className="px-6 py-3"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+          {nameSearch && (
+            <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+              Searching for customers with name containing: &ldquo;{nameSearch}&rdquo;
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Date Search */}
       <div className="mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -486,11 +530,20 @@ const CheckInHistoryPage: React.FC = () => {
       </div>
 
       {/* Results Summary */}
-      {(startDate || endDate) && (
+      {(startDate || endDate || nameSearch) && (
         <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="text-sm text-blue-800 dark:text-blue-200">
-              <span className="font-medium">Date Range:</span> {startDate || 'any date'} to {endDate || 'any date'}
+              {nameSearch && (
+                <div>
+                  <span className="font-medium">Name Search:</span> &ldquo;{nameSearch}&rdquo;
+                </div>
+              )}
+              {(startDate || endDate) && (
+                <div>
+                  <span className="font-medium">Date Range:</span> {startDate || 'any date'} to {endDate || 'any date'}
+                </div>
+              )}
             </div>
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <span className="font-medium">Results:</span> {filteredCheckIns.length} check-ins found
@@ -512,9 +565,11 @@ const CheckInHistoryPage: React.FC = () => {
               No history found
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              {filter === 'all' 
-                ? 'No completed, paid, or cancelled check-ins found.'
-                : `No ${filter} check-ins found.`
+              {nameSearch 
+                ? `No check-ins found for customer "${nameSearch}".`
+                : filter === 'all' 
+                  ? 'No completed, paid, or cancelled check-ins found.'
+                  : `No ${filter} check-ins found.`
               }
             </p>
           </div>

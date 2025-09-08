@@ -11,6 +11,128 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    // Get current admin user from request header
+    const currentAdminId = request.headers.get('X-Admin-ID');
+
+    if (!currentAdminId) {
+      return NextResponse.json(
+        { success: false, error: 'Admin ID not provided in headers' },
+        { status: 400 }
+      );
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(currentAdminId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid admin ID format' },
+        { status: 400 }
+      );
+    }
+
+    // Verify that the admin user exists and has admin role
+    const { data: adminUser, error: adminError } = await supabaseAdmin
+      .from('users')
+      .select('id, role')
+      .eq('id', currentAdminId)
+      .single();
+
+    if (adminError || !adminUser) {
+      return NextResponse.json(
+        { success: false, error: 'Admin user not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch the check-in with customer and vehicle information
+    const { data: checkIn, error: checkInError } = await supabaseAdmin
+      .from('car_check_ins')
+      .select(`
+        *,
+        customers (
+          id,
+          name,
+          email,
+          phone,
+          date_of_birth
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (checkInError || !checkIn) {
+      return NextResponse.json(
+        { success: false, error: 'Check-in not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch vehicle information
+    let vehicleInfo = null;
+    if (checkIn.customer_id) {
+      const { data: vehicle, error: vehicleError } = await supabaseAdmin
+        .from('vehicles')
+        .select('*')
+        .eq('customer_id', checkIn.customer_id)
+        .eq('is_primary', true)
+        .single();
+
+      if (!vehicleError && vehicle) {
+        vehicleInfo = vehicle;
+      }
+    }
+
+    // Transform the response
+    const transformedCheckIn = {
+      id: checkIn.id,
+      customerId: checkIn.customer_id,
+      customerName: checkIn.customers?.name || 'Unknown Customer',
+      customerEmail: checkIn.customers?.email || '',
+      customerPhone: checkIn.customers?.phone || '',
+      licensePlate: checkIn.license_plate,
+      vehicleType: checkIn.vehicle_type,
+      vehicleColor: checkIn.vehicle_color,
+      vehicleModel: checkIn.vehicle_model,
+      vehicleMake: vehicleInfo?.vehicle_make || '',
+      washType: checkIn.wash_type,
+      specialInstructions: checkIn.remarks,
+      valuableItems: checkIn.valuable_items,
+      passcode: checkIn.passcode,
+      userCode: checkIn.user_code,
+      status: checkIn.status,
+      paymentStatus: checkIn.payment_status,
+      totalPrice: checkIn.total_amount,
+      estimatedDuration: checkIn.estimated_duration,
+      actualDuration: checkIn.actual_duration,
+      checkInTime: checkIn.check_in_time,
+      completedTime: checkIn.completed_time,
+      paidTime: checkIn.paid_time,
+      assignedWasherId: checkIn.assigned_washer_id,
+      assignedAdminId: checkIn.assigned_admin_id,
+      createdAt: checkIn.created_at,
+      updatedAt: checkIn.updated_at
+    };
+
+    return NextResponse.json({
+      success: true,
+      checkIn: transformedCheckIn
+    });
+
+  } catch (error) {
+    console.error('Get check-in error:', error);
+    return NextResponse.json(
+      { success: false, error: 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

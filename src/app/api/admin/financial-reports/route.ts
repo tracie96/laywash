@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
       checkInsResponse,
       salesResponse,
       carWasherProfilesResponse,
-      bonusesResponse
+      bonusesResponse,
+      paymentRequestsResponse
     ] = await Promise.all([
       // Car wash check-ins
       supabaseAdmin
@@ -150,16 +151,33 @@ export async function GET(request: NextRequest) {
         `)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', now.toISOString())
+        .order('created_at', { ascending: false }),
+
+      supabaseAdmin
+        .from('payment_request')
+        .select(`
+          id,
+          washer_id,
+          amount,
+          status,
+          created_at,
+          total_earnings,
+          material_deductions,
+          tool_deductions
+        `)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', now.toISOString())
         .order('created_at', { ascending: false })
     ]);
 
     // Check for errors
-    if (checkInsResponse.error || salesResponse.error || carWasherProfilesResponse.error || bonusesResponse.error) {
+    if (checkInsResponse.error || salesResponse.error || carWasherProfilesResponse.error || bonusesResponse.error || paymentRequestsResponse.error) {
       console.error('Error fetching financial data:', {
         checkIns: checkInsResponse.error,
         sales: salesResponse.error,
         carWasherProfiles: carWasherProfilesResponse.error,
-        bonuses: bonusesResponse.error
+        bonuses: bonusesResponse.error,
+        paymentRequests: paymentRequestsResponse.error
       });
       return NextResponse.json(
         { success: false, error: 'Failed to fetch financial data' },
@@ -201,6 +219,10 @@ export async function GET(request: NextRequest) {
       adminSalaries: number;
       totalExpenses: number;
       
+      // Worker Wages
+      totalWages: number;
+      pendingWages: number;
+      
       // Metrics
       customerCount: number;
       transactionCount: number;
@@ -224,6 +246,8 @@ export async function GET(request: NextRequest) {
           customerBonuses: 0,
           adminSalaries: 0,
           totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
           customerCount: 0,
           transactionCount: 0,
           carWashCount: 0,
@@ -264,6 +288,8 @@ export async function GET(request: NextRequest) {
           customerBonuses: 0,
           adminSalaries: 0,
           totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
           customerCount: 0,
           transactionCount: 0,
           carWashCount: 0,
@@ -298,6 +324,8 @@ export async function GET(request: NextRequest) {
           customerBonuses: 0,
           adminSalaries: 0,
           totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
           customerCount: 0,
           transactionCount: 0,
           carWashCount: 0,
@@ -332,6 +360,8 @@ export async function GET(request: NextRequest) {
           customerBonuses: 0,
           adminSalaries: 0,
           totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
           customerCount: 0,
           transactionCount: 0,
           carWashCount: 0,
@@ -353,6 +383,52 @@ export async function GET(request: NextRequest) {
           monthData.customerBonuses += amount;
           monthData.totalExpenses += amount;
         }
+      }
+    });
+
+    // Process payment requests for worker wages
+    console.log('Payment requests data:', paymentRequestsResponse.data);
+    paymentRequestsResponse.data?.forEach(paymentRequest => {
+      console.log('Processing payment request:', {
+        id: paymentRequest.id,
+        status: paymentRequest.status,
+        total_earnings: paymentRequest.total_earnings,
+        amount: paymentRequest.amount,
+        created_at: paymentRequest.created_at
+      });
+      
+      const date = new Date(paymentRequest.created_at);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyData.has(monthKey)) {
+        monthlyData.set(monthKey, {
+          carWashRevenue: 0,
+          productSalesRevenue: 0,
+          totalRevenue: 0,
+          washerSalaries: 0,
+          washerBonuses: 0,
+          customerBonuses: 0,
+          adminSalaries: 0,
+          totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
+          customerCount: 0,
+          transactionCount: 0,
+          carWashCount: 0,
+          productSaleCount: 0,
+          washerCount: 0
+        });
+      }
+
+      const monthData = monthlyData.get(monthKey)!;
+      
+      const totalEarnings = parseFloat(paymentRequest.total_earnings || '0');
+      const amountRequested = parseFloat(paymentRequest.amount || '0');
+      monthData.totalWages += totalEarnings + amountRequested;
+      
+      if (paymentRequest.status === 'paid') {
+        console.log('Adding to pending wages:', totalEarnings);
+        monthData.pendingWages += totalEarnings;
       }
     });
 
@@ -384,6 +460,10 @@ export async function GET(request: NextRequest) {
         washerBonuses: data.washerBonuses,
         customerBonuses: data.customerBonuses,
         adminSalaries: data.adminSalaries,
+        
+        // Worker Wages
+        totalWages: data.totalWages,
+        pendingWages: data.pendingWages,
         
         // Net profit
         netProfit: data.totalRevenue - data.totalExpenses,

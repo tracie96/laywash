@@ -16,6 +16,7 @@ interface CheckInFormData {
   customerEmail: string;
   licensePlate: string;
   vehicleType: string;
+  vehicleMake: string;
   vehicleModel: string;
   vehicleColor: string;
   services: Array<{
@@ -71,6 +72,7 @@ const NewCheckInPage: React.FC = () => {
     customerEmail: '',
     licensePlate: '',
     vehicleType: '',
+    vehicleMake: '',
     vehicleModel: '',
     vehicleColor: '',
     services: [],
@@ -103,15 +105,13 @@ const NewCheckInPage: React.FC = () => {
     email: string;
     phone: string;
   }>>([]);
-  const [washerMaterials, setWasherMaterials] = useState<Array<{
+  const [serviceMaterials, setServiceMaterials] = useState<Record<string, Array<{
     id: string;
     toolName: string;
     materialType: string;
     quantity: number;
     unit: string;
-  }>>([]);
-  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
-  const [currentWasherId, setCurrentWasherId] = useState<string>('');
+  }>>>({});
 
   const vehicleTypes = [
     { value: 'sedan', label: 'Sedan' },
@@ -150,13 +150,16 @@ const NewCheckInPage: React.FC = () => {
         ...prev,
         services: prev.services.map(service => 
           service.serviceId === serviceId 
-            ? { ...service, workerId }
+            ? { ...service, workerId, materials: [] } // Clear materials when worker changes
             : service
         )
       };
       console.log('Updated form data:', updated);
       return updated;
     });
+    
+    // Fetch materials for this specific service
+    fetchServiceMaterials(serviceId, workerId);
   };
 
   const handleCustomPriceChange = (serviceId: string, customPrice: number) => {
@@ -171,7 +174,7 @@ const NewCheckInPage: React.FC = () => {
   };
 
   const handleMaterialAssignment = (serviceId: string, materialId: string, quantity: number) => {
-    const material = washerMaterials.find(m => m.id === materialId);
+    const material = serviceMaterials[serviceId]?.find(m => m.id === materialId);
     if (material && quantity > material.quantity) {
       setError(`Cannot allocate ${quantity} ${material.unit} - only ${material.quantity} ${material.unit} available`);
       return;
@@ -237,7 +240,9 @@ const NewCheckInPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        setAvailableWashers(result.washers);
+        // Only show active washers for assignment
+        const activeWashers = result.washers.filter((washer: { isActive: boolean }) => washer.isActive);
+        setAvailableWashers(activeWashers);
       } else {
         console.error('Failed to fetch washers:', result.error);
       }
@@ -246,29 +251,26 @@ const NewCheckInPage: React.FC = () => {
     }
   };
 
-  // Fetch washer materials
-  const fetchWasherMaterials = useCallback(async (washerId: string) => {
-    if (!washerId) return;
+
+  const fetchServiceMaterials = useCallback(async (serviceId: string, workerId: string) => {
+    if (!workerId) {
+      setServiceMaterials(prev => ({ ...prev, [serviceId]: [] }));
+      return;
+    }
     
-    console.log('Fetching materials for washer:', washerId);
     try {
-      setIsLoadingMaterials(true);
-      const response = await fetch(`/api/admin/washer-materials?washerId=${washerId}&isReturned=false`);
+      const response = await fetch(`/api/admin/washer-materials?washerId=${workerId}&isReturned=false`);
       const result = await response.json();
       
       if (result.success) {
-        console.log('Materials fetched successfully:', result.tools);
-        setWasherMaterials(result.tools);
-        setCurrentWasherId(washerId);
+        setServiceMaterials(prev => ({ ...prev, [serviceId]: result.tools || [] }));
       } else {
-        console.error('Failed to fetch washer materials:', result.error);
-        setWasherMaterials([]);
+        console.error('Failed to fetch materials for service:', result.error);
+        setServiceMaterials(prev => ({ ...prev, [serviceId]: [] }));
       }
     } catch (error) {
-      console.error('Error fetching washer materials:', error);
-      setWasherMaterials([]);
-    } finally {
-      setIsLoadingMaterials(false);
+      console.error('Error fetching materials for service:', error);
+      setServiceMaterials(prev => ({ ...prev, [serviceId]: [] }));
     }
   }, []);
 
@@ -278,26 +280,8 @@ const NewCheckInPage: React.FC = () => {
     fetchWashers();
   }, []);
 
-  // Effect to fetch materials when washer is assigned
-  useEffect(() => {
-    const servicesWithWorkers = formData.services.filter(s => s.workerId);
-    console.log('useEffect triggered:', { 
-      servicesWithWorkers: servicesWithWorkers.length, 
-      currentWasherId, 
-      formDataServices: formData.services 
-    });
-    
-    if (servicesWithWorkers.length > 0) {
-      const firstWorkerId = servicesWithWorkers[0].workerId;
-      console.log('First worker ID:', firstWorkerId);
-      if (currentWasherId !== firstWorkerId) {
-        console.log('Fetching materials for new worker');
-        fetchWasherMaterials(firstWorkerId);
-      } else {
-        console.log('Already have materials for this worker');
-      }
-    }
-  }, [formData.services, currentWasherId, fetchWasherMaterials]);
+  // Effect to fetch materials when washer is assigned - REMOVED
+  // Materials are now fetched per service when worker is assigned
 
   const searchCustomer = async () => {
     const query = searchQuery.trim();
@@ -349,6 +333,7 @@ const NewCheckInPage: React.FC = () => {
       customerEmail: customer.email || '',
       licensePlate: primaryVehicle?.license_plate || '',
       vehicleType: primaryVehicle?.vehicle_type || '',
+      vehicleMake: primaryVehicle?.vehicle_make || '',
       vehicleModel: primaryVehicle?.vehicle_model || '',
       vehicleColor: primaryVehicle?.vehicle_color || '',
       // Set customer type to registered for existing customers
@@ -502,6 +487,7 @@ const NewCheckInPage: React.FC = () => {
         customerEmail: formData.customerEmail,
         licensePlate: formData.licensePlate,
         vehicleType: formData.vehicleType,
+        vehicleMake: formData.vehicleMake,
         vehicleColor: formData.vehicleColor,
         vehicleModel: formData.vehicleModel,
         services: servicesWithData,
@@ -516,6 +502,10 @@ const NewCheckInPage: React.FC = () => {
       };
 
       console.log('Submitting check-in:', submissionData);
+      console.log('Service worker assignments:', servicesWithData.map(s => ({ 
+        service: s.serviceData.name, 
+        workerId: s.workerId 
+      })));
 
       // Call the API
       const response = await fetch('/api/admin/check-ins', {
@@ -540,7 +530,9 @@ const NewCheckInPage: React.FC = () => {
         try {
           for (const serviceItem of servicesWithData) {
             for (const material of serviceItem.materials) {
-              const washerMaterial = washerMaterials.find(wm => wm.id === material.materialId);
+              // Use service-specific materials instead of global washerMaterials
+              const serviceMaterialsForWorker = serviceMaterials[serviceItem.serviceId] || [];
+              const washerMaterial = serviceMaterialsForWorker.find(wm => wm.id === material.materialId);
               if (washerMaterial) {
                 const newQuantity = washerMaterial.quantity - material.quantity;
                 
@@ -770,13 +762,22 @@ const NewCheckInPage: React.FC = () => {
                 disabled={isCustomerSelected}
               />
             </FormField>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField label="Vehicle Type" required>
                 <Select
                   options={vehicleTypes}
                   placeholder="Select vehicle type"
                   value={formData.vehicleType}
                   onChange={(value) => handleInputChange('vehicleType', value)}
+                  disabled={isCustomerSelected}
+                />
+              </FormField>
+              
+              <FormField label="Vehicle Make">
+                <InputField
+                  value={formData.vehicleMake}
+                  onChange={(e) => handleInputChange('vehicleMake', e.target.value)}
+                  placeholder="Enter vehicle make (optional)"
                   disabled={isCustomerSelected}
                 />
               </FormField>
@@ -913,12 +914,6 @@ const NewCheckInPage: React.FC = () => {
                             value={selectedService?.workerId || ''}
                             onChange={(value) => {
                               handleWorkerAssignment(service.id, value);
-                              if (value) {
-                                // Fetch materials for the newly assigned worker
-                                setTimeout(() => {
-                                  fetchWasherMaterials(value);
-                                }, 0);
-                              }
                             }}
                             className="mt-1"
                           />
@@ -935,17 +930,17 @@ const NewCheckInPage: React.FC = () => {
                             </p>
                             {/* Debug info */}
                             <div className="text-xs text-gray-500 mb-2">
-                              Debug: Worker ID: {selectedService.workerId}, Materials Count: {washerMaterials.length}, Loading: {isLoadingMaterials.toString()}
+                              Debug: Worker ID: {selectedService.workerId}, Materials Count: {serviceMaterials[service.id]?.length || 0}
                             </div>
-                            {isLoadingMaterials ? (
+                            {!serviceMaterials[service.id] ? (
                               <div className="text-center py-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Loading materials...</p>
                               </div>
-                            ) : washerMaterials.length === 0 ? (
+                            ) : serviceMaterials[service.id].length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400">No materials available for this worker</p>
                             ) : (
                               <div className="grid grid-cols-1 gap-3">
-                                {washerMaterials.map((material) => {
+                                {serviceMaterials[service.id].map((material) => {
                                   const assignedMaterial = selectedService.materials.find(m => m.materialId === material.id);
                                   
                                   return (

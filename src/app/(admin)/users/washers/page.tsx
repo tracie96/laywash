@@ -13,6 +13,7 @@ interface Washer {
   address: string;
   totalEarnings: number;
   isAvailable: boolean;
+  isActive: boolean;
   assignedAdminId: string | null;
   assignedAdminName: string;
   totalCheckIns: number;
@@ -33,7 +34,7 @@ const UsersWashersPage: React.FC = () => {
   const [washers, setWashers] = useState<Washer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'unavailable' | 'inactive'>('all');
   const [viewingWasher, setViewingWasher] = useState<Washer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const router = useRouter();
@@ -66,14 +67,22 @@ const UsersWashersPage: React.FC = () => {
   // Filter washers based on selected status
   const filteredWashers = filterStatus === 'all' 
     ? washers 
-    : washers.filter(w => 
-        filterStatus === 'available' ? w.isAvailable : !w.isAvailable
-      );
+    : washers.filter(w => {
+        if (filterStatus === 'available') {
+          return w.isActive && w.isAvailable;
+        } else if (filterStatus === 'unavailable') {
+          return w.isActive && !w.isAvailable;
+        } else if (filterStatus === 'inactive') {
+          return !w.isActive;
+        }
+        return true;
+      });
 
   // Calculate totals based on filtered data
   const totalWashers = filteredWashers.length;
-  const activeWashers = filteredWashers.filter(w => w.isAvailable).length;
-  const unavailableWashers = filteredWashers.filter(w => !w.isAvailable).length;
+  const activeWashers = filteredWashers.filter(w => w.isActive && w.isAvailable).length;
+  const unavailableWashers = filteredWashers.filter(w => w.isActive && !w.isAvailable).length;
+  const inactiveWashers = filteredWashers.filter(w => !w.isActive).length;
   const totalCheckInsCompleted = filteredWashers.reduce((sum, washer) => sum + washer.completedCheckIns, 0);
 
   const handleViewWasher = (washer: Washer) => {
@@ -117,13 +126,50 @@ const UsersWashersPage: React.FC = () => {
     }
   };
 
-  const getStatusColor = (isAvailable: boolean) => {
+  const handleActivateWasher = async (washerId: string, washerName: string) => {
+    const confirmActivate = window.confirm(
+      `Are you sure you want to activate ${washerName}? They will be able to access the system and receive new assignments.`
+    );
+    
+    if (!confirmActivate) return;
+
+    try {
+      const response = await fetch(`/api/admin/washers/${washerId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: true }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the washers list
+        await fetchWashers();
+        alert(`${washerName} has been successfully activated.`);
+      } else {
+        alert(`Failed to activate ${washerName}: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error activating washer:', err);
+      alert(`Failed to activate ${washerName}. Please try again.`);
+    }
+  };
+
+  const getStatusColor = (isActive: boolean, isAvailable: boolean) => {
+    if (!isActive) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    }
     return isAvailable
       ? "bg-green-light-100 text-green-light-800 dark:bg-green-light-900/30 dark:text-green-light-300"
       : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   };
 
-  const getStatusText = (isAvailable: boolean) => {
+  const getStatusText = (isActive: boolean, isAvailable: boolean) => {
+    if (!isActive) {
+      return "Inactive";
+    }
     return isAvailable ? "Available" : "Unavailable";
   };
 
@@ -172,7 +218,7 @@ const UsersWashersPage: React.FC = () => {
       <PageBreadCrumb pageTitle="Manage Washers" />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -210,6 +256,20 @@ const UsersWashersPage: React.FC = () => {
             <div className="p-3 bg-gray-100 dark:bg-gray-900/30 rounded-lg">
               <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Washers</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{inactiveWashers}</p>
+            </div>
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
@@ -281,6 +341,16 @@ const UsersWashersPage: React.FC = () => {
         >
           Unavailable Washers
         </button>
+        <button
+          onClick={() => setFilterStatus('inactive')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+            filterStatus === 'inactive'
+              ? 'bg-green-light-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+        >
+          Inactive Washers
+        </button>
       </div>
 
       {/* Washers Table */}
@@ -291,7 +361,7 @@ const UsersWashersPage: React.FC = () => {
               Washer Management
               {filterStatus !== 'all' && (
                 <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                  ({filterStatus === 'available' ? 'Available' : 'Unavailable'} Washers)
+                  ({filterStatus === 'available' ? 'Available' : filterStatus === 'unavailable' ? 'Unavailable' : 'Inactive'} Washers)
                 </span>
               )}
             </h2>
@@ -313,15 +383,19 @@ const UsersWashersPage: React.FC = () => {
                   ? 'No washers found' 
                   : filterStatus === 'available' 
                     ? 'No available washers found' 
-                    : 'No unavailable washers found'
+                    : filterStatus === 'unavailable'
+                      ? 'No unavailable washers found'
+                      : 'No inactive washers found'
                 }
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {filterStatus === 'all' 
                   ? 'Get started by creating a new washer account.'
                   : filterStatus === 'available'
-                    ? 'All washers are currently unavailable.'
-                    : 'All washers are currently available.'
+                    ? 'All washers are currently unavailable or inactive.'
+                    : filterStatus === 'unavailable'
+                      ? 'All washers are currently available or inactive.'
+                      : 'All washers are currently active.'
                 }
               </p>
               {filterStatus === 'all' && (
@@ -369,8 +443,8 @@ const UsersWashersPage: React.FC = () => {
                       {new Date(washer.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(washer.isAvailable)}`}>
-                        {getStatusText(washer.isAvailable)}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(washer.isActive, washer.isAvailable)}`}>
+                        {getStatusText(washer.isActive, washer.isAvailable)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -398,12 +472,21 @@ const UsersWashersPage: React.FC = () => {
                           Edit
                         </button>
                     
+                      {washer.isActive ? (
                         <button 
                           onClick={() => handleDeactivateWasher(washer.id, washer.name)}
                           className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300 transition-colors"
                         >
                           Deactivate
                         </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleActivateWasher(washer.id, washer.name)}
+                          className="text-error-600 hover:text-error-500 dark:text-error-400 dark:hover:text-error-300 transition-colors"
+                        >
+                          Activate
+                        </button>
+                      )}
                       </div>
                     </td>
                   </tr>

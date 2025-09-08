@@ -104,6 +104,7 @@ export async function GET() {
         address: washer.address || "Not specified",
         totalEarnings: parseFloat(washer.total_earnings || '0'),
         isAvailable: washer.is_available ?? true,
+        isActive: user?.is_active ?? true,
         assignedAdminId: washer.assigned_admin_id || null,
         assignedAdminName,
         assigned_location: washer.assigned_location || "Not specified",

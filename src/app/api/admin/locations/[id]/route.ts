@@ -70,7 +70,6 @@ export async function PUT(
   }
 }
 
-// DELETE /api/admin/locations/[id] - Delete (deactivate) a location
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -519,6 +519,16 @@ const OperationsCheckInsPage: React.FC = () => {
                   >
                     View Details
                   </Button>
+                  {(checkIn.status === 'pending' || checkIn.status === 'in_progress') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.location.href = `/checkins/edit/${checkIn.id}`}
+                      className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                    >
+                      Add Services
+                    </Button>
+                  )}
                   {checkIn.status === 'pending' && (
                     <Button
                       size="sm"
