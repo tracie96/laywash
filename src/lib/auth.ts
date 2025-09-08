@@ -243,6 +243,11 @@ export class AuthService {
         return null;
       }
 
+      // Check if user is active
+      if (!userProfile.is_active) {
+        return null;
+      }
+
       return {
         id: userProfile.id,
         name: userProfile.name,

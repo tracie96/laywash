@@ -7,7 +7,7 @@ import { UploadService } from '../lib/upload';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (identifier: string, password: string) => Promise<boolean>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: UserRole) => boolean;
@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (identifier: string, password: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
       // Determine if identifier is email or phone
@@ -102,7 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (!isEmail && !isPhone) {
         console.error('Invalid identifier format');
-        return false;
+        return { success: false, error: 'Invalid email or phone format' };
       }
       
       const response = await AuthService.login({ 
@@ -113,13 +113,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (response.success && response.user) {
         setUser(response.user);
-        return true;
+        return { success: true };
       }
       
-      return false;
+      return { success: false, error: response.error || 'Login failed' };
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      return { success: false, error: 'An unexpected error occurred' };
     } finally {
       setIsLoading(false);
     }

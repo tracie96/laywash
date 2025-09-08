@@ -30,13 +30,13 @@ export default function SignInForm() {
     setError('');
 
     try {
-      const success = await login(email, password);
-      console.log('Login success:', success);
+      const result = await login(email, password);
+      console.log('Login result:', result);
       
-      if (success) {
+      if (result.success) {
         router.push('/dashboard');
       } else {
-        setError('Invalid email or password');
+        setError(result.error || 'Invalid email or password');
       }
     } catch {
       setError('An error occurred during login');
