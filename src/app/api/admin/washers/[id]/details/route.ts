@@ -161,6 +161,7 @@ export async function GET(
       address: profile?.address || 'Address not provided',
       emergencyContact: profile?.next_of_kin?.[0]?.name || 'Not provided',
       emergencyPhone: profile?.next_of_kin?.[0]?.phone || 'Not provided',
+      nextOfKin: profile?.next_of_kin || [],
       skills: ['Car Washing', 'Customer Service'],
       certifications: [],
       notes: 'No additional notes.',

@@ -216,7 +216,6 @@ export async function GET(request: NextRequest) {
       washerSalaries: number;
       washerBonuses: number;
       customerBonuses: number;
-      adminSalaries: number;
       totalExpenses: number;
       
       // Worker Wages
@@ -244,7 +243,6 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
-          adminSalaries: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -286,7 +284,6 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
-          adminSalaries: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -322,7 +319,6 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
-          adminSalaries: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -358,7 +354,6 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
-          adminSalaries: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -408,7 +403,6 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
-          adminSalaries: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -432,12 +426,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Estimate admin salaries (this would come from actual admin salary data in a real system)
-    monthlyData.forEach((data) => {
-      // Estimate admin salaries as 15% of revenue (this should be replaced with actual data)
-      data.adminSalaries = data.totalRevenue * 0.15;
-      data.totalExpenses += data.adminSalaries;
-    });
 
     // Transform data into the expected format
     const reports = Array.from(monthlyData.entries()).map(([monthKey, data]) => {
@@ -459,7 +447,6 @@ export async function GET(request: NextRequest) {
         washerSalaries: data.washerSalaries,
         washerBonuses: data.washerBonuses,
         customerBonuses: data.customerBonuses,
-        adminSalaries: data.adminSalaries,
         
         // Worker Wages
         totalWages: data.totalWages,

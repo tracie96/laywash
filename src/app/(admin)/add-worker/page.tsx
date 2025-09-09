@@ -18,7 +18,7 @@ const AddWorkerPage: React.FC = () => {
     assignedAdmin: '',
     assignedLocation: '',
     bankInformation: '',
-    nextOfKin: [{ name: '', phone: '', address: '' }]
+    nextOfKin: [{ name: '', phone: '', address: '', relationship: '' }]
   });
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const pictureInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +48,7 @@ const AddWorkerPage: React.FC = () => {
   const addNextOfKin = () => {
     setFormData(prev => ({
       ...prev,
-      nextOfKin: [...prev.nextOfKin, { name: '', phone: '', address: '' }]
+      nextOfKin: [...prev.nextOfKin, { name: '', phone: '', address: '', relationship: '' }]
     }));
   };
 
@@ -92,7 +92,7 @@ const AddWorkerPage: React.FC = () => {
 
       if (result.success) {
         setSuccess('Car washer account created successfully! Login credentials have been sent to their email.');
-        setFormData({ name: '', email: '', phone: '', password: '', assignedAdmin: '', assignedLocation: '', bankInformation: '', nextOfKin: [{ name: '', phone: '', address: '' }] });
+        setFormData({ name: '', email: '', phone: '', password: '', assignedAdmin: '', assignedLocation: '', bankInformation: '', nextOfKin: [{ name: '', phone: '', address: '', relationship: '' }] });
         setPictureFile(null);
         if (pictureInputRef.current) {
           pictureInputRef.current.value = '';
@@ -297,7 +297,7 @@ const AddWorkerPage: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Name</Label>
                     <Input
@@ -305,6 +305,15 @@ const AddWorkerPage: React.FC = () => {
                       placeholder="Full name"
                       value={kin.name}
                       onChange={(e) => handleNextOfKinChange(index, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Relationship</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Spouse, Parent, Sibling"
+                      value={kin.relationship}
+                      onChange={(e) => handleNextOfKinChange(index, 'relationship', e.target.value)}
                     />
                   </div>
                   <div>

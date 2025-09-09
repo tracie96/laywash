@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { Modal } from "@/components/ui/modal";
+import { useModal } from "@/hooks/useModal";
 
 interface FinancialReport {
   id: string;
@@ -17,7 +19,6 @@ interface FinancialReport {
   washerSalaries: number;
   washerBonuses: number;
   customerBonuses: number;
-  adminSalaries: number;
   
   // Worker Wages
   totalWages: number;
@@ -42,6 +43,8 @@ const FinancialReportsPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('6');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [locations, setLocations] = useState<Array<{id: string, address: string, lga: string}>>([]);
+  const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null);
+  const { isOpen, openModal, closeModal } = useModal();
 
   const fetchLocations = useCallback(async () => {
     try {
@@ -99,7 +102,6 @@ const FinancialReportsPage: React.FC = () => {
     washerSalaries: acc.washerSalaries + report.washerSalaries,
     washerBonuses: acc.washerBonuses + report.washerBonuses,
     customerBonuses: acc.customerBonuses + report.customerBonuses,
-    adminSalaries: acc.adminSalaries + report.adminSalaries,
     totalWages: acc.totalWages + report.totalWages,
     pendingWages: acc.pendingWages + report.pendingWages,
     netProfit: acc.netProfit + report.netProfit,
@@ -115,7 +117,6 @@ const FinancialReportsPage: React.FC = () => {
     washerSalaries: 0,
     washerBonuses: 0,
     customerBonuses: 0,
-    adminSalaries: 0,
     totalWages: 0,
     pendingWages: 0,
     netProfit: 0,
@@ -126,6 +127,11 @@ const FinancialReportsPage: React.FC = () => {
   });
 
   const overallProfitMargin = totals.totalRevenue > 0 ? (totals.netProfit / totals.totalRevenue) * 100 : 0;
+
+  const handleViewDetails = (report: FinancialReport) => {
+    setSelectedReport(report);
+    openModal();
+  };
 
   if (loading) {
     return (
@@ -251,8 +257,12 @@ const FinancialReportsPage: React.FC = () => {
               <span className="text-error-600 dark:text-error-400">₦ {totals.washerSalaries.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Admin Salaries:</span>
-              <span className="text-error-600 dark:text-error-400">₦ {totals.adminSalaries.toFixed(2)}</span>
+              <span className="text-gray-500 dark:text-gray-400">Washer Bonuses:</span>
+              <span className="text-error-600 dark:text-error-400">₦ {totals.washerBonuses.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Customer Bonuses:</span>
+              <span className="text-error-600 dark:text-error-400">₦ {totals.customerBonuses.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -416,7 +426,7 @@ const FinancialReportsPage: React.FC = () => {
                           ₦ {report.totalExpenses.toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          WS: ₦ {report.washerSalaries.toFixed(2)} | AS: ₦ {report.adminSalaries.toFixed(2)}
+                          WS: ₦ {report.washerSalaries.toFixed(2)} | WB: ₦ {report.washerBonuses.toFixed(2)} | CB: ₦ {report.customerBonuses.toFixed(2)}
                         </div>
                       </div>
                     </td>
@@ -439,7 +449,10 @@ const FinancialReportsPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
+                      <button 
+                        onClick={() => handleViewDetails(report)}
+                        className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300"
+                      >
                         View Details
                       </button>
                     </td>
@@ -450,6 +463,186 @@ const FinancialReportsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Report Details Modal */}
+      <Modal
+        isOpen={isOpen}
+        onClose={closeModal}
+        className="max-w-4xl p-6"
+      >
+        {selectedReport && (
+          <div className="space-y-6">
+            <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Financial Report Details
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {selectedReport.period} - {selectedReport.date}
+              </p>
+            </div>
+
+            {/* Revenue Section */}
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-4">
+                Revenue Breakdown
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    ₦ {selectedReport.totalRevenue.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Car Wash Revenue</p>
+                  <p className="text-xl font-semibold text-green-600 dark:text-green-400">
+                    ₦ {selectedReport.carWashRevenue.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Product Sales Revenue</p>
+                  <p className="text-xl font-semibold text-green-600 dark:text-green-400">
+                    ₦ {selectedReport.productSalesRevenue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses Section */}
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-4">
+                Expense Breakdown
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    ₦ {selectedReport.totalExpenses.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Washer Salaries</p>
+                  <p className="text-xl font-semibold text-red-600 dark:text-red-400">
+                    ₦ {selectedReport.washerSalaries.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Washer Bonuses</p>
+                  <p className="text-xl font-semibold text-red-600 dark:text-red-400">
+                    ₦ {selectedReport.washerBonuses.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Customer Bonuses</p>
+                  <p className="text-xl font-semibold text-red-600 dark:text-red-400">
+                    ₦ {selectedReport.customerBonuses.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Worker Wages Section */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-4">
+                Worker Wages
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Wages</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    ₦ {selectedReport.totalWages.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Pending Wages</p>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    ₦ {selectedReport.pendingWages.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Metrics */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                Performance Metrics
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Net Profit</p>
+                  <p className={`text-2xl font-bold ${selectedReport.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                    ₦ {selectedReport.netProfit.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Profit Margin</p>
+                  <p className={`text-2xl font-bold ${selectedReport.profitMargin >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {selectedReport.profitMargin.toFixed(1)}%
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Transactions</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {selectedReport.transactionCount}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Average Transaction</p>
+                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                    ₦ {selectedReport.averageTransaction.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Transaction Breakdown */}
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-purple-800 dark:text-purple-200 mb-4">
+                Transaction Breakdown
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Car Washes</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {selectedReport.carWashCount}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Product Sales</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {selectedReport.productSaleCount}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Customers</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {selectedReport.customerCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  // Here you could add export functionality for individual reports
+                  console.log('Export report for:', selectedReport.period);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-light-600 hover:bg-green-light-700 rounded-lg transition-colors"
+              >
+                Export This Report
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

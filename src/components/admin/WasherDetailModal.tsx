@@ -41,6 +41,12 @@ interface WasherProfile {
   certifications?: string[];
   notes?: string;
   picture_url?: string | null;
+  nextOfKin?: Array<{
+    name: string;
+    phone: string;
+    address: string;
+    relationship: string;
+  }>;
 }
 
 interface WasherDetailModalProps {
@@ -237,22 +243,41 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
                 </div>
               </div>
 
+              {washer.nextOfKin && washer.nextOfKin.length > 0 && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Emergency Contact
+                  Next of Kin
                 </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
-                    <p className="text-gray-900 dark:text-white">{washer.emergencyContact || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</label>
-                    <p className="text-gray-900 dark:text-white">{washer.emergencyPhone || 'Not provided'}</p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {washer.nextOfKin.map((kin, index) => (
+                    <div key={index} className=" dark:bg-gray-700 rounded-lg p-4">
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
+                          <p className="text-gray-900 dark:text-white">{kin.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Relationship</label>
+                          <p className="text-gray-900 dark:text-white">{kin.relationship}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</label>
+                          <p className="text-gray-900 dark:text-white">{kin.phone}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</label>
+                          <p className="text-gray-900 dark:text-white">{kin.address}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            )}
             </div>
+
+            {/* Next of Kin Information */}
+        
 
             {/* Work Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

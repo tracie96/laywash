@@ -28,6 +28,12 @@ interface Washer {
   certifications?: string[];
   notes?: string;
   picture_url?: string | null;
+  nextOfKin?: Array<{
+    name: string;
+    phone: string;
+    address: string;
+    relationship: string;
+  }>;
 }
 
 const UsersWashersPage: React.FC = () => {
@@ -530,7 +536,6 @@ const UsersWashersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Washer Detail Modal */}
       <WasherDetailModal
         washer={viewingWasher}
         isOpen={isDetailModalOpen}

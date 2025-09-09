@@ -23,6 +23,8 @@ export async function GET() {
         total_earnings,
         is_available,
         assigned_location,
+        next_of_kin,
+        picture_url,
         users!user_id (
           id,
           name,
@@ -112,7 +114,9 @@ export async function GET() {
         completedCheckIns: stats.completedCheckIns,
         averageRating: 4.5, // TODO: Calculate from actual ratings
         createdAt: new Date(user?.created_at || new Date()),
-        lastActive: stats.lastActive || new Date(user?.updated_at || new Date())
+        lastActive: stats.lastActive || new Date(user?.updated_at || new Date()),
+        nextOfKin: washer.next_of_kin || [],
+        picture_url: washer.picture_url || null
       };
     }) || [];
 

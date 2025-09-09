@@ -24,6 +24,7 @@ export interface Admin extends User {
     name: string;
     phone: string;
     address: string;
+    relationship: string;
   }>;
   assignedWashers?: string[]; 
 }
@@ -39,6 +40,7 @@ export interface CarWasher extends User {
     name: string;
     phone: string;
     address: string;
+    relationship: string;
   }>;
 }
 

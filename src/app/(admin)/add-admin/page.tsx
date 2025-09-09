@@ -17,7 +17,7 @@ const AddAdminPage: React.FC = () => {
     password: '',
     location: '',
     address: '',
-    nextOfKin: [{ name: '', phone: '', address: '' }]
+    nextOfKin: [{ name: '', phone: '', address: '', relationship: '' }]
   });
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [pictureFile, setPictureFile] = useState<File | null>(null);
@@ -49,7 +49,7 @@ const AddAdminPage: React.FC = () => {
   const addNextOfKin = () => {
     setFormData(prev => ({
       ...prev,
-      nextOfKin: [...prev.nextOfKin, { name: '', phone: '', address: '' }]
+      nextOfKin: [...prev.nextOfKin, { name: '', phone: '', address: '', relationship: '' }]
     }));
   };
 
@@ -87,14 +87,14 @@ const AddAdminPage: React.FC = () => {
         formData.password,
         formData.location,
         formData.address,
-        formData.nextOfKin.filter(kin => kin.name && kin.phone && kin.address),
+        formData.nextOfKin.filter(kin => kin.name && kin.phone && kin.address && kin.relationship),
         cvFile || undefined,
         pictureFile || undefined
       );
 
       if (result.success) {
         setSuccess('Admin account created successfully! The admin will receive a confirmation email to activate their account.');
-        setFormData({ name: '', email: '', phone: '', password: '', location: '', address: '', nextOfKin: [{ name: '', phone: '', address: '' }] });
+        setFormData({ name: '', email: '', phone: '', password: '', location: '', address: '', nextOfKin: [{ name: '', phone: '', address: '', relationship: '' }] });
         setCvFile(null);
         setPictureFile(null);
         // Clear file inputs
@@ -290,7 +290,7 @@ const AddAdminPage: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Name</Label>
                     <Input
@@ -298,6 +298,15 @@ const AddAdminPage: React.FC = () => {
                       placeholder="Full name"
                       value={kin.name}
                       onChange={(e) => handleNextOfKinChange(index, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Relationship</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Spouse, Parent, Sibling"
+                      value={kin.relationship}
+                      onChange={(e) => handleNextOfKinChange(index, 'relationship', e.target.value)}
                     />
                   </div>
                   <div>

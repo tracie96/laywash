@@ -20,6 +20,7 @@ interface AdminProfile {
     name: string;
     phone: string;
     address: string;
+    relationship: string;
   }[];
 }
 
@@ -202,6 +203,10 @@ const AdminDetailModal: React.FC<AdminDetailModalProps> = ({
                     <div>
                       <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
                       <p className="text-gray-900 dark:text-white">{kin.name}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Relationship</label>
+                      <p className="text-gray-900 dark:text-white">{kin.relationship}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</label>

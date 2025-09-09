@@ -22,6 +22,7 @@ interface Admin {
     name: string;
     phone: string;
     address: string;
+    relationship: string;
   }[];
 }
 
