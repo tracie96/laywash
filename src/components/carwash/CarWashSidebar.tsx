@@ -103,6 +103,14 @@ const superAdminItems: NavItem[] = [
       { name: "Stock Reports", path: "/reports/stock", pro: false }
     ],
     roles: ["super_admin"]
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "Profile",
+    subItems: [
+      { name: "Change Password", path: "/change-password", pro: false }
+    ],
+    roles: ["super_admin"]
   }
 ];
 
@@ -171,6 +179,15 @@ const adminItems: NavItem[] = [
       { name: "Sales", path: "/sales", pro: false }
     ],
     roles: ["admin"]
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "Profile",
+    subItems: [
+      { name: "My Profile", path: "/profile", pro: false },
+      { name: "Change Password", path: "/change-password", pro: false }
+    ],
+    roles: ["admin"]
   }
 ];
 
@@ -204,7 +221,10 @@ const washerItems: NavItem[] = [
   {
     icon: <UserCircleIcon />,
     name: "My Profile",
-    path: "/profile/worker",
+    subItems: [
+      { name: "Profile", path: "/profile/worker", pro: false },
+      { name: "Change Password", path: "/profile/worker/change-password", pro: false }
+    ],
     roles: ["car_washer"]
   }
 ];

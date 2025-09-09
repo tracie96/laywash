@@ -51,6 +51,7 @@ interface AuthContextType {
   }) => Promise<{ success: boolean; customers?: Customer[]; error?: string }>;
   searchCustomersByEmail: (email: string) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
   searchCustomers: (params: { email?: string; licensePlate?: string; name?: string; phone?: string; query?: string }) => Promise<{ success: boolean; customers?: Customer[]; found?: boolean; error?: string }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -387,6 +388,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    try {
+      // Use the AuthService method directly
+      const result = await AuthService.changePassword(currentPassword, newPassword);
+      return result;
+    } catch (error) {
+      console.error('Change password error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  };
+
   const hasRole = (role: UserRole): boolean => {
     return user?.role === role;
   };
@@ -410,6 +426,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     fetchCustomers,
     searchCustomersByEmail,
     searchCustomers,
+    changePassword,
   };
 
   return (

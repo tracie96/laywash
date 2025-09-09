@@ -315,4 +315,68 @@ export class AuthService {
       };
     }
   }
+
+  // Change password with current password verification
+  static async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // First, verify the current password by attempting to sign in
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return {
+          success: false,
+          error: 'User not authenticated',
+        };
+      }
+
+      // Get user email from our users table
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        return {
+          success: false,
+          error: 'User profile not found',
+        };
+      }
+
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userProfile.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        return {
+          success: false,
+          error: 'Current password is incorrect',
+        };
+      }
+
+      // If current password is correct, update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        return {
+          success: false,
+          error: updateError.message,
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error('Change password error:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+      };
+    }
+  }
 } 

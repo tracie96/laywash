@@ -140,7 +140,6 @@ async function updateWasherEarnings(checkInId: string, washerId: string) {
   
   console.log('✅ Successfully updated washer earnings in database');
 
-  // Update the company_income field in car_check_ins table
   const { error: companyIncomeUpdateError } = await supabaseAdmin
     .from('car_check_ins')
     .update({
