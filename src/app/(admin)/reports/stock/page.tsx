@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { Modal } from '@/components/ui/modal';
 
 interface StockReport {
   id: string;
@@ -30,6 +31,12 @@ interface InventoryItem {
 const StockReportsPage: React.FC = () => {
   const [reports, setReports] = useState<StockReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StockReport | null>(null);
+  const [restockAmount, setRestockAmount] = useState<number>(0);
+  const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successNotification, setSuccessNotification] = useState<string | null>(null);
 
   const fetchStockReports = useCallback(async () => {
     console.log('Fetching stock reports...');
@@ -88,6 +95,57 @@ const StockReportsPage: React.FC = () => {
   useEffect(() => {
     fetchStockReports();
   }, [fetchStockReports]);
+
+  const handleRestock = (item: StockReport) => {
+    setSelectedItem(item);
+    setRestockAmount(item.currentStock);
+    setShowRestockModal(true);
+    setError(null);
+  };
+
+  const handleRestockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedItem) return;
+    
+    if (restockAmount < 0) {
+      setError('Restock amount cannot be negative');
+      return;
+    }
+
+    setRestockSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/inventory/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentStock: restockAmount
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowRestockModal(false);
+        setSelectedItem(null);
+        setRestockAmount(0);
+        fetchStockReports(); // Refresh the reports
+        setSuccessNotification(`${selectedItem.itemName} stock updated to ${restockAmount} units`);
+        // Clear notification after 5 seconds
+        setTimeout(() => setSuccessNotification(null), 5000);
+      } else {
+        setError(data.error || 'Failed to restock item');
+      }
+    } catch {
+      setError('Failed to restock item');
+    } finally {
+      setRestockSubmitting(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -193,16 +251,51 @@ const StockReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Stock Value</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalValue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">NGN{totalValue.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
+              </svg> */}
+              NGN
             </div>
           </div>
         </div>
       </div>
+
+      {/* Success Notification */}
+      {successNotification && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-green-800 dark:text-green-200">{successNotification}</span>
+            </div>
+            <button
+              onClick={() => setSuccessNotification(null)}
+              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-red-800 dark:text-red-200">{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Stock Reports Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -264,13 +357,13 @@ const StockReportsPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex space-x-2">
-                      <button className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300">
-                        Restock
-                      </button>
-                      <button className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300">
-                        History
-                      </button>
-                    </div>
+                        <button 
+                          onClick={() => handleRestock(report)}
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                        >
+                          Restock
+                        </button>
+                           </div>
                   </td>
                 </tr>
               ))}
@@ -279,6 +372,95 @@ const StockReportsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Restock Modal */}
+      <Modal
+        isOpen={showRestockModal}
+        onClose={() => {
+          setShowRestockModal(false);
+          setSelectedItem(null);
+          setRestockAmount(0);
+          setError(null);
+        }}
+        className="w-full max-w-md mx-4"
+      >
+        <div className="p-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Restock Item
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Update stock level for {selectedItem?.itemName}
+            </p>
+          </div>
+
+          <form onSubmit={handleRestockSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Current Stock
+              </label>
+              <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white">
+                {selectedItem?.currentStock} units
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                New Stock Level
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={restockAmount}
+                onChange={(e) => setRestockAmount(parseInt(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter new stock level"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Units
+              </p>
+            </div>
+
+            {selectedItem && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <div className="flex justify-between">
+                    <span>Min Level:</span>
+                    <span className="font-medium">{selectedItem.minimumStock} units</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Reorder Point:</span>
+                    <span className="font-medium">{selectedItem.reorderPoint} units</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRestockModal(false);
+                  setSelectedItem(null);
+                  setRestockAmount(0);
+                  setError(null);
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={restockSubmitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+              >
+                {restockSubmitting ? 'Updating...' : 'Update Stock'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 };
