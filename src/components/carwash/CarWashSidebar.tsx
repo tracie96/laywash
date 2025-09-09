@@ -184,7 +184,6 @@ const adminItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "Profile",
     subItems: [
-      { name: "My Profile", path: "/profile", pro: false },
       { name: "Change Password", path: "/change-password", pro: false }
     ],
     roles: ["admin"]
