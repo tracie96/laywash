@@ -449,6 +449,29 @@ export interface DashboardMetrics {
   }>;
 }
 
+// Expense Types
+export type ExpenseType = 'checkin' | 'salary' | 'sales' | 'free_will' | 'deposit_to_bank' | 'other';
+
+export interface Expense {
+  id: string;
+  serviceType: ExpenseType;
+  amount: number;
+  reason: string;
+  description?: string;
+  adminId?: string;
+  admin?: Admin;
+  checkInId?: string;
+  checkIn?: CarCheckIn;
+  locationId?: string;
+  location?: {
+    id: string;
+    address: string;
+  };
+  expenseDate: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 // Report Types
 export interface ReportFilters {
   startDate: Date;

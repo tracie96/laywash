@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
+import AddExpenseModal from "@/components/admin/AddExpenseModal";
 
 interface FinancialReport {
   id: string;
@@ -45,6 +46,7 @@ const FinancialReportsPage: React.FC = () => {
   const [locations, setLocations] = useState<Array<{id: string, address: string, lga: string}>>([]);
   const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null);
   const { isOpen, openModal, closeModal } = useModal();
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
   const fetchLocations = useCallback(async () => {
     try {
@@ -133,6 +135,10 @@ const FinancialReportsPage: React.FC = () => {
     openModal();
   };
 
+  const handleExpenseAdded = () => {
+    fetchFinancialReports(); // Refresh reports when expense is added
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -182,6 +188,12 @@ const FinancialReportsPage: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">Report Filters</h3>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsExpenseModalOpen(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              + Add Expense
+            </button>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
               <select
@@ -251,20 +263,7 @@ const FinancialReportsPage: React.FC = () => {
               </svg>
             </div>
           </div>
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Washer Salaries:</span>
-              <span className="text-error-600 dark:text-error-400">₦ {totals.washerSalaries.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Washer Bonuses:</span>
-              <span className="text-error-600 dark:text-error-400">₦ {totals.washerBonuses.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Customer Bonuses:</span>
-              <span className="text-error-600 dark:text-error-400">₦ {totals.customerBonuses.toFixed(2)}</span>
-            </div>
-          </div>
+         
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -643,6 +642,13 @@ const FinancialReportsPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Add Expense Modal */}
+      <AddExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        onExpenseAdded={handleExpenseAdded}
+      />
     </div>
   );
 };

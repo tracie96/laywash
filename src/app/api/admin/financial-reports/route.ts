@@ -80,7 +80,8 @@ export async function GET(request: NextRequest) {
       salesResponse,
       carWasherProfilesResponse,
       bonusesResponse,
-      paymentRequestsResponse
+      paymentRequestsResponse,
+      expensesResponse
     ] = await Promise.all([
       // Car wash check-ins
       supabaseAdmin
@@ -167,17 +168,34 @@ export async function GET(request: NextRequest) {
         `)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', now.toISOString())
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }),
+
+      // Expenses from the new expenses table
+      supabaseAdmin
+        .from('expenses')
+        .select(`
+          id,
+          service_type,
+          amount,
+          reason,
+          description,
+          expense_date,
+          location_id
+        `)
+        .gte('expense_date', startDate.toISOString())
+        .lte('expense_date', now.toISOString())
+        .order('expense_date', { ascending: false })
     ]);
 
     // Check for errors
-    if (checkInsResponse.error || salesResponse.error || carWasherProfilesResponse.error || bonusesResponse.error || paymentRequestsResponse.error) {
+    if (checkInsResponse.error || salesResponse.error || carWasherProfilesResponse.error || bonusesResponse.error || paymentRequestsResponse.error || expensesResponse.error) {
       console.error('Error fetching financial data:', {
         checkIns: checkInsResponse.error,
         sales: salesResponse.error,
         carWasherProfiles: carWasherProfilesResponse.error,
         bonuses: bonusesResponse.error,
-        paymentRequests: paymentRequestsResponse.error
+        paymentRequests: paymentRequestsResponse.error,
+        expenses: expensesResponse.error
       });
       return NextResponse.json(
         { success: false, error: 'Failed to fetch financial data' },
@@ -426,6 +444,59 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Process expenses from the new expenses table
+    expensesResponse.data?.forEach(expense => {
+      const date = new Date(expense.expense_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyData.has(monthKey)) {
+        monthlyData.set(monthKey, {
+          carWashRevenue: 0,
+          productSalesRevenue: 0,
+          totalRevenue: 0,
+          washerSalaries: 0,
+          washerBonuses: 0,
+          customerBonuses: 0,
+          totalExpenses: 0,
+          totalWages: 0,
+          pendingWages: 0,
+          customerCount: 0,
+          transactionCount: 0,
+          carWashCount: 0,
+          productSaleCount: 0,
+          washerCount: 0
+        });
+      }
+
+      const monthData = monthlyData.get(monthKey)!;
+      const amount = parseFloat(expense.amount || '0');
+      
+      // Add to total expenses
+      monthData.totalExpenses += amount;
+      
+      // Categorize expenses by service type
+      switch (expense.service_type) {
+        case 'checkin':
+          // Free car wash - this is a revenue loss, not a direct expense
+          // We could track this separately if needed
+          break;
+        case 'salary':
+          monthData.washerSalaries += amount;
+          break;
+        case 'sales':
+          // Free sales - revenue loss
+          break;
+        case 'free_will':
+          // Voluntary expenses
+          break;
+        case 'deposit_to_bank':
+          // Bank deposits
+          break;
+        case 'other':
+          // Other expenses
+          break;
+      }
+    });
 
     // Transform data into the expected format
     const reports = Array.from(monthlyData.entries()).map(([monthKey, data]) => {
