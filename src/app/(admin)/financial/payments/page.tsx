@@ -72,7 +72,6 @@ const FinancialPaymentsPage: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch both car wash payments and sales transactions
         const [carWashResponse, salesResponse] = await Promise.all([
           fetch('/api/admin/payments'),
           fetch('/api/admin/sales-transactions')
@@ -249,7 +248,7 @@ const FinancialPaymentsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Transactions</h2>
-          <div className="flex space-x-2">
+           <div className="flex space-x-2">
             <button
               onClick={() => setFilterType('all')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${

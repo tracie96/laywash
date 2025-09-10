@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get('reportType') || 'daily'; // daily, weekly, monthly
     const period = searchParams.get('period') || 'week'; // today, yesterday, week, month, quarter, custom
-    const includeStockSales = searchParams.get('includeStockSales') !== 'false'; // Default to true
+    const viewMode = searchParams.get('viewMode') || 'all'; // all, car-wash-only, stock-sales-only
     const customStartDate = searchParams.get('startDate'); // Custom start date
     const customEndDate = searchParams.get('endDate'); // Custom end date
     
@@ -55,37 +55,51 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch car check-ins data for the specified period
-    const { data: checkIns, error: checkInsError } = await supabaseAdmin
-      .from('car_check_ins')
-      .select(`
-        id,
-        company_income,
-        payment_status,
-        payment_method,
-        check_in_time,
-        customer_id
-      `)
-      .gte('check_in_time', startDate.toISOString())
-      .lte('check_in_time', endDate.toISOString())
-      .order('check_in_time', { ascending: false });
+    // Fetch car check-ins data for the specified period (only if not stock-sales-only)
+    let checkIns: Array<{
+      id: string;
+      company_income: number;
+      payment_status: string;
+      payment_method: string;
+      check_in_time: string;
+      customer_id: string;
+    }> = [];
+    
+    if (viewMode !== 'stock-sales-only') {
+      const { data: checkInsData, error: checkInsError } = await supabaseAdmin
+        .from('car_check_ins')
+        .select(`
+          id,
+          company_income,
+          payment_status,
+          payment_method,
+          check_in_time,
+          customer_id
+        `)
+        .gte('check_in_time', startDate.toISOString())
+        .lte('check_in_time', endDate.toISOString())
+        .order('check_in_time', { ascending: false });
 
-    if (checkInsError) {
-      console.error('Error fetching check-ins for payment reports:', checkInsError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch car wash payment data' },
-        { status: 500 }
-      );
+      if (checkInsError) {
+        console.error('Error fetching check-ins for payment reports:', checkInsError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch car wash payment data' },
+          { status: 500 }
+        );
+      }
+      
+      checkIns = checkInsData || [];
     }
 
-    // Fetch stock sales data if requested
+    // Fetch stock sales data if requested (only if not car-wash-only)
     let stockSales: Array<{
       id: string;
       total_amount: number;
       payment_method: string;
       created_at: string;
     }> = [];
-    if (includeStockSales) {
+    
+    if (viewMode !== 'car-wash-only') {
       // Fetch actual stock sales from sales_transactions table
       const { data: salesTransactions, error: salesError } = await supabaseAdmin
         .from('sales_transactions')
@@ -125,8 +139,9 @@ export async function GET(request: NextRequest) {
       date: string;
     }>();
 
-    // Process car check-ins
-    checkIns?.forEach(checkIn => {
+    // Process car check-ins (only if not stock-sales-only)
+    if (viewMode !== 'stock-sales-only') {
+      checkIns?.forEach(checkIn => {
       const date = new Date(checkIn.check_in_time);
       let groupKey: string;
 
@@ -193,9 +208,10 @@ export async function GET(request: NextRequest) {
         group.pendingAmount += checkIn.company_income || 0;
       }
     });
+    }
 
-    // Process stock sales
-    if (includeStockSales && stockSales.length > 0) {
+    // Process stock sales (only if not car-wash-only)
+    if (viewMode !== 'car-wash-only' && stockSales.length > 0) {
       stockSales.forEach(sale => {
         const date = new Date(sale.created_at);
         let groupKey: string;
@@ -282,7 +298,7 @@ export async function GET(request: NextRequest) {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         totalReports: reports.length,
-        includeStockSales,
+        viewMode,
         totalCarWashRevenue: reports.reduce((sum, r) => sum + r.carWashRevenue, 0),
         totalStockSalesRevenue: reports.reduce((sum, r) => sum + r.stockSalesRevenue, 0),
         totalCombinedRevenue: reports.reduce((sum, r) => sum + r.totalRevenue, 0)

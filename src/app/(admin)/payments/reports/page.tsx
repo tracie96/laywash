@@ -22,9 +22,8 @@ const PaymentReportsPage: React.FC = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState<PaymentReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedPeriod, setSelectedPeriod] = useState('week');
-  const [includeStockSales, setIncludeStockSales] = useState(true);
+  const [viewMode, setViewMode] = useState<'all' | 'car-wash-only' | 'stock-sales-only'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -77,9 +76,9 @@ const PaymentReportsPage: React.FC = () => {
       }
       
       const params = new URLSearchParams();
-      params.append('reportType', reportType);
+      params.append('reportType', 'daily');
       params.append('period', selectedPeriod);
-      params.append('includeStockSales', includeStockSales.toString());
+      params.append('viewMode', viewMode);
       
       // Add custom date range if period is custom
       if (selectedPeriod === 'custom') {
@@ -101,7 +100,7 @@ const PaymentReportsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [reportType, selectedPeriod, includeStockSales, customStartDate, customEndDate]);
+  }, [selectedPeriod, viewMode, customStartDate, customEndDate]);
 
   useEffect(() => {
     fetchReports();
@@ -156,44 +155,101 @@ const PaymentReportsPage: React.FC = () => {
       return;
     }
 
-    const headers = [
-      'Date', 
-      'Total Payments', 
-      'Total Revenue', 
-      'Car Wash Revenue', 
-      'Stock Sales Revenue',
-      'Cash Payments', 
-      'Card Payments', 
-      'Mobile Payments',
-      'Pending Payments', 
-      'Pending Amount',
-      'Car Wash Count',
-      'Stock Sales Count'
-    ];
+    const headers = viewMode === 'car-wash-only' 
+      ? [
+          'Date', 
+          'Total Payments', 
+          'Total Revenue', 
+          'Car Wash Revenue',
+          'Cash Payments', 
+          'Card Payments', 
+          'Mobile Payments',
+          'Pending Payments', 
+          'Pending Amount',
+          'Car Wash Count'
+        ]
+      : viewMode === 'stock-sales-only'
+      ? [
+          'Date', 
+          'Total Payments', 
+          'Total Revenue', 
+          'Stock Sales Revenue',
+          'Cash Payments', 
+          'Card Payments', 
+          'Mobile Payments',
+          'Pending Payments', 
+          'Pending Amount',
+          'Stock Sales Count'
+        ]
+      : [
+          'Date', 
+          'Total Payments', 
+          'Total Revenue', 
+          'Car Wash Revenue', 
+          'Stock Sales Revenue',
+          'Cash Payments', 
+          'Card Payments', 
+          'Mobile Payments',
+          'Pending Payments', 
+          'Pending Amount',
+          'Car Wash Count',
+          'Stock Sales Count'
+        ];
     
     const csvContent = [
       headers.join(','),
-      ...reports.map(report => [
-        report.date,
-        report.totalPayments,
-        report.totalRevenue.toFixed(2),
-        report.carWashRevenue.toFixed(2),
-        report.stockSalesRevenue.toFixed(2),
-        report.cashPayments,
-        report.cardPayments,
-        report.mobilePayments,
-        report.pendingPayments,
-        report.pendingAmount.toFixed(2),
-        report.carWashCount,
-        report.stockSalesCount
-      ].join(','))
+      ...reports.map(report => {
+        if (viewMode === 'car-wash-only') {
+          return [
+            report.date,
+            report.carWashCount,
+            report.carWashRevenue.toFixed(2),
+            report.carWashRevenue.toFixed(2),
+            report.cashPayments,
+            report.cardPayments,
+            report.mobilePayments,
+            report.pendingPayments,
+            report.pendingAmount.toFixed(2),
+            report.carWashCount
+          ].join(',');
+        } else if (viewMode === 'stock-sales-only') {
+          return [
+            report.date,
+            report.stockSalesCount,
+            report.stockSalesRevenue.toFixed(2),
+            report.stockSalesRevenue.toFixed(2),
+            report.cashPayments,
+            report.cardPayments,
+            report.mobilePayments,
+            report.pendingPayments,
+            report.pendingAmount.toFixed(2),
+            report.stockSalesCount
+          ].join(',');
+        } else {
+          return [
+            report.date,
+            report.totalPayments,
+            report.totalRevenue.toFixed(2),
+            report.carWashRevenue.toFixed(2),
+            report.stockSalesRevenue.toFixed(2),
+            report.cashPayments,
+            report.cardPayments,
+            report.mobilePayments,
+            report.pendingPayments,
+            report.pendingAmount.toFixed(2),
+            report.carWashCount,
+            report.stockSalesCount
+          ].join(',');
+        }
+      })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `payment-reports-${reportType}-${selectedPeriod}-${new Date().toISOString().split('T')[0]}.csv`);
+    const viewModeSuffix = viewMode === 'car-wash-only' ? '-car-wash' : viewMode === 'stock-sales-only' ? '-stock-sales' : '';
+    link.setAttribute('download', `payment-reports-daily-${selectedPeriod}${viewModeSuffix}-${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -245,7 +301,7 @@ const PaymentReportsPage: React.FC = () => {
             Payment Reports
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Comprehensive view of car wash and stock sales revenue
+            Comprehensive view of car wash and stock sales revenue with filtering options
           </p>
           {selectedPeriod === 'custom' && customStartDate && customEndDate && (
             <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
@@ -265,39 +321,7 @@ const PaymentReportsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Report Type */}
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-            <button
-              onClick={() => setReportType('daily')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                reportType === 'daily'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Daily
-            </button>
-            <button
-              onClick={() => setReportType('weekly')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                reportType === 'weekly'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Weekly
-            </button>
-            <button
-              onClick={() => setReportType('monthly')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                reportType === 'monthly'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Monthly
-            </button>
-          </div>
-
+          
           {/* Period Selector */}
           <select
             value={selectedPeriod}
@@ -320,17 +344,44 @@ const PaymentReportsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Stock Sales Toggle */}
-          <div className="flex items-center space-x-2">
-            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={includeStockSales}
-                onChange={(e) => setIncludeStockSales(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>Include Stock Sales</span>
-            </label>
+          {/* View Mode Selector */}
+          <div className="flex items-center space-x-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View Mode:</label>
+            <div className="flex space-x-4">
+              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  name="viewMode"
+                  value="all"
+                  checked={viewMode === 'all'}
+                  onChange={(e) => setViewMode(e.target.value as 'all' | 'car-wash-only' | 'stock-sales-only')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <span>All Sales</span>
+              </label>
+              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  name="viewMode"
+                  value="car-wash-only"
+                  checked={viewMode === 'car-wash-only'}
+                  onChange={(e) => setViewMode(e.target.value as 'all' | 'car-wash-only' | 'stock-sales-only')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <span>Car Wash Only</span>
+              </label>
+              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  name="viewMode"
+                  value="stock-sales-only"
+                  checked={viewMode === 'stock-sales-only'}
+                  onChange={(e) => setViewMode(e.target.value as 'all' | 'car-wash-only' | 'stock-sales-only')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <span>Stock Sales Only</span>
+              </label>
+            </div>
           </div>
 
           {/* Custom Date Range Inputs - Hidden for admin users */}
@@ -363,8 +414,8 @@ const PaymentReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+      {/* Overall Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -378,42 +429,6 @@ const PaymentReportsPage: React.FC = () => {
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Car Wash Revenue
-              </p>
-              <p className="text-2xl font-bold text-blue-600">
-                ₦ {totals.carWashRevenue.toFixed(2)}
-              </p>
-            </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Stock Sales Revenue
-              </p>
-              <p className="text-2xl font-bold text-purple-600">
-                ₦ {totals.stockSalesRevenue.toFixed(2)}
-              </p>
-            </div>
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
           </div>
@@ -456,7 +471,148 @@ const PaymentReportsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Car Wash Sales Section */}
+      {(viewMode === 'all' || viewMode === 'car-wash-only') && (
+      <div className="mb-8">
+        <div className="flex items-center mb-4">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg mr-3">
+            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Car Wash Sales</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Car Wash Revenue
+                </p>
+                <p className="text-2xl font-bold text-blue-600">
+                  ₦ {totals.carWashRevenue.toFixed(2)}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Car Wash Transactions
+                </p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {totals.carWashCount}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Average per Transaction
+                </p>
+                <p className="text-2xl font-bold text-blue-600">
+                  ₦ {totals.carWashCount > 0 ? (totals.carWashRevenue / totals.carWashCount).toFixed(2) : '0.00'}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Product Sales Section */}
+      {(viewMode === 'all' || viewMode === 'stock-sales-only') && (
+      <div className="mb-8">
+        <div className="flex items-center mb-4">
+          <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg mr-3">
+            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Product Sales</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Product Sales Revenue
+                </p>
+                <p className="text-2xl font-bold text-purple-600">
+                  ₦ {totals.stockSalesRevenue.toFixed(2)}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Product Transactions
+                </p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {totals.stockSalesCount}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Average per Transaction
+                </p>
+                <p className="text-2xl font-bold text-purple-600">
+                  ₦ {totals.stockSalesCount > 0 ? (totals.stockSalesRevenue / totals.stockSalesCount).toFixed(2) : '0.00'}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
       {/* Revenue Breakdown */}
+      {viewMode === 'all' && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
@@ -512,6 +668,7 @@ const PaymentReportsPage: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Payment Method Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -559,7 +716,7 @@ const PaymentReportsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {reportType.charAt(0).toUpperCase() + reportType.slice(1)} Payment Reports - {getDateRangeDisplay()}
+            Daily Payment Reports - {getDateRangeDisplay()}
           </h3>
         </div>
         <div className="overflow-x-auto">
