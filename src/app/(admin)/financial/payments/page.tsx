@@ -31,6 +31,16 @@ interface SalesTransaction {
   status: string;
   created_at: string;
   remarks?: string;
+  // Inventory tracking fields
+  inventory_id?: string;
+  inventory_name?: string;
+  quantity_sold?: number;
+  inventory?: {
+    id: string;
+    name: string;
+    category: string;
+    unit: string;
+  };
   customer?: {
     name?: string;
     email?: string;
@@ -58,6 +68,11 @@ interface PaymentRecord {
   assignedAdminId?: string;
   remarks?: string;
   transactionType?: string;
+  // Product sales fields
+  productName?: string;
+  productCategory?: string;
+  productQuantity?: number;
+  productUnit?: string;
 }
 
 const FinancialPaymentsPage: React.FC = () => {
@@ -106,7 +121,12 @@ const FinancialPaymentsPage: React.FC = () => {
             customerId: transaction.customer_id,
             assignedAdminId: transaction.admin_id,
             remarks: transaction.remarks,
-            transactionType: 'Product Sale'
+            transactionType: 'Product Sale',
+            // Product information
+            productName: transaction.inventory_name || transaction.inventory?.name || 'Unknown Product',
+            productCategory: transaction.inventory?.category || 'General',
+            productQuantity: transaction.quantity_sold || 0,
+            productUnit: transaction.inventory?.unit || 'units'
           })) || [];
           
           console.log('Transformed sales payments:', salesPayments);
@@ -416,6 +436,78 @@ const FinancialPaymentsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Product Sales Summary */}
+      {filterType === 'sales_transaction' && salesCount > 0 && (
+        <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-xl p-6 mb-6">
+          <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-4">
+            Product Sales Summary
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Sale Value</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    ₦{(filteredPayments.filter(p => p.type === 'sales_transaction').reduce((sum, p) => sum + p.amount, 0) / salesCount).toFixed(2)}
+                  </p>
+                </div>
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Products Sold</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {filteredPayments
+                      .filter(p => p.type === 'sales_transaction' && p.productQuantity)
+                      .reduce((sum, p) => sum + (p.productQuantity || 0), 0)}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">units sold</p>
+                </div>
+                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Top Product Category</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {(() => {
+                      const categories = filteredPayments
+                        .filter(p => p.type === 'sales_transaction' && p.productCategory)
+                        .reduce((acc: Record<string, number>, p) => {
+                          acc[p.productCategory!] = (acc[p.productCategory!] || 0) + (p.productQuantity || 0);
+                          return acc;
+                        }, {});
+                      const topCategory = Object.keys(categories).reduce((a, b) => 
+                        categories[a] > categories[b] ? a : b, 'General'
+                      );
+                      return topCategory;
+                    })()}
+                  </p>
+                </div>
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                  <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Payments Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -480,11 +572,19 @@ const FinancialPaymentsPage: React.FC = () => {
                       <div className="text-sm text-gray-900 dark:text-white">
                         {payment.serviceType}
                       </div>
-                      {payment.type === 'car_wash' && payment.remarks && (
+                      {payment.type === 'sales_transaction' && payment.productName ? (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <div className="font-medium">{payment.productName}</div>
+                          <div>
+                            {payment.productQuantity} {payment.productUnit}
+                            {payment.productCategory && ` • ${payment.productCategory}`}
+                          </div>
+                        </div>
+                      ) : payment.type === 'car_wash' && payment.remarks ? (
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           {payment.remarks}
                         </div>
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       ₦ {payment.amount.toFixed(2)}

@@ -24,20 +24,26 @@ export async function PUT(
       name,
       email,
       phone,
-      licensePlate,
-      vehicleType,
-      vehicleMake,
-      vehicleModel,
-      vehicleColor,
+      vehicles,
       dateOfBirth
     } = body;
 
     // Validate required fields
-    if (!name || !phone || !licensePlate || !vehicleType || !vehicleColor) {
+    if (!name || !phone || !vehicles || !Array.isArray(vehicles) || vehicles.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Required fields are missing' },
         { status: 400 }
       );
+    }
+
+    // Validate vehicles array
+    for (const vehicle of vehicles) {
+      if (!vehicle.licensePlate || !vehicle.vehicleType || !vehicle.vehicleColor) {
+        return NextResponse.json(
+          { success: false, error: 'All vehicles must have license plate, type, and color' },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if customer exists
@@ -54,17 +60,17 @@ export async function PUT(
       );
     }
 
-    // Check if license plate is already taken by another customer's vehicle
-    const { data: existingVehicle } = await supabaseAdmin
+    // Check if any license plate is already taken by another customer's vehicle
+    const licensePlates = vehicles.map(v => v.licensePlate.trim().toUpperCase());
+    const { data: existingVehicles } = await supabaseAdmin
       .from('vehicles')
-      .select('id, customer_id')
-      .eq('license_plate', licensePlate.trim().toUpperCase())
-      .neq('customer_id', id)
-      .single();
+      .select('id, customer_id, license_plate')
+      .in('license_plate', licensePlates)
+      .neq('customer_id', id);
 
-    if (existingVehicle) {
+    if (existingVehicles && existingVehicles.length > 0) {
       return NextResponse.json(
-        { success: false, error: 'License plate already exists for another customer' },
+        { success: false, error: `License plate(s) already exist for another customer: ${existingVehicles.map(v => v.license_plate).join(', ')}` },
         { status: 400 }
       );
     }
@@ -105,52 +111,75 @@ export async function PUT(
       );
     }
 
-    // Update the primary vehicle for this customer
-    const { data: existingVehicles } = await supabaseAdmin
+    // Get existing vehicles for this customer
+    const { data: existingCustomerVehicles } = await supabaseAdmin
       .from('vehicles')
-      .select('id')
-      .eq('customer_id', id)
-      .eq('is_primary', true);
+      .select('id, license_plate')
+      .eq('customer_id', id);
 
-    if (existingVehicles && existingVehicles.length > 0) {
-      // Update existing primary vehicle
-      const { error: vehicleUpdateError } = await supabaseAdmin
+    const existingVehiclesMap = new Map(
+      existingCustomerVehicles?.map(v => [v.license_plate, v.id]) || []
+    );
+
+    // Separate new vehicles from existing ones
+    const newVehicles = [];
+    const vehiclesToUpdate = [];
+
+    for (const vehicle of vehicles) {
+      const licensePlate = vehicle.licensePlate.trim().toUpperCase();
+      if (existingVehiclesMap.has(licensePlate)) {
+        vehiclesToUpdate.push({
+          id: existingVehiclesMap.get(licensePlate),
+          ...vehicle
+        });
+      } else {
+        newVehicles.push(vehicle);
+      }
+    }
+
+    // Update existing vehicles
+    for (const vehicle of vehiclesToUpdate) {
+      const { error: updateError } = await supabaseAdmin
         .from('vehicles')
         .update({
-          license_plate: licensePlate.trim().toUpperCase(),
-          vehicle_type: vehicleType,
-          vehicle_make: vehicleMake?.trim() || null,
-          vehicle_model: vehicleModel?.trim() || null,
-          vehicle_color: vehicleColor.trim(),
+          license_plate: vehicle.licensePlate.trim().toUpperCase(),
+          vehicle_type: vehicle.vehicleType,
+          vehicle_make: vehicle.vehicleMake?.trim() || null,
+          vehicle_model: vehicle.vehicleModel?.trim() || null,
+          vehicle_color: vehicle.vehicleColor.trim(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', existingVehicles[0].id);
+        .eq('id', vehicle.id);
 
-      if (vehicleUpdateError) {
-        console.error('Update vehicle error:', vehicleUpdateError);
+      if (updateError) {
+        console.error('Update vehicle error:', updateError);
         return NextResponse.json(
           { success: false, error: 'Failed to update vehicle information' },
           { status: 500 }
         );
       }
-    } else {
-      // Create new primary vehicle if none exists
+    }
+
+    // Insert new vehicles
+    if (newVehicles.length > 0) {
+      const vehiclesToInsert = newVehicles.map((vehicle) => ({
+        customer_id: id,
+        license_plate: vehicle.licensePlate.trim().toUpperCase(),
+        vehicle_type: vehicle.vehicleType,
+        vehicle_make: vehicle.vehicleMake?.trim() || null,
+        vehicle_model: vehicle.vehicleModel?.trim() || null,
+        vehicle_color: vehicle.vehicleColor.trim(),
+        is_primary: false // New vehicles are not primary by default
+      }));
+
       const { error: vehicleInsertError } = await supabaseAdmin
         .from('vehicles')
-        .insert({
-          customer_id: id,
-          license_plate: licensePlate.trim().toUpperCase(),
-          vehicle_type: vehicleType,
-          vehicle_make: vehicleMake?.trim() || null,
-          vehicle_model: vehicleModel?.trim() || null,
-          vehicle_color: vehicleColor.trim(),
-          is_primary: true
-        });
+        .insert(vehiclesToInsert);
 
       if (vehicleInsertError) {
-        console.error('Insert vehicle error:', vehicleInsertError);
+        console.error('Insert vehicles error:', vehicleInsertError);
         return NextResponse.json(
-          { success: false, error: 'Failed to create vehicle information' },
+          { success: false, error: 'Failed to add vehicle information' },
           { status: 500 }
         );
       }
@@ -191,10 +220,18 @@ export async function PUT(
       })) || []
     };
 
+    const updateMessage = vehiclesToUpdate.length > 0 && newVehicles.length > 0 
+      ? `Customer updated successfully. Updated ${vehiclesToUpdate.length} vehicle(s) and added ${newVehicles.length} new vehicle(s).`
+      : vehiclesToUpdate.length > 0 
+      ? `Customer updated successfully. Updated ${vehiclesToUpdate.length} vehicle(s).`
+      : newVehicles.length > 0
+      ? `Customer updated successfully. Added ${newVehicles.length} new vehicle(s).`
+      : 'Customer updated successfully.';
+
     return NextResponse.json({
       success: true,
       customer: transformedCustomer,
-      message: 'Customer updated successfully'
+      message: updateMessage
     });
 
   } catch (error) {

@@ -136,9 +136,9 @@ const PaymentReportsPage: React.FC = () => {
 
   const totals = calculateTotals();
 
-  const getAverageRevenue = () => {
-    return reports.length > 0 ? totals.totalRevenue / reports.length : 0;
-  };
+  // const getAverageRevenue = () => {
+  //   return reports.length > 0 ? totals.totalRevenue / reports.length : 0;
+  // };
 
   const getDateRangeDisplay = () => {
     if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
@@ -452,7 +452,7 @@ const PaymentReportsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -468,7 +468,7 @@ const PaymentReportsPage: React.FC = () => {
               </svg>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Car Wash Sales Section */}

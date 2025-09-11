@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
           id,
           name,
           email
+        ),
+        inventory (
+          id,
+          name,
+          category,
+          unit
         )
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })

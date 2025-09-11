@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
           vehicle_type,
           vehicle_model,
           vehicle_color,
+          vehicle_make,
           is_primary,
           created_at,
           updated_at

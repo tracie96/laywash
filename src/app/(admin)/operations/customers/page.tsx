@@ -320,19 +320,12 @@ console.log(customers);
     setEditError(null);
 
     try {
-      // Get the primary vehicle (first vehicle in the array)
-      const primaryVehicle = vehicles[0];
-      
       const customerData = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         dateOfBirth: formData.dateOfBirth,
-        licensePlate: primaryVehicle.licensePlate,
-        vehicleType: primaryVehicle.vehicleType,
-        vehicleMake: primaryVehicle.vehicleMake,
-        vehicleModel: primaryVehicle.vehicleModel,
-        vehicleColor: primaryVehicle.vehicleColor
+        vehicles: vehicles
       };
 
       const response = await fetch(`/api/admin/customers/${selectedCustomer.id}`, {

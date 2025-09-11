@@ -60,13 +60,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!totalAmount || totalAmount <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid total amount' },
-        { status: 400 }
-      );
-    }
-
     // Validate each item
     for (const item of items) {
       if (!item.inventoryId || !item.quantity || item.quantity <= 0) {
@@ -77,9 +70,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process inventory updates
+    if (!totalAmount || totalAmount <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid total amount' },
+        { status: 400 }
+      );
+    }
+
+    const createdTransactions = [];
     const inventoryUpdates = [];
 
+    // Process each item one by one
     for (const item of items) {
       // Get current inventory item
       const { data: inventoryItem, error: inventoryError } = await supabaseAdmin
@@ -125,52 +126,48 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Create sales transaction record for this item
+      const { data: salesTransaction, error: transactionError } = await supabaseAdmin
+        .from('sales_transactions')
+        .insert({
+          customer_id: customerId || null,
+          total_amount: item.totalPrice, // Individual item total
+          payment_method: paymentMethod || 'cash',
+          admin_id: adminId,
+          status: 'completed',
+          remarks: remarks || null,
+          inventory_id: item.inventoryId,
+          inventory_name: inventoryItem.name,
+          quantity_sold: item.quantity
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('Error creating sales transaction:', transactionError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to create sales transaction record' },
+          { status: 500 }
+        );
+      }
+
+      createdTransactions.push(salesTransaction);
       inventoryUpdates.push({
         id: item.inventoryId,
         name: inventoryItem.name,
         previousStock: inventoryItem.current_stock,
         newStock: newStock,
         quantitySold: item.quantity,
-        unitPrice: item.unitPrice || inventoryItem.cost_per_unit,
-        totalPrice: (item.unitPrice || inventoryItem.cost_per_unit) * item.quantity
+        totalPrice: item.totalPrice
       });
-    }
-
-    // Create sales transaction record
-    const { data: salesTransaction, error: transactionError } = await supabaseAdmin
-      .from('sales_transactions')
-      .insert({
-        customer_id: customerId || null,
-        total_amount: totalAmount,
-        payment_method: paymentMethod || 'cash',
-        admin_id: adminId,
-        status: 'completed',
-        remarks: remarks || null
-      })
-      .select()
-      .single();
-
-    if (transactionError) {
-      console.error('Error creating sales transaction:', transactionError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to create sales transaction record' },
-        { status: 500 }
-      );
     }
 
     return NextResponse.json({
       success: true,
       message: 'Sale completed successfully',
       totalAmount: totalAmount,
-      transactionId: salesTransaction.id,
-      itemsSold: inventoryUpdates,
-      inventoryUpdates: inventoryUpdates.map(update => ({
-        id: update.id,
-        name: update.name,
-        previousStock: update.previousStock,
-        newStock: update.newStock,
-        quantitySold: update.quantitySold
-      }))
+      transactionsCreated: createdTransactions.length,
+      itemsSold: inventoryUpdates
     });
 
   } catch (error) {

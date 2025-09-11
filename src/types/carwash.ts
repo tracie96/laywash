@@ -472,6 +472,26 @@ export interface Expense {
   updatedAt: Date | string;
 }
 
+// Sales Transaction Types
+export interface SalesTransaction {
+  id: string;
+  customer_id?: string;
+  customer?: Customer;
+  total_amount: number;
+  payment_method: 'cash' | 'card' | 'mobile_money';
+  admin_id: string;
+  admin?: User;
+  status: 'pending' | 'completed' | 'cancelled' | 'refunded';
+  remarks?: string;
+  created_at: string;
+  updated_at: string;
+  // Inventory tracking fields
+  inventory_id?: string;
+  inventory_name?: string;
+  quantity_sold?: number;
+  inventory?: Inventory;
+}
+
 // Report Types
 export interface ReportFilters {
   startDate: Date;
