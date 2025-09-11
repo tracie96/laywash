@@ -337,19 +337,13 @@ const PaymentReportsPage: React.FC = () => {
           {/* Report Type */}
           
           {/* Period Selector - Radio Buttons for Mobile */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Period:
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
+            <div className="flex flex-wrap gap-2">
               {availableOptions.map((option) => (
                 <label
                   key={option.value}
-                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors touch-manipulation ${
-                    selectedPeriod === option.value
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}
+                  className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                 >
                   <input
                     type="radio"
@@ -357,19 +351,10 @@ const PaymentReportsPage: React.FC = () => {
                     value={option.value}
                     checked={selectedPeriod === option.value}
                     onChange={(e) => handlePeriodChange(e.target.value)}
-                    className="sr-only"
+                    className="text-blue-600 focus:ring-blue-500"
                     disabled={isAdmin}
                   />
-                  <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
-                    selectedPeriod === option.value
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}>
-                    {selectedPeriod === option.value && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <span className="text-sm font-medium">{option.label}</span>
+                  <span>{option.label}</span>
                 </label>
               ))}
             </div>

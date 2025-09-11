@@ -476,6 +476,7 @@ export interface Expense {
 export interface SalesTransaction {
   id: string;
   customer_id?: string;
+  customer_name?: string;
   customer?: Customer;
   total_amount: number;
   payment_method: 'cash' | 'card' | 'mobile_money';

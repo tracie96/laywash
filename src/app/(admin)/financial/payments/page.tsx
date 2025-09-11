@@ -25,6 +25,7 @@ interface CarWashPayment {
 interface SalesTransaction {
   id: string;
   customer_id?: string;
+  customer_name?: string;
   total_amount: number;
   payment_method?: string;
   admin_id: string;
@@ -111,10 +112,15 @@ const FinancialPaymentsPage: React.FC = () => {
           // Transform sales data
           const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => {
             console.log('Raw transaction data:', transaction);
+            console.log('Customer data:', {
+              customer_id: transaction.customer_id,
+              customer_name: transaction.customer_name,
+              customer_object: transaction.customer
+            });
             return {
             id: transaction.id,
             type: 'sales_transaction' as const,
-            customerName: transaction.customer?.name || 'Walk-in Customer',
+            customerName: transaction.customer?.name || transaction.customer_name || 'Walk-in Customer',
             amount: transaction.total_amount,
             date: transaction.created_at,
             status: transaction.status === 'completed' ? 'completed' : 'pending',
@@ -162,7 +168,7 @@ const FinancialPaymentsPage: React.FC = () => {
             const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => ({
               id: transaction.id,
               type: 'sales_transaction' as const,
-              customerName: transaction.customer?.name || 'Walk-in Customer',
+              customerName: transaction.customer?.name || transaction.customer_name || 'Walk-in Customer',
               amount: transaction.total_amount,
               date: transaction.created_at,
               status: transaction.status === 'completed' ? 'completed' : 'pending',
