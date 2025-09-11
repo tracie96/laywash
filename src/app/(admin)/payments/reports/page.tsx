@@ -27,27 +27,8 @@ const PaymentReportsPage: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
-
   // Check if user is admin (restricted to current month only)
   const isAdmin = user?.role === 'admin';
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (isPeriodDropdownOpen) {
-        const target = event.target as Element;
-        if (!target.closest('.period-dropdown')) {
-          setIsPeriodDropdownOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isPeriodDropdownOpen]);
 
   // Period options
   const periodOptions = [
@@ -73,7 +54,6 @@ const PaymentReportsPage: React.FC = () => {
     }
     
     setSelectedPeriod(newPeriod);
-    setIsPeriodDropdownOpen(false);
     if (newPeriod === 'custom') {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -356,43 +336,43 @@ const PaymentReportsPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4">
           {/* Report Type */}
           
-          {/* Period Selector - Custom Dropdown for Mobile */}
-          <div className="relative period-dropdown">
-            <button
-              type="button"
-              onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
-              className="w-full px-4 py-3 text-left border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white flex items-center justify-between min-h-[48px] touch-manipulation"
-              disabled={isAdmin}
-            >
-              <span>{availableOptions.find(opt => opt.value === selectedPeriod)?.label || 'Select Period'}</span>
-              <svg
-                className={`w-5 h-5 transition-transform duration-200 ${isPeriodDropdownOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {isPeriodDropdownOpen && (
-              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
-                {availableOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handlePeriodChange(option.value)}
-                    className={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-600 first:rounded-t-lg last:rounded-b-lg touch-manipulation ${
-                      selectedPeriod === option.value 
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Period Selector - Radio Buttons for Mobile */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select Period:
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {availableOptions.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors touch-manipulation ${
+                    selectedPeriod === option.value
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="period"
+                    value={option.value}
+                    checked={selectedPeriod === option.value}
+                    onChange={(e) => handlePeriodChange(e.target.value)}
+                    className="sr-only"
+                    disabled={isAdmin}
+                  />
+                  <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
+                    selectedPeriod === option.value
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}>
+                    {selectedPeriod === option.value && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium">{option.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
           
           {/* Admin restriction notice */}
