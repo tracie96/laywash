@@ -81,6 +81,74 @@ const FinancialPaymentsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'car_wash' | 'sales_transaction'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  // Period options
+  const periodOptions = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'week', label: 'This Week' },
+    { value: 'month', label: 'This Month' },
+    { value: 'quarter', label: 'This Quarter' },
+  ];
+
+  // Handle period change
+  const handlePeriodChange = (newPeriod: string) => {
+    setSelectedPeriod(newPeriod);
+    if (newPeriod === 'custom') {
+      const today = new Date();
+      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+      setCustomStartDate(lastMonth.toISOString().split('T')[0]);
+      setCustomEndDate(today.toISOString().split('T')[0]);
+    }
+  };
+
+  // Filter payments by date range
+  const filterPaymentsByDate = (payments: PaymentRecord[]) => {
+    if (selectedPeriod === 'custom') {
+      if (!customStartDate || !customEndDate) return payments;
+      const startDate = new Date(customStartDate);
+      const endDate = new Date(customEndDate);
+      endDate.setHours(23, 59, 59, 999);
+      
+      return payments.filter(payment => {
+        const paymentDate = new Date(payment.date);
+        return paymentDate >= startDate && paymentDate <= endDate;
+      });
+    }
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate = new Date(now);
+
+    switch (selectedPeriod) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'yesterday':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'quarter':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      default:
+        return payments;
+    }
+
+    return payments.filter(payment => {
+      const paymentDate = new Date(payment.date);
+      return paymentDate >= startDate && paymentDate <= endDate;
+    });
+  };
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -231,10 +299,14 @@ const FinancialPaymentsPage: React.FC = () => {
     }
   };
 
-  // Filter payments based on selected type
-  const filteredPayments = filterType === 'all' 
-    ? payments 
-    : payments.filter(p => p.type === filterType);
+  // Filter payments based on selected type and date
+  const filteredPayments = (() => {
+    const filtered = filterType === 'all' 
+      ? payments 
+      : payments.filter(p => p.type === filterType);
+    
+    return filterPaymentsByDate(filtered);
+  })();
 
   const totalRevenue = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
   const completedPayments = filteredPayments.filter(p => p.status === "completed").length;
@@ -310,6 +382,49 @@ const FinancialPaymentsPage: React.FC = () => {
               Sales Only
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Period Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Period Selector */}
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
+            <select
+              value={selectedPeriod}
+              onChange={(e) => handlePeriodChange(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              {periodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Date Range Inputs */}
+          {selectedPeriod === 'custom' && (
+            <div className="flex flex-col space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Custom Date Range:</label>
+              <div className="flex space-x-2">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+                <span className="text-gray-600 dark:text-gray-400 flex items-center">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

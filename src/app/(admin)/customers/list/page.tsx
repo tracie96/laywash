@@ -11,6 +11,7 @@ const CustomerListPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [filter, setFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'totalVisits' | 'totalSpent' | 'registrationDate'>('totalSpent');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -65,6 +66,15 @@ const CustomerListPage: React.FC = () => {
       totalVisits: customers.reduce((sum, c) => sum + c.totalVisits, 0),
       averageSpent: customers.length > 0 ? customers.reduce((sum, c) => sum + c.totalSpent, 0) / customers.length : 0
     };
+  };
+
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchTerm('');
   };
 
   const handleSort = (field: typeof sortBy) => {
@@ -217,14 +227,29 @@ const CustomerListPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
-          <div className="flex-1">
+          <div className="flex-1 flex gap-2">
             <input
               type="text"
               placeholder="Search by name, email, phone, or license plate..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
             />
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              Search
+            </button>
+            {searchTerm && (
+              <button
+                onClick={handleClearSearch}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Filter */}

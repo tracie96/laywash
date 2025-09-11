@@ -18,9 +18,26 @@ interface PaymentReport {
   stockSalesCount: number;
 }
 
+interface DetailedTransaction {
+  id: string;
+  total_amount: number;
+  payment_method: string;
+  created_at: string;
+  inventory_id?: string;
+  inventory_name?: string;
+  quantity_sold?: number;
+  inventory?: {
+    id: string;
+    name: string;
+    category: string;
+    unit: string;
+  };
+}
+
 const PaymentReportsPage: React.FC = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState<PaymentReport[]>([]);
+  const [detailedTransactions, setDetailedTransactions] = useState<DetailedTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [viewMode, setViewMode] = useState<'all' | 'car-wash-only' | 'stock-sales-only'>('all');
@@ -37,7 +54,6 @@ const PaymentReportsPage: React.FC = () => {
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
     { value: 'quarter', label: 'This Quarter' },
-    { value: 'custom', label: 'Custom Date Range' }
   ];
 
   // Filter options for admin users
@@ -105,6 +121,7 @@ const PaymentReportsPage: React.FC = () => {
       
       if (data.success) {
         setReports(data.reports || []);
+        setDetailedTransactions(data.detailedTransactions || []);
       } else {
         setError(data.error || 'Failed to fetch reports');
       }
@@ -795,6 +812,96 @@ const PaymentReportsPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Product Sales Details */}
+      {detailedTransactions.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-6">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Product Sales Details - {getDateRangeDisplay()}
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Payment Method
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {detailedTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <div>
+                        <div className="font-medium">
+                          {new Date(transaction.created_at).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(transaction.created_at).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <div>
+                        <div className="font-medium">
+                          {transaction.inventory?.name || transaction.inventory_name || 'Unknown Product'}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ID: {transaction.inventory_id || 'N/A'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {transaction.inventory?.category || 'General'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <div className="text-center">
+                        <div className="font-medium">{transaction.quantity_sold || 0}</div>
+                        <div className="text-xs text-gray-500">
+                          {transaction.inventory?.unit || 'units'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      ₦ {transaction.total_amount.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        transaction.payment_method === 'cash' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                          : transaction.payment_method === 'pos'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200'
+                          : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200'
+                      }`}>
+                        {transaction.payment_method === 'pos' ? 'POS' : 
+                         transaction.payment_method === 'mobile_money' ? 'Mobile' : 
+                         transaction.payment_method?.toUpperCase() || 'CASH'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

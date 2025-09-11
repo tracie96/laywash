@@ -75,6 +75,7 @@ const OperationsCustomersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'totalVisits' | 'totalSpent' | 'lastVisit'>('totalSpent');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -140,6 +141,15 @@ console.log(customers);
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
+
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchTerm('');
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -510,13 +520,30 @@ console.log(customers);
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-wrap gap-4">
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                onClick={handleSearch}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                Search
+              </button>
+              {searchTerm && (
+                <button
+                  onClick={handleClearSearch}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
             <select
               value={filterType}

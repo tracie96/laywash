@@ -97,6 +97,15 @@ export async function GET(request: NextRequest) {
       total_amount: number;
       payment_method: string;
       created_at: string;
+      inventory_id?: string;
+      inventory_name?: string;
+      quantity_sold?: number;
+      inventory?: {
+        id: string;
+        name: string;
+        category: string;
+        unit: string;
+      };
     }> = [];
     
     if (viewMode !== 'car-wash-only') {
@@ -108,7 +117,16 @@ export async function GET(request: NextRequest) {
           total_amount,
           payment_method,
           status,
-          created_at
+          created_at,
+          inventory_id,
+          inventory_name,
+          quantity_sold,
+          inventory (
+            id,
+            name,
+            category,
+            unit
+          )
         `)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -119,7 +137,17 @@ export async function GET(request: NextRequest) {
         console.error('Error fetching sales transactions for stock sales:', salesError);
         // Continue without stock sales data rather than failing completely
       } else if (salesTransactions) {
-        stockSales = salesTransactions;
+        // Transform the joined data to match our interface
+        stockSales = salesTransactions.map(transaction => ({
+          id: transaction.id,
+          total_amount: transaction.total_amount,
+          payment_method: transaction.payment_method,
+          created_at: transaction.created_at,
+          inventory_id: transaction.inventory_id,
+          inventory_name: transaction.inventory_name,
+          quantity_sold: transaction.quantity_sold,
+          inventory: Array.isArray(transaction.inventory) ? transaction.inventory[0] : transaction.inventory
+        }));
       }
     }
 
@@ -292,6 +320,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       reports,
+      detailedTransactions: stockSales, // Include detailed transaction data with inventory info
       summary: {
         reportType,
         period,
