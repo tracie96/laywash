@@ -73,6 +73,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Log the first transaction to debug the structure
+    if (transactions && transactions.length > 0) {
+      console.log('Sample transaction structure:', JSON.stringify(transactions[0], null, 2));
+    }
+
     return NextResponse.json({
       success: true,
       transactions: transactions || []

@@ -109,7 +109,9 @@ const FinancialPaymentsPage: React.FC = () => {
           console.log('Transformed car wash payments:', carWashPayments);
           
           // Transform sales data
-          const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => ({
+          const salesPayments = salesData.transactions?.map((transaction: SalesTransaction) => {
+            console.log('Raw transaction data:', transaction);
+            return {
             id: transaction.id,
             type: 'sales_transaction' as const,
             customerName: transaction.customer?.name || 'Walk-in Customer',
@@ -123,11 +125,13 @@ const FinancialPaymentsPage: React.FC = () => {
             remarks: transaction.remarks,
             transactionType: 'Product Sale',
             // Product information
-            productName: transaction.inventory_name || transaction.inventory?.name || 'Unknown Product',
+            productName: transaction.inventory?.name || transaction.inventory_name || 'Unknown Product',
             productCategory: transaction.inventory?.category || 'General',
             productQuantity: transaction.quantity_sold || 0,
-            productUnit: transaction.inventory?.unit || 'units'
-          })) || [];
+            productUnit: transaction.inventory?.unit || 'units',
+            inventoryId: transaction.inventory_id
+          };
+          }) || [];
           
           console.log('Transformed sales payments:', salesPayments);
           

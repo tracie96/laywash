@@ -27,9 +27,42 @@ const PaymentReportsPage: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
 
   // Check if user is admin (restricted to current month only)
   const isAdmin = user?.role === 'admin';
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isPeriodDropdownOpen) {
+        const target = event.target as Element;
+        if (!target.closest('.period-dropdown')) {
+          setIsPeriodDropdownOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPeriodDropdownOpen]);
+
+  // Period options
+  const periodOptions = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'week', label: 'This Week' },
+    { value: 'month', label: 'This Month' },
+    { value: 'quarter', label: 'This Quarter' },
+    { value: 'custom', label: 'Custom Date Range' }
+  ];
+
+  // Filter options for admin users
+  const availableOptions = isAdmin 
+    ? periodOptions.filter(option => option.value === 'month')
+    : periodOptions;
 
   // Set default custom dates when custom period is selected
   const handlePeriodChange = (newPeriod: string) => {
@@ -40,6 +73,7 @@ const PaymentReportsPage: React.FC = () => {
     }
     
     setSelectedPeriod(newPeriod);
+    setIsPeriodDropdownOpen(false);
     if (newPeriod === 'custom') {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -322,20 +356,44 @@ const PaymentReportsPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4">
           {/* Report Type */}
           
-          {/* Period Selector */}
-          <select
-            value={selectedPeriod}
-            onChange={(e) => handlePeriodChange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            disabled={isAdmin}
-          >
-            {!isAdmin && <option value="today">Today</option>}
-            {!isAdmin && <option value="yesterday">Yesterday</option>}
-            {!isAdmin && <option value="week">This Week</option>}
-            <option value="month">This Month</option>
-            {!isAdmin && <option value="quarter">This Quarter</option>}
-            {!isAdmin && <option value="custom">Custom Date Range</option>}
-          </select>
+          {/* Period Selector - Custom Dropdown for Mobile */}
+          <div className="relative period-dropdown">
+            <button
+              type="button"
+              onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
+              className="w-full px-4 py-3 text-left border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white flex items-center justify-between min-h-[48px] touch-manipulation"
+              disabled={isAdmin}
+            >
+              <span>{availableOptions.find(opt => opt.value === selectedPeriod)?.label || 'Select Period'}</span>
+              <svg
+                className={`w-5 h-5 transition-transform duration-200 ${isPeriodDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {isPeriodDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+                {availableOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handlePeriodChange(option.value)}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-600 first:rounded-t-lg last:rounded-b-lg touch-manipulation ${
+                      selectedPeriod === option.value 
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           
           {/* Admin restriction notice */}
           {isAdmin && (
@@ -415,7 +473,7 @@ const PaymentReportsPage: React.FC = () => {
       </div>
 
       {/* Overall Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -483,7 +541,7 @@ const PaymentReportsPage: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Car Wash Sales</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -520,23 +578,6 @@ const PaymentReportsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Average per Transaction
-                </p>
-                <p className="text-2xl font-bold text-blue-600">
-                  ₦ {totals.carWashCount > 0 ? (totals.carWashRevenue / totals.carWashCount).toFixed(2) : '0.00'}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       )}
@@ -553,7 +594,7 @@ const PaymentReportsPage: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Product Sales</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -590,23 +631,7 @@ const PaymentReportsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Average per Transaction
-                </p>
-                <p className="text-2xl font-bold text-purple-600">
-                  ₦ {totals.stockSalesCount > 0 ? (totals.stockSalesRevenue / totals.stockSalesCount).toFixed(2) : '0.00'}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
+        
         </div>
       </div>
       )}
