@@ -161,6 +161,7 @@ console.log(customers);
     }));
   };
 
+
   const handleVehicleChange = (index: number, field: string, value: string | boolean) => {
     setVehicles(prev => prev.map((vehicle, i) => 
       i === index ? { ...vehicle, [field]: value } : vehicle

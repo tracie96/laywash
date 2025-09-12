@@ -30,6 +30,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if email already exists (if provided)
+    if (email && email.trim()) {
+      const { data: existingCustomer, error: emailCheckError } = await supabaseAdmin
+        .from('customers')
+        .select('id, email')
+        .eq('email', email.trim())
+        .single();
+
+      if (emailCheckError && emailCheckError.code !== 'PGRST116') { // PGRST116 = no rows found
+        return NextResponse.json(
+          { success: false, error: 'Error checking for existing email' },
+          { status: 500 }
+        );
+      }
+
+      if (existingCustomer) {
+        return NextResponse.json(
+          { success: false, error: 'A customer with this email address already exists' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate vehicles
     for (const vehicle of vehicles) {
       if (!vehicle.licensePlate || !vehicle.vehicleType || !vehicle.vehicleColor) {
