@@ -3,6 +3,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useAuth } from "@/context/AuthContext";
 import { PlusIcon, CheckCircleIcon, CloseIcon, TrashBinIcon } from "@/icons";
+import { Modal } from "@/components/ui/modal";
+import Button from "@/components/ui/button/Button";
+import Label from "@/components/form/Label";
+import Input from "@/components/form/input/InputField";
+import { LocationSelect } from "@/components/ui/LocationSelect";
 
 interface Bonus {
   id: string;
@@ -24,8 +29,10 @@ interface Bonus {
 interface CreateBonusForm {
   type: 'customer' | 'washer';
   recipientId: string;
-  amount: number;
+  amount: string;
   reason: string;
+  description: string;
+  locationId: string;
   milestone: string;
 }
 
@@ -35,6 +42,8 @@ interface Customer {
   email?: string;
   phone: string;
   licensePlate: string;
+  totalVisits: number;
+  totalSpent: number;
 }
 
 interface Washer {
@@ -52,15 +61,22 @@ const FinancialBonusesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateBonusForm>({
-    type: 'washer',
+    type: 'customer',
     recipientId: '',
-    amount: 0,
+    amount: '',
     reason: '',
+    description: '',
+    locationId: '',
     milestone: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'customer' | 'washer'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'paid' | 'rejected'>('all');
+  
+  // Customer filtering states
+  const [minVisits, setMinVisits] = useState<string>('');
+  const [minSpent, setMinSpent] = useState<string>('');
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   
   const { user } = useAuth();
 
@@ -93,18 +109,45 @@ const FinancialBonusesPage: React.FC = () => {
     }
   }, [filterType, filterStatus]);
 
+  // Filter customers based on visits and spending
+  const filterCustomers = useCallback(() => {
+    let filtered = customers;
+    
+    if (minVisits) {
+      const visits = parseInt(minVisits);
+      if (!isNaN(visits)) {
+        filtered = filtered.filter(customer => customer.totalVisits >= visits);
+      }
+    }
+    
+    if (minSpent) {
+      const spent = parseFloat(minSpent);
+      if (!isNaN(spent)) {
+        filtered = filtered.filter(customer => customer.totalSpent >= spent);
+      }
+    }
+    
+    setFilteredCustomers(filtered);
+  }, [customers, minVisits, minSpent]);
+
   useEffect(() => {
     fetchBonuses();
     fetchCustomers();
     fetchWashers();
   }, [fetchBonuses]);
 
+  // Filter customers when filters change
+  useEffect(() => {
+    filterCustomers();
+  }, [filterCustomers]);
+
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('/api/admin/customers');
+      const response = await fetch('/api/admin/customers?includeStats=true');
       const data = await response.json();
       if (data.success) {
         setCustomers(data.customers);
+        setFilteredCustomers(data.customers);
       }
     } catch {
       console.error('Error fetching customers');
@@ -131,7 +174,8 @@ const FinancialBonusesPage: React.FC = () => {
       return;
     }
 
-    if (createForm.amount <= 0) {
+    const amount = parseFloat(createForm.amount);
+    if (isNaN(amount) || amount <= 0) {
       setError('Bonus amount must be greater than 0');
       return;
     }
@@ -140,31 +184,63 @@ const FinancialBonusesPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/admin/bonuses', {
+      // Create bonus entry
+      const bonusResponse = await fetch('/api/admin/bonuses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify({
+          type: createForm.type,
+          recipientId: createForm.recipientId,
+          amount: amount,
+          reason: createForm.reason,
+          milestone: createForm.milestone || null,
+        }),
       });
 
-      const data = await response.json();
+      const bonusData = await bonusResponse.json();
 
-      if (data.success) {
+      if (bonusData.success) {
+        // Create expense entry for customer bonuses
+        if (createForm.type === 'customer') {
+          const expenseResponse = await fetch('/api/admin/expenses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              serviceType: 'checkin', // Free Car Wash
+              amount: amount,
+              reason: `Customer Bonus: ${createForm.reason}`,
+              description: createForm.description || `Bonus awarded to customer - ${createForm.milestone || 'No milestone specified'}`,
+              locationId: createForm.locationId || null,
+              expenseDate: new Date().toISOString()
+            }),
+          });
+
+          const expenseData = await expenseResponse.json();
+          if (!expenseData.success) {
+            console.warn('Bonus created but expense entry failed:', expenseData.error);
+          }
+        }
+
         setShowCreateModal(false);
         setCreateForm({
-          type: 'washer',
+          type: 'customer',
           recipientId: '',
-          amount: 0,
+          amount: '',
           reason: '',
+          description: '',
+          locationId: '',
           milestone: ''
         });
         fetchBonuses(); // Refresh the list
       } else {
-        if (data.needsTableCreation) {
+        if (bonusData.needsTableCreation) {
           setError('The bonuses table does not exist in your database. Please run the SQL script to create it.');
         } else {
-          setError(data.error || 'Failed to create bonus');
+          setError(bonusData.error || 'Failed to create bonus');
         }
       }
     } catch {
@@ -360,6 +436,51 @@ const FinancialBonusesPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Customer Filtering Section */}
+      {filterType === 'customer' && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filter Customers for Bonus</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Minimum Visits</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="e.g., 10"
+                value={minVisits}
+                onChange={(e) => setMinVisits(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Minimum Amount Spent (₦)</Label>
+              <Input
+                type="number"
+                min="0"
+                step={0.01}
+                placeholder="e.g., 5000"
+                value={minSpent}
+                onChange={(e) => setMinSpent(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={() => {
+                  setMinVisits('');
+                  setMinSpent('');
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+          <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+            Showing {filteredCustomers.length} customers matching your criteria
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -506,124 +627,138 @@ const FinancialBonusesPage: React.FC = () => {
       </div>
 
       {/* Create Bonus Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Bonus</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <CloseIcon className="w-6 h-6" />
-              </button>
-            </div>
+      <Modal
+      isOpen={showCreateModal}
+      onClose={() => setShowCreateModal(false)}
+      className="max-w-md"
+    >
+      <div className="p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Create New Bonus
+        </h2>
 
-            <form onSubmit={handleCreateBonus} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Bonus Type
-                </label>
-                <select
-                  value={createForm.type}
-                  onChange={(e) => setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer'})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="washer">Washer</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Recipient
-                </label>
-                <select
-                  value={createForm.recipientId}
-                  onChange={(e) => setCreateForm({...createForm, recipientId: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select recipient</option>
-                  {createForm.type === 'customer' 
-                    ? customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} - {customer.licensePlate}
-                        </option>
-                      ))
-                    : washers.map(washer => (
-                        <option key={washer.id} value={washer.id}>
-                          {washer.name} - {washer.email}
-                        </option>
-                      ))
-                  }
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Amount ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={createForm.amount}
-                  onChange={(e) => setCreateForm({...createForm, amount: parseFloat(e.target.value) || 0})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter bonus amount"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Reason
-                </label>
-                <textarea
-                  value={createForm.reason}
-                  onChange={(e) => setCreateForm({...createForm, reason: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter reason for bonus"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Milestone (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={createForm.milestone}
-                  onChange={(e) => setCreateForm({...createForm, milestone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., 100th car washed, Loyal customer"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-green-light-600 text-white rounded-lg hover:bg-green-light-700 disabled:bg-green-light-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                >
-                  {submitting ? 'Creating...' : 'Create Bonus'}
-                </button>
-              </div>
-            </form>
+        {error && (
+          <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
           </div>
-        </div>
-      )}
+        )}
+
+        <form onSubmit={handleCreateBonus} className="space-y-4">
+          {/* Bonus Type */}
+          <div>
+            <Label>Bonus Type <span className="text-error-500">*</span></Label>
+            <select
+              value={createForm.type}
+              onChange={(e) => setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer'})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="customer">Customer</option>
+              <option value="washer">Washer</option>
+            </select>
+          </div>
+
+          {/* Recipient */}
+          <div>
+            <Label>Recipient <span className="text-error-500">*</span></Label>
+            <select
+              value={createForm.recipientId}
+              onChange={(e) => setCreateForm({...createForm, recipientId: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">Select recipient</option>
+              {createForm.type === 'customer' 
+                ? filteredCustomers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} - {customer.licensePlate} (Visits: {customer.totalVisits}, Spent: ₦{customer.totalSpent.toFixed(2)})
+                    </option>
+                  ))
+                : washers.map(washer => (
+                    <option key={washer.id} value={washer.id}>
+                      {washer.name} - {washer.email}
+                    </option>
+                  ))
+              }
+            </select>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <Label>Amount (₦) <span className="text-error-500">*</span></Label>
+            <Input
+              type="number"
+              step={0.01}
+              min="0"
+              placeholder="Enter bonus amount"
+              value={createForm.amount}
+              onChange={(e) => setCreateForm({...createForm, amount: e.target.value})}
+            />
+          </div>
+
+          {/* Reason */}
+          <div>
+            <Label>Reason <span className="text-error-500">*</span></Label>
+            <Input
+              type="text"
+              placeholder="Brief reason for bonus"
+              value={createForm.reason}
+              onChange={(e) => setCreateForm({...createForm, reason: e.target.value})}
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <Label>Description</Label>
+            <textarea
+              placeholder="Detailed description (optional)"
+              value={createForm.description}
+              onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              rows={3}
+            />
+          </div>
+
+          {/* Location */}
+          <div>
+            <Label>Location</Label>
+            <LocationSelect
+              value={createForm.locationId}
+              onChange={(locationId) => setCreateForm({...createForm, locationId})}
+              placeholder="Select location (optional)"
+            />
+          </div>
+
+          {/* Milestone */}
+          <div>
+            <Label>Milestone (Optional)</Label>
+            <Input
+              type="text"
+              placeholder="e.g., 100th car washed, Loyal customer"
+              value={createForm.milestone}
+              onChange={(e) => setCreateForm({...createForm, milestone: e.target.value})}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="flex-1"
+            >
+              {submitting ? 'Creating...' : 'Create Bonus'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+              className="px-6"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Modal>
     </div>
   );
 };

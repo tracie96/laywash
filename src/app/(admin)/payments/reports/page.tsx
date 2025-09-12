@@ -44,7 +44,7 @@ const PaymentReportsPage: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
-  // Check if user is admin (restricted to current month only)
+  // Check if user is admin (can access today, this week, this month, and range)
   const isAdmin = user?.role === 'admin';
 
   // Period options
@@ -58,13 +58,13 @@ const PaymentReportsPage: React.FC = () => {
 
   // Filter options for admin users
   const availableOptions = isAdmin 
-    ? periodOptions.filter(option => option.value === 'month')
+    ? periodOptions.filter(option => ['today', 'week', 'month'].includes(option.value))
     : periodOptions;
 
   // Set default custom dates when custom period is selected
   const handlePeriodChange = (newPeriod: string) => {
-    // Admin users can only select current month
-    if (isAdmin && newPeriod !== 'month') {
+    // Admin users can select today, week, month, or custom range
+    if (isAdmin && !['today', 'week', 'month'].includes(newPeriod)) {
       setSelectedPeriod('month');
       return;
     }
@@ -78,7 +78,7 @@ const PaymentReportsPage: React.FC = () => {
     }
   };
 
-  // Set admin users to current month on component mount
+  // Set admin users to current month on component mount (admin can also select today, week, or range)
   useEffect(() => {
     if (isAdmin) {
       setSelectedPeriod('month');
