@@ -63,6 +63,7 @@ interface CheckIn {
       name: string;
       description?: string;
       base_price?: number;
+      
       category?: string;
     };
   }>;
@@ -122,6 +123,7 @@ console.log(customers);
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
       if (filterType !== 'all') params.append('filter', filterType);
+      params.append('limit', '10000'); // Request all customers
       
       const response = await fetch(`/api/admin/customers?${params.toString()}`);
       const data = await response.json();
