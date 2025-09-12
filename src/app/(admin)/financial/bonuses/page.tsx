@@ -478,6 +478,50 @@ const FinancialBonusesPage: React.FC = () => {
           <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
             Showing {filteredCustomers.length} customers matching your criteria
           </div>
+          
+          {/* Customer List */}
+          {filteredCustomers.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">Eligible Customers</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredCustomers.map((customer) => (
+                  <div 
+                    key={customer.id}
+                    className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setCreateForm(prev => ({...prev, recipientId: customer.id}));
+                      setShowCreateModal(true);
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h5 className="font-medium text-gray-900 dark:text-white">{customer.name}</h5>
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded">
+                        {customer.licensePlate}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex justify-between">
+                        <span>Total Visits:</span>
+                        <span className="font-medium">{customer.totalVisits}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Spent:</span>
+                        <span className="font-medium">₦{customer.totalSpent.toFixed(2)}</span>
+                      </div>
+                      {customer.email && (
+                        <div className="text-xs text-gray-500 dark:text-gray-500 truncate">
+                          {customer.email}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+                      Click to select for bonus
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
