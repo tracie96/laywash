@@ -526,7 +526,7 @@ console.log(customers);
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Search customers..."
+                placeholder="Search customers by name, email, phone, or license plate..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}

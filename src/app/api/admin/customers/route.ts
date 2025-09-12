@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+interface Vehicle {
+  id: string;
+  license_plate: string;
+  vehicle_type: string;
+  vehicle_model: string;
+  vehicle_color: string;
+  vehicle_make: string;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CustomerWithVehicles {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string;
+  is_registered: boolean;
+  registration_date: string;
+  license_plate?: string;
+  created_at: string;
+  updated_at: string;
+  vehicles: Vehicle[];
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -47,6 +73,44 @@ export async function GET(request: NextRequest) {
 
     const { data: customers, error } = await query;
 
+    // If we have a search term, also search for customers by vehicle license plates
+    let customersByVehicle: CustomerWithVehicles[] = [];
+    if (search) {
+      const { data: vehicles, error: vehicleError } = await supabaseAdmin
+        .from('vehicles')
+        .select('customer_id')
+        .ilike('license_plate', `%${search}%`);
+      
+      if (!vehicleError && vehicles && vehicles.length > 0) {
+        const vehicleCustomerIds = vehicles.map(v => v.customer_id).filter(Boolean);
+        if (vehicleCustomerIds.length > 0) {
+          const { data: customersByVehicleData, error: customersByVehicleError } = await supabaseAdmin
+            .from('customers')
+            .select(`
+              *,
+              vehicles:vehicles (
+                id,
+                license_plate,
+                vehicle_type,
+                vehicle_model,
+                vehicle_color,
+                vehicle_make,
+                is_primary,
+                created_at,
+                updated_at
+              )
+            `)
+            .in('id', vehicleCustomerIds)
+            .order('name', { ascending: true })
+            .limit(limit);
+          
+          if (!customersByVehicleError) {
+            customersByVehicle = customersByVehicleData || [];
+          }
+        }
+      }
+    }
+
     if (error) {
       console.error('Error fetching customers:', error);
       return NextResponse.json(
@@ -55,8 +119,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Combine customers from both queries and remove duplicates
+    const allCustomers = [...(customers || []), ...customersByVehicle];
+    const uniqueCustomers = allCustomers.filter((customer, index, self) => 
+      index === self.findIndex(c => c.id === customer.id)
+    );
+
     // Get all customer IDs to fetch their check-in statistics
-    const customerIds = (customers || []).map(c => c.id);
+    const customerIds = uniqueCustomers.map(c => c.id);
     
     
     const { data: checkInStats, error: statsError } = await supabaseAdmin
@@ -88,9 +158,17 @@ export async function GET(request: NextRequest) {
     
     // Create a map of license plates to customer IDs for matching
     const licensePlateToCustomerId: { [key: string]: string } = {};
-    (customers || []).forEach(customer => {
+    uniqueCustomers.forEach(customer => {
       if (customer.license_plate) {
         licensePlateToCustomerId[customer.license_plate.toUpperCase()] = customer.id;
+      }
+      // Also check vehicles for license plates
+      if (customer.vehicles) {
+        customer.vehicles.forEach((vehicle: Vehicle) => {
+          if (vehicle.license_plate) {
+            licensePlateToCustomerId[vehicle.license_plate.toUpperCase()] = customer.id;
+          }
+        });
       }
     });
     
@@ -126,7 +204,7 @@ export async function GET(request: NextRequest) {
 
     
     // Transform customers with calculated statistics
-    const transformedCustomers = (customers || []).map(customer => {
+    const transformedCustomers = uniqueCustomers.map(customer => {
       const stats = customerStats[customer.id] || { totalVisits: 0, totalSpent: 0 };
       
       return {
