@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       name, 
       email, 
       phone, 
+      whatsapp_number,
       dateOfBirth,
       vehicles
     } = await request.json();
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
         name,
         email: email || null,
         phone,
+        whatsapp_number: whatsapp_number || null,
         date_of_birth: dateOfBirth || null,
         is_registered: true,
         registration_date: new Date().toISOString(),

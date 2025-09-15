@@ -11,6 +11,42 @@ export interface SMSData {
 export class SMSService {
   private static client: twilio.Twilio | null = null;
 
+  /**
+   * Formats a Nigerian phone number to international format (+234)
+   * Handles various input formats:
+   * - 08169530309 -> +2348169530309
+   * - 8169530309 -> +2348169530309
+   * - +2348169530309 -> +2348169530309 (already formatted)
+   * - 2348169530309 -> +2348169530309
+   */
+  private static formatNigerianPhoneNumber(phoneNumber: string): string {
+    // Remove all non-digit characters
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // If it's already in international format with country code
+    if (cleaned.startsWith('234') && cleaned.length === 13) {
+      return `+${cleaned}`;
+    }
+    
+    // If it starts with 0 (local format like 08169530309)
+    if (cleaned.startsWith('0') && cleaned.length === 11) {
+      return `+234${cleaned.substring(1)}`;
+    }
+    
+    // If it's 10 digits (like 8169530309)
+    if (cleaned.length === 10) {
+      return `+234${cleaned}`;
+    }
+    
+    // If it already starts with +, return as is
+    if (phoneNumber.startsWith('+')) {
+      return phoneNumber;
+    }
+    
+    // Default: add + prefix
+    return `+${cleaned}`;
+  }
+
   private static getClient(): twilio.Twilio {
     if (!this.client) {
       const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -40,8 +76,9 @@ export class SMSService {
         throw new Error('TWILIO_PHONE_NUMBER not configured');
       }
 
-      // Format phone number (ensure it starts with +)
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      // Format phone number to Nigerian international format
+      // TEMPORARY: Hardcoded test number for development
+      const formattedPhone = '+2348033242104';
 
       // Create the message
       const message = `Hi ${customerName}! Your car wash key code is: ${keyCode}${locationName ? ` at ${locationName}` : ''}. Please keep this code safe and present it when picking up your vehicle.`;
@@ -74,8 +111,9 @@ export class SMSService {
         throw new Error('TWILIO_PHONE_NUMBER not configured');
       }
 
-      // Format phone number (ensure it starts with +)
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      // Format phone number to Nigerian international format
+      // TEMPORARY: Hardcoded test number for development
+      const formattedPhone = '+2348033242104';
 
       // Send SMS
       const messageResponse = await client.messages.create({

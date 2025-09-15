@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { SMSService } from '../../../../lib/sms';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -165,23 +166,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if recipient exists
+    // Check if recipient exists and get their information
     let recipientExists = false;
+    let recipientName = '';
+    let recipientPhone = '';
+    
     if (type === 'customer') {
       const { data: customer } = await supabaseAdmin
         .from('customers')
-        .select('id')
+        .select('id, name, phone')
         .eq('id', recipientId)
         .single();
       recipientExists = !!customer;
+      if (customer) {
+        recipientName = customer.name;
+        recipientPhone = customer.phone;
+      }
     } else {
       const { data: washer } = await supabaseAdmin
         .from('users')
-        .select('id')
+        .select('id, name, phone')
         .eq('id', recipientId)
         .eq('role', 'car_washer')
         .single();
       recipientExists = !!washer;
+      if (washer) {
+        recipientName = washer.name;
+        recipientPhone = washer.phone;
+      }
     }
 
     if (!recipientExists) {
@@ -225,6 +237,18 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Failed to create bonus' },
         { status: 500 }
       );
+    }
+
+    // Send SMS notification for customer bonuses
+    if (type === 'customer' && recipientPhone) {
+      try {
+        const smsMessage = `Congratulations ${recipientName}! You've been awarded a bonus of ₦${amount} for: ${reason}${milestone ? ` (${milestone})` : ''}. Thank you for being a valued customer at LayWasho!`;
+        await SMSService.sendCustomMessage(recipientPhone, smsMessage);
+        console.log('SMS sent successfully to customer for bonus award');
+      } catch (smsError) {
+        console.error('Failed to send SMS for bonus award:', smsError);
+        // Don't fail the bonus creation if SMS fails
+      }
     }
 
     return NextResponse.json({

@@ -63,6 +63,19 @@ const StockUpdatePage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [editForm, setEditForm] = useState<CreateStockForm>({
+    name: '',
+    description: '',
+    category: '',
+    currentStock: 0,
+    minStockLevel: 0,
+    maxStockLevel: 0,
+    unit: '',
+    price: 0,
+    supplier: ''
+  });
 
   // Fetch real stock data from API
   const fetchStockItems = async () => {
@@ -216,6 +229,82 @@ const StockUpdatePage: React.FC = () => {
     } catch (error) {
       console.error('Error updating stock:', error);
       alert('Failed to update stock. Please try again.');
+    }
+  };
+
+  const handleEditItem = (item: StockItem) => {
+    setEditingItem(item);
+    setEditForm({
+      name: item.name,
+      description: '', // Add description if available
+      category: item.category,
+      currentStock: item.currentStock,
+      minStockLevel: item.minStockLevel,
+      maxStockLevel: item.minStockLevel * 3, // Set reasonable default
+      unit: item.unit,
+      price: item.price,
+      supplier: item.supplier
+    });
+    setShowEditModal(true);
+    setError(null);
+  };
+
+  const handleUpdateItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingItem) return;
+
+    if (!editForm.name || !editForm.category || !editForm.unit || !editForm.supplier) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (editForm.currentStock < 0 || editForm.minStockLevel < 0 || editForm.maxStockLevel < 0 || editForm.price <= 0) {
+      setError('Please enter valid numeric values');
+      return;
+    }
+
+    if (editForm.minStockLevel >= editForm.maxStockLevel) {
+      setError('Minimum stock level must be less than maximum stock level');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/inventory/${editingItem.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editForm),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowEditModal(false);
+        setEditingItem(null);
+        setEditForm({
+          name: '',
+          description: '',
+          category: '',
+          currentStock: 0,
+          minStockLevel: 0,
+          maxStockLevel: 0,
+          unit: '',
+          price: 0,
+          supplier: ''
+        });
+        fetchStockItems(); // Refresh the list
+        alert('Item updated successfully!');
+      } else {
+        setError(data.error || 'Failed to update inventory item');
+      }
+    } catch {
+      setError('Failed to update inventory item');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -403,13 +492,27 @@ const StockUpdatePage: React.FC = () => {
                   </div>
                 </div>
 
-                <Button
-                  size="sm"
-                  onClick={() => setSelectedItem(item)}
-                  className="w-full"
-                >
-                  Update Stock
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setSelectedItem(item)}
+                    className="flex-1"
+                  >
+                    Update Stock
+                  </Button>
+                  {user?.role === 'super_admin' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditItem(item)}
+                      className="px-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -677,6 +780,182 @@ const StockUpdatePage: React.FC = () => {
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                 >
                   {submitting ? 'Creating...' : 'Create Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Item Modal */}
+      {user?.role === 'super_admin' && (
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          className="w-full max-w-md mx-4"
+        >
+          <div className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Inventory Item</h3>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-800 dark:text-red-200">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateItem} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter item name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter item description"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={editForm.category}
+                  onChange={(e) => setEditForm({...editForm, category: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Cleaning Supplies"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Current Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.currentStock}
+                    onChange={(e) => setEditForm({...editForm, currentStock: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Unit
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.unit}
+                    onChange={(e) => setEditForm({...editForm, unit: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Liters, Pieces"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Min Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.minStockLevel}
+                    onChange={(e) => setEditForm({...editForm, minStockLevel: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Max Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.maxStockLevel}
+                    onChange={(e) => setEditForm({...editForm, maxStockLevel: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Price per Unit
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Supplier
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.supplier}
+                    onChange={(e) => setEditForm({...editForm, supplier: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter supplier name"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                >
+                  {submitting ? 'Updating...' : 'Update Item'}
                 </button>
               </div>
             </form>

@@ -67,6 +67,7 @@ interface PaymentRecord {
   customerId?: string;
   assignedWasherId?: string;
   assignedAdminId?: string;
+  assignedAdminName?: string;
   remarks?: string;
   transactionType?: string;
   // Product sales fields
@@ -75,6 +76,26 @@ interface PaymentRecord {
   productQuantity?: number;
   productUnit?: string;
 }
+
+// Function to fetch admin names and create a mapping
+const fetchAdminNames = async (): Promise<Record<string, string>> => {
+  try {
+    const response = await fetch('/api/admin/admins');
+    const data = await response.json();
+    
+    if (data.success && data.admins) {
+      const adminMap: Record<string, string> = {};
+      data.admins.forEach((admin: { id: string; name: string }) => {
+        adminMap[admin.id] = admin.name;
+      });
+      return adminMap;
+    }
+    return {};
+  } catch (error) {
+    console.error('Error fetching admin names:', error);
+    return {};
+  }
+};
 
 const FinancialPaymentsPage: React.FC = () => {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -156,6 +177,9 @@ const FinancialPaymentsPage: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Fetch admin names first
+        const adminNames = await fetchAdminNames();
+        
         const [carWashResponse, salesResponse] = await Promise.all([
           fetch('/api/admin/payments'),
           fetch('/api/admin/sales-transactions')
@@ -172,7 +196,8 @@ const FinancialPaymentsPage: React.FC = () => {
           const carWashPayments = carWashData.payments?.map((payment: CarWashPayment) => ({
             ...payment,
             type: 'car_wash' as const,
-            transactionType: 'Car Wash Service'
+            transactionType: 'Car Wash Service',
+            assignedAdminName: payment.assignedAdminId ? adminNames[payment.assignedAdminId] || 'Unknown Admin' : undefined
           })) || [];
           
           console.log('Transformed car wash payments:', carWashPayments);
@@ -196,6 +221,7 @@ const FinancialPaymentsPage: React.FC = () => {
             serviceType: 'Product Sales',
             customerId: transaction.customer_id,
             assignedAdminId: transaction.admin_id,
+            assignedAdminName: transaction.admin_id ? adminNames[transaction.admin_id] || 'Unknown Admin' : undefined,
             remarks: transaction.remarks,
             transactionType: 'Product Sale',
             // Product information
@@ -225,7 +251,8 @@ const FinancialPaymentsPage: React.FC = () => {
             const carWashPayments = carWashData.payments?.map((payment: CarWashPayment) => ({
               ...payment,
               type: 'car_wash' as const,
-              transactionType: 'Car Wash Service'
+              transactionType: 'Car Wash Service',
+              assignedAdminName: payment.assignedAdminId ? adminNames[payment.assignedAdminId] || 'Unknown Admin' : undefined
             })) || [];
             console.log('Car wash payments from partial success:', carWashPayments);
             allPayments = [...allPayments, ...carWashPayments];
@@ -244,6 +271,7 @@ const FinancialPaymentsPage: React.FC = () => {
               serviceType: 'Product Sales',
               customerId: transaction.customer_id,
               assignedAdminId: transaction.admin_id,
+              assignedAdminName: transaction.admin_id ? adminNames[transaction.admin_id] || 'Unknown Admin' : undefined,
               remarks: transaction.remarks,
               transactionType: 'Product Sale'
             })) || [];
@@ -743,7 +771,11 @@ const FinancialPaymentsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {payment.assignedAdminId ? (
+                      {payment.assignedAdminName ? (
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {payment.assignedAdminName}
+                        </div>
+                      ) : payment.assignedAdminId ? (
                         <div className="text-sm text-gray-900 dark:text-white">
                           Admin #{payment.assignedAdminId.slice(0, 8)}...
                         </div>

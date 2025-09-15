@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { EmailService } from '../../../../lib/email';
+import { SMSService } from '../../../../lib/sms';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -110,6 +111,10 @@ export async function POST(request: NextRequest) {
 
     // Send email to washer with login credentials
     await EmailService.sendTemporaryPassword(email, name, password, 'car_washer');
+
+    // Send SMS to washer with login credentials
+    const smsMessage = `Welcome to LayWasho ${name}! Your car washer account has been created. Login credentials: Email: ${email}, Password: ${password}. Please change your password after first login.`;
+    await SMSService.sendCustomMessage(phone, smsMessage);
 
     return NextResponse.json({
       success: true,

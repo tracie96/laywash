@@ -702,7 +702,7 @@ const ActiveCheckInsPage: React.FC = () => {
               {checkIn.userCode && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Key Code:</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Key Code:{checkIn.userCode}</p>
                     {hasRole('admin') && checkIn.customerId && (
                       <Button
                         size="sm"

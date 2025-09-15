@@ -212,6 +212,7 @@ export async function GET(request: NextRequest) {
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
+        whatsapp_number: customer.whatsapp_number,
         dateOfBirth: customer.date_of_birth,
         isRegistered: customer.is_registered,
         registrationDate: customer.registration_date,

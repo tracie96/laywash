@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   email?: string;
   phone: string;
+  whatsapp_number?: string;
   dateOfBirth?: string;
   isRegistered: boolean;
   registrationDate?: string;
@@ -96,6 +97,7 @@ const OperationsCustomersPage: React.FC = () => {
     name: '',
     email: '',
     phone: '',
+    whatsapp_number: '',
     dateOfBirth: ''
   });
 
@@ -197,6 +199,7 @@ console.log(customers);
       name: '',
       email: '',
       phone: '',
+      whatsapp_number: '',
       dateOfBirth: ''
     });
     setVehicles([{
@@ -248,6 +251,7 @@ console.log(customers);
       name: customer.name,
       email: customer.email || '',
       phone: customer.phone,
+      whatsapp_number: customer.whatsapp_number || '',
       dateOfBirth: customer.dateOfBirth || ''
     });
     
@@ -831,15 +835,15 @@ console.log(customers);
                     Date of Birth
                   </label>
                   <input
-                    type="date"
+                    type="text"
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}
-                    max={new Date().toISOString().split('T')[0]} // Prevents future dates
+                    placeholder="DD/MM/YYYY or YYYY-MM-DD"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Optional - helps with promotions and special offers
+                    Optional - helps with promotions and special offers. Format: DD/MM/YYYY or YYYY-MM-DD
                   </p>
                 </div>
 
@@ -857,6 +861,24 @@ console.log(customers);
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
                     placeholder="Enter phone number"
                   />
+                </div>
+
+                {/* WhatsApp Number (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    WhatsApp Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="whatsapp_number"
+                    value={formData.whatsapp_number}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter WhatsApp number (optional)"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Optional - for WhatsApp notifications and communication
+                  </p>
                 </div>
 
                 {/* Vehicles Section */}
@@ -1339,15 +1361,15 @@ console.log(customers);
                     Date of Birth
                   </label>
                   <input
-                    type="date"
+                    type="text"
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}
-                    max={new Date().toISOString().split('T')[0]} // Prevents future dates
+                    placeholder="DD/MM/YYYY or YYYY-MM-DD"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Optional - helps with promotions and special offers
+                    Optional - helps with promotions and special offers. Format: DD/MM/YYYY or YYYY-MM-DD
                   </p>
                 </div>
 
@@ -1365,6 +1387,24 @@ console.log(customers);
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
                     placeholder="Enter phone number"
                   />
+                </div>
+
+                {/* WhatsApp Number (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    WhatsApp Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="whatsapp_number"
+                    value={formData.whatsapp_number}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-light-500 focus:border-transparent"
+                    placeholder="Enter WhatsApp number (optional)"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Optional - for WhatsApp notifications and communication
+                  </p>
                 </div>
 
                 {/* Vehicles Section */}

@@ -53,22 +53,13 @@ const PaymentReportsPage: React.FC = () => {
     { value: 'yesterday', label: 'Yesterday' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
-    { value: 'quarter', label: 'This Quarter' },
   ];
 
-  // Filter options for admin users
-  const availableOptions = isAdmin 
-    ? periodOptions.filter(option => ['today', 'week', 'month'].includes(option.value))
-    : periodOptions;
+  // All options available for admin users
+  const availableOptions = periodOptions;
 
   // Set default custom dates when custom period is selected
   const handlePeriodChange = (newPeriod: string) => {
-    // Admin users can select today, week, month, or custom range
-    if (isAdmin && !['today', 'week', 'month'].includes(newPeriod)) {
-      setSelectedPeriod('month');
-      return;
-    }
-    
     setSelectedPeriod(newPeriod);
     if (newPeriod === 'custom') {
       const today = new Date();
@@ -78,7 +69,7 @@ const PaymentReportsPage: React.FC = () => {
     }
   };
 
-  // Set admin users to current month on component mount (admin can also select today, week, or range)
+  // Set admin users to current month on component mount (admin can select any period)
   useEffect(() => {
     if (isAdmin) {
       setSelectedPeriod('month');
@@ -369,7 +360,6 @@ const PaymentReportsPage: React.FC = () => {
                     checked={selectedPeriod === option.value}
                     onChange={(e) => handlePeriodChange(e.target.value)}
                     className="text-blue-600 focus:ring-blue-500"
-                    disabled={isAdmin}
                   />
                   <span>{option.label}</span>
                 </label>
@@ -377,10 +367,10 @@ const PaymentReportsPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Admin restriction notice */}
+          {/* Admin access notice */}
           {isAdmin && (
-            <div className="text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-              <span className="font-medium">Admin Access:</span> Limited to current month data only
+            <div className="text-sm text-gray-600 dark:text-gray-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg">
+              <span className="font-medium">Admin Access:</span> Full access to all period options
             </div>
           )}
 
@@ -424,8 +414,8 @@ const PaymentReportsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Custom Date Range Inputs - Hidden for admin users */}
-          {selectedPeriod === 'custom' && !isAdmin && (
+          {/* Custom Date Range Inputs */}
+          {selectedPeriod === 'custom' && (
             <div className="flex space-x-2">
               <input
                 type="date"

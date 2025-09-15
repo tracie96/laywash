@@ -24,6 +24,7 @@ export async function PUT(
       name,
       email,
       phone,
+      whatsapp_number,
       vehicles,
       dateOfBirth
     } = body;
@@ -81,6 +82,7 @@ export async function PUT(
       phone: string;
       updated_at: string;
       email?: string;
+      whatsapp_number?: string;
       date_of_birth?: string;
     } = {
       name: name.trim(),
@@ -91,6 +93,9 @@ export async function PUT(
     // Add optional fields
     if (email && email.trim()) {
       customerUpdateData.email = email.trim().toLowerCase();
+    }
+    if (whatsapp_number && whatsapp_number.trim()) {
+      customerUpdateData.whatsapp_number = whatsapp_number.trim();
     }
     if (dateOfBirth) {
       customerUpdateData.date_of_birth = dateOfBirth;
@@ -198,6 +203,7 @@ export async function PUT(
       name: updatedCustomer.name,
       email: updatedCustomer.email || '',
       phone: updatedCustomer.phone,
+      whatsapp_number: updatedCustomer.whatsapp_number || '',
       licensePlate: customerVehicles?.[0]?.license_plate || '',
       vehicleType: customerVehicles?.[0]?.vehicle_type || '',
       vehicleModel: customerVehicles?.[0]?.vehicle_model || '',
