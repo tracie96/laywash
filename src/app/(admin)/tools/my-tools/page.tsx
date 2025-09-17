@@ -78,29 +78,23 @@ const MyToolsPage: React.FC = () => {
   };
 
   // Material assignment functions
-  const handleMaterialToggle = (material: WorkerTool) => {
-    const existingIndex = selectedMaterials.findIndex(m => m.materialId === material.id);
+  // const handleMaterialToggle = (material: WorkerTool) => {
+  //   const existingIndex = selectedMaterials.findIndex(m => m.materialId === material.id);
     
-    if (existingIndex >= 0) {
-      // Remove material
-      setSelectedMaterials(prev => prev.filter((_, index) => index !== existingIndex));
-    } else {
-      // Add material with default quantity 1
-      setSelectedMaterials(prev => [...prev, {
-        materialId: material.id,
-        materialName: material.toolName,
-        quantityUsed: 1
-      }]);
-    }
-  };
+  //   if (existingIndex >= 0) {
+  //     // Remove material
+  //     setSelectedMaterials(prev => prev.filter((_, index) => index !== existingIndex));
+  //   } else {
+  //     // Add material with default quantity 1
+  //     setSelectedMaterials(prev => [...prev, {
+  //       materialId: material.id,
+  //       materialName: material.toolName,
+  //       quantityUsed: 1
+  //     }]);
+  //   }
+  // };
 
-  const handleQuantityChange = (materialId: string, quantity: number) => {
-    setSelectedMaterials(prev => prev.map(m => 
-      m.materialId === materialId 
-        ? { ...m, quantityUsed: Math.max(1, quantity) }
-        : m
-    ));
-  };
+
 
   const handleAssignMaterials = async () => {
     if (!checkInIdInput.trim()) {
@@ -150,14 +144,7 @@ const MyToolsPage: React.FC = () => {
     }
   };
 
-  const isMaterialSelected = (materialId: string) => {
-    return selectedMaterials.some(m => m.materialId === materialId);
-  };
 
-  const getSelectedMaterialQuantity = (materialId: string) => {
-    const selected = selectedMaterials.find(m => m.materialId === materialId);
-    return selected ? selected.quantityUsed : 0;
-  };
 
   const filteredTools = tools.filter(tool => {
     if (filterStatus === 'assigned') return !tool.isReturned;
@@ -247,80 +234,7 @@ const MyToolsPage: React.FC = () => {
       </div>
 
       {/* Material Assignment Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Assign Materials to Check-in</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Use your assigned materials for specific car wash jobs
-            </p>
-          </div>
-          <Button
-            onClick={() => setAssignMaterialsModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Assign Materials
-          </Button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tools.filter(tool => !tool.isReturned).map((tool) => (
-            <div
-              key={tool.id}
-              className={`p-4 border rounded-lg transition-colors cursor-pointer ${
-                isMaterialSelected(tool.id)
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-              }`}
-              onClick={() => handleMaterialToggle(tool)}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                  {tool.toolName}
-                </h4>
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  Available: {tool.quantity}
-                </span>
-              </div>
-              
-              {isMaterialSelected(tool.id) && (
-                <div className="flex items-center space-x-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    Quantity:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={tool.quantity}
-                    value={getSelectedMaterialQuantity(tool.id)}
-                    onChange={(e) => handleQuantityChange(tool.id, parseInt(e.target.value) || 1)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        
-        {selectedMaterials.length > 0 && (
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-              Selected Materials ({selectedMaterials.length})
-            </h4>
-            <div className="space-y-1">
-              {selectedMaterials.map((material) => (
-                <div key={material.materialId} className="flex justify-between text-xs">
-                  <span className="text-blue-700 dark:text-blue-300">{material.materialName}</span>
-                  <span className="text-blue-900 dark:text-blue-100 font-medium">
-                    {material.quantityUsed}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+     
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
