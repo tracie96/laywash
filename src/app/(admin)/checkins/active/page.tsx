@@ -656,11 +656,33 @@ const ActiveCheckInsPage: React.FC = () => {
                       <p className="font-medium text-gray-900 dark:text-white">{checkIn.licensePlate}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600 dark:text-gray-400">Vehicle</p>
+                      <p className="text-gray-600 dark:text-gray-400">Vehicle Color</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {checkIn.vehicleColor} {checkIn.vehicleModel || checkIn.vehicleType}
+                        {checkIn.vehicleColor}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Vehicle Type</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {checkIn.vehicleType}
+                      </p>
+                    </div>
+                    {checkIn.vehicleModel && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Vehicle Model</p>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {checkIn.vehicleModel}
+                        </p>
+                      </div>
+                    )}
+                    {checkIn.washType && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Wash Type</p>
+                        <p className="font-medium text-gray-900 dark:text-white capitalize">
+                          {checkIn.washType}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Check-in Time</p>
                       <p className="font-medium text-gray-900 dark:text-white">

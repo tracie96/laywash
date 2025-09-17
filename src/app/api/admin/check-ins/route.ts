@@ -94,6 +94,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || 'all';
     const paymentStatus = searchParams.get('paymentStatus') || 'all';
+    const licensePlate = searchParams.get('licensePlate') || '';
+    const date = searchParams.get('date') || '';
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -170,6 +172,21 @@ export async function GET(request: NextRequest) {
 
       console.log(`Total results after filtering: ${checkIns.length}`);
 
+      // Apply license plate and date filters
+      if (licensePlate) {
+        checkIns = checkIns.filter(checkIn => 
+          checkIn.license_plate.toLowerCase() === licensePlate.toLowerCase()
+        );
+      }
+      
+      if (date) {
+        const targetDate = new Date(date);
+        checkIns = checkIns.filter(checkIn => {
+          const checkInDate = new Date(checkIn.check_in_time);
+          return checkInDate.toDateString() === targetDate.toDateString();
+        });
+      }
+
       // Apply status and payment status filters
       let filteredCheckIns = checkIns;
       
@@ -229,6 +246,23 @@ export async function GET(request: NextRequest) {
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .limit(limit);
+
+    // Apply license plate filter
+    if (licensePlate) {
+      query = query.eq('license_plate', licensePlate);
+    }
+
+    // Apply date filter
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('check_in_time', startDate.toISOString())
+        .lte('check_in_time', endDate.toISOString());
+    }
 
     // Apply status filter
     if (status !== 'all') {

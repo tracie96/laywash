@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 import { useAuth } from '@/context/AuthContext';
+import AddExpenseModal from '@/components/admin/AddExpenseModal';
 
 interface PaymentReport {
   date: string;
@@ -44,6 +45,7 @@ const PaymentReportsPage: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   // Check if user is admin (can access today, this week, this month, and range)
   const isAdmin = user?.role === 'admin';
 
@@ -127,6 +129,10 @@ const PaymentReportsPage: React.FC = () => {
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
+
+  const handleExpenseAdded = () => {
+    fetchReports(); // Refresh reports when expense is added
+  };
 
   const calculateTotals = () => {
     return reports.reduce((totals, report) => ({
@@ -331,12 +337,20 @@ const PaymentReportsPage: React.FC = () => {
             </p>
           )}
         </div>
-        <Button
-          onClick={exportToCSV}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          Export Report
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setIsExpenseModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            + Add Expense
+          </Button>
+          <Button
+            onClick={exportToCSV}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            Export Report
+          </Button>
+        </div>
       </div>
 
       {/* Report Controls */}
@@ -892,6 +906,13 @@ const PaymentReportsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Add Expense Modal */}
+      <AddExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        onExpenseAdded={handleExpenseAdded}
+      />
     </div>
   );
 };

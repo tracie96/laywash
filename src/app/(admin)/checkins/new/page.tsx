@@ -64,6 +64,17 @@ const NewCheckInPage: React.FC = () => {
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [showCustomerResults, setShowCustomerResults] = useState(false);
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
+  
+  // Duplicate check states
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateCheckIns, setDuplicateCheckIns] = useState<Array<{
+    id: string;
+    customerName: string;
+    status: string;
+    checkInTime: string;
+    vehicleColor?: string;
+    vehicleType?: string;
+  }>>([]);
 
   const [formData, setFormData] = useState<CheckInFormData>({
     customerId: '',
@@ -97,6 +108,26 @@ const NewCheckInPage: React.FC = () => {
     isActive: boolean;
   }>>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
+  
+  // Function to check for duplicate license plates on the same day
+  const checkForDuplicateLicensePlate = async (licensePlate: string) => {
+    if (!licensePlate.trim()) return { hasDuplicates: false, duplicates: [] };
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await fetch(`/api/admin/check-ins?licensePlate=${encodeURIComponent(licensePlate)}&date=${today}`);
+      const result = await response.json();
+      
+      if (result.success && result.checkIns && result.checkIns.length > 0) {
+        return { hasDuplicates: true, duplicates: result.checkIns };
+      }
+      
+      return { hasDuplicates: false, duplicates: [] };
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      return { hasDuplicates: false, duplicates: [] };
+    }
+  };
   
   // Washer and materials state
   const [availableWashers, setAvailableWashers] = useState<Array<{
@@ -388,8 +419,22 @@ const NewCheckInPage: React.FC = () => {
     return Math.min(baseDuration + serviceDuration, 120); // Max 2 hours
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle duplicate warning modal
+  const handleProceedWithDuplicate = () => {
+    setShowDuplicateWarning(false);
+    setDuplicateCheckIns([]);
+    // Continue with form submission
+    proceedWithSubmission();
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateWarning(false);
+    setDuplicateCheckIns([]);
+    setIsSubmitting(false);
+  };
+
+  // Separate function to proceed with actual submission
+  const proceedWithSubmission = async () => {
     setIsSubmitting(true);
     setError('');
     setSuccess('');
@@ -438,142 +483,102 @@ const NewCheckInPage: React.FC = () => {
 
       // For $0 services, custom price is required
       if (service.price === 0 && (!serviceItem.customPrice || serviceItem.customPrice <= 0)) {
-        setError(`Custom price is required for service: ${service.name} (base price is $0)`);
+        setError(`Custom price is required for service: ${service.name}`);
         setIsSubmitting(false);
         return;
       }
-
-      // For services with base price > 0, custom price cannot be less than base price
-      if (service.price > 0 && serviceItem.customPrice !== undefined && serviceItem.customPrice < service.price) {
-        setError(`Price for service "${service.name}" cannot be decreased below base price of $${service.price}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-
     }
 
+    // Calculate total price
+    const totalPrice = formData.services.reduce((total, serviceItem) => {
+      const service = availableServices.find(s => s.id === serviceItem.serviceId);
+      if (!service) return total;
+      
+      const servicePrice = service.price === 0 ? (serviceItem.customPrice || 0) : service.price;
+      return total + servicePrice;
+    }, 0);
+
+    // Calculate estimated duration
+    const estimatedDuration = calculateEstimatedDuration();
+
     try {
-      // Prepare services data with service information
-      const servicesWithData = formData.services.map(serviceItem => {
-        const service = availableServices.find(s => s.id === serviceItem.serviceId);
-        if (!service) {
-          throw new Error(`Service not found: ${serviceItem.serviceId}`);
-        }
-        return {
-          ...serviceItem,
-          serviceData: {
-            id: service.id,
-            name: service.name,
-            price: service.price,
-            duration: service.duration
-          }
-        };
-      });
-
-      // Validate services data
-      if (servicesWithData.length === 0) {
-        throw new Error('No services selected');
-      }
-
-      for (const service of servicesWithData) {
-        if (!service.workerId) {
-          throw new Error(`Worker not assigned for service: ${service.serviceData.name}`);
-        }
-      }
-      const submissionData = {
-        customerId: formData.customerId,
-        customerName: formData.customerName,
-        customerPhone: formData.customerPhone,
-        customerEmail: formData.customerEmail,
-        licensePlate: formData.licensePlate,
-        vehicleType: formData.vehicleType,
-        vehicleMake: formData.vehicleMake,
-        vehicleColor: formData.vehicleColor,
-        vehicleModel: formData.vehicleModel,
-        services: servicesWithData,
-        specialInstructions: formData.specialInstructions,
-        estimatedDuration: calculateEstimatedDuration(),
-        washType: formData.washType, 
-        valuableItems: formData.valuableItems,
-        userCode: formData.userCode,
-        passcode: formData.securityCode,
-        remarks: formData.checkInProcess,
-        totalAmount: calculateTotalPrice()
-      };
-
-      console.log('Submitting check-in:', submissionData);
-      console.log('Service worker assignments:', servicesWithData.map(s => ({ 
-        service: s.serviceData.name, 
-        workerId: s.workerId 
-      })));
-
-      // Call the API
       const response = await fetch('/api/admin/check-ins', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-ID': user?.id || '', // Pass current admin ID
         },
-        body: JSON.stringify(submissionData),
+        body: JSON.stringify({
+          ...formData,
+          totalPrice,
+          estimatedDuration,
+          assignedAdmin: user?.name || 'Unknown Admin',
+          assignedAdminId: user?.id,
+        }),
       });
 
-      console.log('Response status:', response.status);
       const result = await response.json();
-      console.log('Response result:', result);
-
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}: Failed to create check-in`);
-      }
 
       if (result.success) {
-        // Update washer materials quantities by subtracting allocated amounts
-        try {
-          for (const serviceItem of servicesWithData) {
-            for (const material of serviceItem.materials) {
-              // Use service-specific materials instead of global washerMaterials
-              const serviceMaterialsForWorker = serviceMaterials[serviceItem.serviceId] || [];
-              const washerMaterial = serviceMaterialsForWorker.find(wm => wm.id === material.materialId);
-              if (washerMaterial) {
-                const newQuantity = washerMaterial.quantity - material.quantity;
-                
-                // Update the washer material quantity in the database
-                const updateResponse = await fetch(`/api/admin/washer-materials/${washerMaterial.id}`, {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Admin-ID': user?.id || '',
-                  },
-                  body: JSON.stringify({
-                    quantity: newQuantity
-                  }),
-                });
-
-                if (!updateResponse.ok) {
-                  console.warn(`Failed to update quantity for material ${material.materialName}`);
-                }
-              }
-            }
-          }
-        } catch (updateError) {
-          console.warn('Failed to update some material quantities:', updateError);
-          // Don't fail the check-in creation if quantity updates fail
-        }
-
         setSuccess('Check-in created successfully!');
+        // Reset form
+        setFormData({
+          customerId: '',
+          customerName: '',
+          customerPhone: '',
+          customerEmail: '',
+          licensePlate: '',
+          vehicleType: '',
+          vehicleMake: '',
+          vehicleModel: '',
+          vehicleColor: '',
+          services: [],
+          specialInstructions: '',
+          estimatedDuration: 30,
+          washType: 'instant',
+          valuableItems: '',
+          securityCode: '',
+          userCode: '',
+          checkInProcess: '',
+        });
+        setSearchQuery('');
+        setFoundCustomers([]);
+        setShowCustomerResults(false);
+        setIsCustomerSelected(false);
+        
+        // Redirect after a short delay
         setTimeout(() => {
           router.push('/checkins/active');
         }, 2000);
       } else {
-        throw new Error(result.error || 'Failed to create check-in');
+        setError(result.error || 'Failed to create check-in');
       }
-    } catch (error) {
-      console.error('Error creating check-in:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create check-in. Please try again.');
+    } catch (err) {
+      console.error('Error creating check-in:', err);
+      setError('Failed to create check-in. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError('');
+    setSuccess('');
+
+    // Check for duplicate license plate first
+    const duplicateCheck = await checkForDuplicateLicensePlate(formData.licensePlate);
+    if (duplicateCheck.hasDuplicates) {
+      setDuplicateCheckIns(duplicateCheck.duplicates);
+      setShowDuplicateWarning(true);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // If no duplicates, proceed with submission
+    proceedWithSubmission();
+  };
+
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -1236,6 +1241,68 @@ const NewCheckInPage: React.FC = () => {
           </Button>
         </div>
       </form>
+
+      {/* Duplicate License Plate Warning Modal */}
+      {showDuplicateWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4 w-full">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Duplicate License Plate Warning
+                </h3>
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                The license plate <strong>{formData.licensePlate}</strong> has already been used for check-ins today:
+              </p>
+              
+              <div className="mt-3 space-y-2 max-h-40 overflow-y-auto">
+                {duplicateCheckIns.map((checkIn, index) => (
+                  <div key={index} className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="text-sm">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {checkIn.customerName}
+                      </p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Status: {checkIn.status} | Time: {new Date(checkIn.checkInTime).toLocaleTimeString()}
+                      </p>
+                      {checkIn.vehicleColor && checkIn.vehicleType && (
+                        <p className="text-gray-600 dark:text-gray-400">
+                          Vehicle: {checkIn.vehicleColor} {checkIn.vehicleType}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <Button
+                onClick={handleCancelDuplicate}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleProceedWithDuplicate}
+                className="flex-1 bg-yellow-600 hover:bg-yellow-700"
+              >
+                Proceed Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
