@@ -64,7 +64,7 @@ const NewCheckInPage: React.FC = () => {
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [showCustomerResults, setShowCustomerResults] = useState(false);
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
-  
+
   // Duplicate check states
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateCheckIns, setDuplicateCheckIns] = useState<Array<{
@@ -439,6 +439,13 @@ const NewCheckInPage: React.FC = () => {
     setError('');
     setSuccess('');
 
+    // Check if user is authenticated
+    if (!user?.id) {
+      setError('You must be logged in to create a check-in');
+      setIsSubmitting(false);
+      return;
+    }
+
     // Security validation
     if (!formData.valuableItems.trim()) {
       setError('Valuable items documentation is required for all customers');
@@ -506,6 +513,7 @@ const NewCheckInPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           ...formData,
@@ -513,6 +521,19 @@ const NewCheckInPage: React.FC = () => {
           estimatedDuration,
           assignedAdmin: user?.name || 'Unknown Admin',
           assignedAdminId: user?.id,
+          // Transform services to include serviceData
+          services: formData.services.map(serviceItem => {
+        const service = availableServices.find(s => s.id === serviceItem.serviceId);
+        return {
+          ...serviceItem,
+              serviceData: service ? {
+            id: service.id,
+            name: service.name,
+            price: service.price,
+            duration: service.duration
+              } : null
+            };
+          })
         }),
       });
 
@@ -547,7 +568,7 @@ const NewCheckInPage: React.FC = () => {
         
         // Redirect after a short delay
         setTimeout(() => {
-          router.push('/checkins/active');
+          router.push('/checkins/history');
         }, 2000);
       } else {
         setError(result.error || 'Failed to create check-in');
@@ -565,6 +586,13 @@ const NewCheckInPage: React.FC = () => {
     setIsSubmitting(true);
     setError('');
     setSuccess('');
+
+    // Check if user is authenticated
+    if (!user?.id) {
+      setError('You must be logged in to create a check-in');
+      setIsSubmitting(false);
+      return;
+    }
 
     // Check for duplicate license plate first
     const duplicateCheck = await checkForDuplicateLicensePlate(formData.licensePlate);
