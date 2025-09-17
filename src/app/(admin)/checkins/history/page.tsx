@@ -239,7 +239,8 @@ const CheckInHistoryPage: React.FC = () => {
       const matchesName = checkIn.customerName.toLowerCase().includes(query);
       const matchesPhone = checkIn.customerPhone.toLowerCase().includes(query);
       const matchesPlate = checkIn.licensePlate.toLowerCase().includes(query);
-      if (!matchesName && !matchesPhone && !matchesPlate) return false;
+      const matchesWasher = checkIn.assignedWasher?.toLowerCase().includes(query) || false;
+      if (!matchesName && !matchesPhone && !matchesPlate && !matchesWasher) return false;
     }
     
     // Then filter by date range if dates are selected
@@ -799,7 +800,7 @@ const CheckInHistoryPage: React.FC = () => {
             <div className="flex-1">
               <input
                 type="text"
-                placeholder="Search by customer name, phone, or license plate..."
+                placeholder="Search by customer name, phone, license plate, or washer..."
                 value={searchQuery}
                 onChange={handleSearchChange}
                 className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
