@@ -159,9 +159,9 @@ const ActiveCheckInsPage: React.FC = () => {
         const allWashers = result.washers || [];
         console.log('All washers:', allWashers);
         
-        // Temporarily show all washers for debugging
-        const availableWashers = allWashers; // .filter((washer: Washer) => washer.status === 'active' && washer.isAvailable);
-        console.log('Available washers (showing all for now):', availableWashers);
+        // Filter to only show active and available washers
+        const availableWashers = allWashers.filter((washer: Washer) => washer.status === 'active' && washer.isAvailable);
+        console.log('Available washers:', availableWashers);
         
         setWashers(availableWashers);
       } else {

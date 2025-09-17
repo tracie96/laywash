@@ -456,22 +456,27 @@ export async function POST(request: NextRequest) {
 
     // Create service records for each check-in
     for (const { checkIn, service } of createdCheckIns) {
-      // Fetch service details including company_commission_percentage from services table
+      // Fetch service details including commission percentages from services table
       const { data: serviceDetails, error: serviceDetailsError } = await supabaseAdmin
         .from('services')
-        .select('id, company_commission_percentage')
+        .select('id, company_commission_percentage, washer_commission_percentage')
         .eq('id', service.serviceData.id)
         .single();
 
       if (serviceDetailsError) {
         console.error('Error fetching service details for:', service.serviceData.name, serviceDetailsError);
-        // Continue without company income calculation
+        // Continue without income calculation
       }
 
       let companyIncome = 0;
+      let washerIncome = 0;
       
       if (serviceDetails?.company_commission_percentage && service.serviceData.price) {
         companyIncome = (service.serviceData.price * serviceDetails.company_commission_percentage) / 100;
+      }
+      
+      if (serviceDetails?.washer_commission_percentage && service.serviceData.price) {
+        washerIncome = (service.serviceData.price * serviceDetails.washer_commission_percentage) / 100;
       }
       
       const checkInService = {
@@ -479,7 +484,8 @@ export async function POST(request: NextRequest) {
         service_id: service.serviceData.id,
         service_name: service.serviceData.name,
         price: service.serviceData.price,
-        company_income: companyIncome,    
+        // company_income: companyIncome,
+        // washer_income: washerIncome,
         duration: service.serviceData.duration
       };
 
@@ -492,18 +498,26 @@ export async function POST(request: NextRequest) {
         // Note: We don't fail here as the check-in was created successfully
       }
 
-      // Update the check-in with the calculated company income
+      // Update the check-in with the calculated incomes
+      const updateData: { company_income?: number; washer_income?: number } = {};
       if (companyIncome > 0) {
+        updateData.company_income = companyIncome;
+      }
+      if (washerIncome > 0) {
+        updateData.washer_income = washerIncome;
+      }
+      
+      if (Object.keys(updateData).length > 0) {
         const { error: updateError } = await supabaseAdmin
           .from('car_check_ins')
-          .update({ company_income: companyIncome })
+          .update(updateData)
           .eq('id', checkIn.id);
 
         if (updateError) {
-          console.error('Error updating company income:', updateError);
+          console.error('Error updating incomes:', updateError);
           // Note: We don't fail here as the check-in was created successfully
         } else {
-          console.log(`Updated company income for check-in ${checkIn.id} to ${companyIncome}`);
+          console.log(`Updated incomes for check-in ${checkIn.id}: company=${companyIncome}, washer=${washerIncome}`);
         }
       }
 

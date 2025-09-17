@@ -8,10 +8,11 @@ interface Payment {
   customerName: string;
   licensePlate: string;
   amount: number;
-  paymentMethod: 'cash' | 'card' | 'mobile_money' | 'Not specified';
+  paymentMethod: 'cash' | 'card' | 'mobile_money' | 'pos' | 'Not specified';
   status: 'pending' | 'completed';
   date: string;
-  serviceType: string;
+  serviceType?: string;
+  services?: string[];
   vehicleType?: string;
   vehicleModel?: string;
   vehicleColor?: string;
@@ -128,24 +129,44 @@ const PaymentHistoryPage: React.FC = () => {
     switch (method) {
       case 'cash':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-          </svg>
+          <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg">
+            <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+          </div>
         );
       case 'card':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
+          <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
         );
       case 'mobile_money':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-          </svg>
+          <div className="flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+            <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+        );
+      case 'pos':
+        return (
+          <div className="flex items-center justify-center w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+            <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
         );
       default:
-        return null;
+        return (
+          <div className="flex items-center justify-center w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        );
     }
   };
 
@@ -348,7 +369,7 @@ const PaymentHistoryPage: React.FC = () => {
                     </h3>
                     {getStatusBadge(payment.status)}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">License Plate</p>
                       <p className="font-medium text-gray-900 dark:text-white">{payment.licensePlate}</p>
@@ -356,15 +377,6 @@ const PaymentHistoryPage: React.FC = () => {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Amount</p>
                       <p className="font-medium text-gray-900 dark:text-white">₦ {payment.amount.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Payment Method</p>
-                      <div className="flex items-center space-x-2">
-                        {getPaymentMethodIcon(payment.paymentMethod)}
-                        <span className="font-medium text-gray-900 dark:text-white capitalize">
-                          {payment.paymentMethod.replace('_', ' ')}
-                        </span>
-                      </div>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Date</p>
@@ -376,20 +388,70 @@ const PaymentHistoryPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Services */}
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Services:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded">
-                    {payment.serviceType || 'Not specified'}
-                  </span>
+              {/* Payment Method & Services */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Payment Method</h4>
+                  <div className="flex items-center space-x-2">
+                    {getPaymentMethodIcon(payment.paymentMethod)}
+                    <span className="font-medium text-gray-900 dark:text-white capitalize">
+                      {payment.paymentMethod.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Services</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {payment.services && payment.services.length > 0 ? (
+                      payment.services.map((service, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-full"
+                        >
+                          {service.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-full">
+                        {payment.serviceType ? payment.serviceType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Not specified'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Vehicle Information */}
+              {(payment.vehicleType || payment.vehicleColor || payment.vehicleModel) && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Vehicle Information</h4>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {payment.vehicleColor && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Color: </span>
+                        <span className="font-medium text-gray-900 dark:text-white capitalize">{payment.vehicleColor}</span>
+                      </div>
+                    )}
+                    {payment.vehicleType && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Type: </span>
+                        <span className="font-medium text-gray-900 dark:text-white capitalize">{payment.vehicleType}</span>
+                      </div>
+                    )}
+                    {payment.vehicleModel && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Model: </span>
+                        <span className="font-medium text-gray-900 dark:text-white">{payment.vehicleModel}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Check-in ID: <span className="font-medium text-gray-900 dark:text-white">{payment.id}</span>
+                  Payment ID: <span className="font-medium text-gray-900 dark:text-white">{payment.id}</span>
                 </div>
                 
                 <div className="flex space-x-2">

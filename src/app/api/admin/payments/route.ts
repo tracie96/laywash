@@ -34,14 +34,10 @@ export async function GET(request: NextRequest) {
           phone
         ),
         check_in_services (
-          services (
-            id,
-            name,
-            description,
-            base_price,
-            category,
-            company_commission_percentage
-          )
+          id,
+          service_name,
+          price,
+          company_income
         )
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })
@@ -73,25 +69,32 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match the frontend interface
-    const transformedPayments = checkIns?.map(checkIn => ({
-      id: checkIn.id,
-      customerName: checkIn.customers?.name || 'Walk-in Customer',
-      amount: checkIn.company_income || 0,
-      date: checkIn.check_in_time,
-      status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
-      paymentMethod: checkIn.payment_method || 'Not specified',
-      serviceType: checkIn.check_in_services?.map((cis: { services?: { name?: string }[] }) => cis.services?.[0]?.name).filter(Boolean).join(', ') || 'Not specified',
-      licensePlate: checkIn.license_plate,
-      vehicleType: checkIn.vehicle_type,
-      vehicleModel: checkIn.vehicle_model,
-      vehicleColor: checkIn.vehicle_color,
-      checkInTime: checkIn.check_in_time,
-      completionTime: checkIn.actual_completion_time,
-      customerId: checkIn.customer_id,
-      assignedWasherId: checkIn.assigned_washer_id,
-      assignedAdminId: checkIn.assigned_admin_id,
-      remarks: checkIn.remarks
-    })) || [];
+    const transformedPayments = checkIns?.map(checkIn => {
+      // Extract services from check_in_services
+      const services = checkIn.check_in_services?.map((cis: { service_name?: string }) => cis.service_name).filter(Boolean) || [];
+      const serviceType = services.length > 0 ? services.join(', ') : 'Not specified';
+      
+      return {
+        id: checkIn.id,
+        customerName: checkIn.customers?.name || 'Walk-in Customer',
+        amount: checkIn.company_income || 0,
+        date: checkIn.check_in_time,
+        status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
+        paymentMethod: checkIn.payment_method || 'Not specified',
+        serviceType: serviceType,
+        services: services,
+        licensePlate: checkIn.license_plate,
+        vehicleType: checkIn.vehicle_type,
+        vehicleModel: checkIn.vehicle_model,
+        vehicleColor: checkIn.vehicle_color,
+        checkInTime: checkIn.check_in_time,
+        completionTime: checkIn.actual_completion_time,
+        customerId: checkIn.customer_id,
+        assignedWasherId: checkIn.assigned_washer_id,
+        assignedAdminId: checkIn.assigned_admin_id,
+        remarks: checkIn.remarks
+      };
+    }) || [];
 
     return NextResponse.json({
       success: true,

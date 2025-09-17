@@ -22,8 +22,8 @@ interface FinancialReport {
   customerBonuses: number;
   
   // Worker Wages
-  totalWages: number;
-  pendingWages: number;
+  totalWages: number; // Workers Pay - sum of total_earnings from car_washer_profiles
+  pendingWages: number; // Amount Paid - sum of approved payment requests
   
   // Net profit
   netProfit: number;
@@ -320,7 +320,7 @@ const FinancialReportsPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Wages</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Workers Pay</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalWages.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -331,7 +331,7 @@ const FinancialReportsPage: React.FC = () => {
           </div>
           <div className="mt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Sum of total_earnings + amount requested from payment requests
+              Sum of total_earnings from all worker profiles
             </p>
           </div>
         </div>
@@ -339,18 +339,18 @@ const FinancialReportsPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Wages</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Amount Paid</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.pendingWages.toFixed(2)}</p>
             </div>
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
           <div className="mt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Sum of total_earnings and amount requested for approved payment requests
+              Sum of approved payment requests (status = &apos;paid&apos;)
             </p>
           </div>
         </div>
@@ -547,15 +547,21 @@ const FinancialReportsPage: React.FC = () => {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Wages</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Workers Pay</p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     ₦ {selectedReport.totalWages.toFixed(2)}
                   </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Sum of total_earnings from all worker profiles
+                  </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Pending Wages</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Amount Paid</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                     ₦ {selectedReport.pendingWages.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Sum of approved payment requests (status = &apos;paid&apos;)
                   </p>
                 </div>
               </div>

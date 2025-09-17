@@ -324,7 +324,7 @@ export async function GET(request: NextRequest) {
       monthData.productSaleCount += 1;
     });
 
-    // Process car washer profiles for earnings data
+    // Process car washer profiles for workers pay (total earnings)
     carWasherProfilesResponse.data?.forEach(profile => {
       const date = new Date(profile.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -350,12 +350,11 @@ export async function GET(request: NextRequest) {
 
       const monthData = monthlyData.get(monthKey)!;
       
-      // Count total earnings as washer salaries (expenses)
+      // Add total earnings to workers pay (totalWages) - NOT to expenses
       if (profile.total_earnings) {
         const amount = parseFloat(profile.total_earnings || '0');
-        
-        monthData.washerSalaries += amount;
-        monthData.totalExpenses += amount;
+        monthData.totalWages += amount;
+        // Note: Worker salaries are NOT included in expenses - they have their own tracking
       }
     });
 
@@ -399,7 +398,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Process payment requests for worker wages
+    // Process payment requests for amount paid (approved payment requests)
     console.log('Payment requests data:', paymentRequestsResponse.data);
     paymentRequestsResponse.data?.forEach(paymentRequest => {
       console.log('Processing payment request:', {
@@ -434,13 +433,11 @@ export async function GET(request: NextRequest) {
 
       const monthData = monthlyData.get(monthKey)!;
       
-      const totalEarnings = parseFloat(paymentRequest.total_earnings || '0');
-      const amountRequested = parseFloat(paymentRequest.amount || '0');
-      monthData.totalWages += totalEarnings + amountRequested;
-      
+      // Only count approved (paid) payment requests as "Amount Paid"
       if (paymentRequest.status === 'paid') {
-        console.log('Adding to pending wages:', totalEarnings);
-        monthData.pendingWages += totalEarnings;
+        const amountPaid = parseFloat(paymentRequest.amount || '0');
+        console.log('Adding to amount paid:', amountPaid);
+        monthData.pendingWages += amountPaid;
       }
     });
 

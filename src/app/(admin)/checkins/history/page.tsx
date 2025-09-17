@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { Modal } from '@/components/ui/modal';
+import PasscodeModal from '@/components/admin/PasscodeModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface CheckIn {
   id: string;
@@ -12,6 +14,7 @@ interface CheckIn {
   vehicleType: string;
   vehicleColor: string;
   vehicleModel?: string;
+  washType?: string;
   services: string[];
   status: 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled';
   checkInTime: Date;
@@ -30,13 +33,29 @@ interface CheckIn {
   createdAt?: string;
   reason?: string;
   updatedAt?: string;
+  passcode?: string;
+  userCode?: string;
+  washerCompletionStatus?: boolean;
+}
+
+interface Washer {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  isAvailable: boolean;
+  hourlyRate: number;
+  totalEarnings: number;
 }
 
 const CheckInHistoryPage: React.FC = () => {
+  const { user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [washers, setWashers] = useState<Washer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'paid' | 'cancelled'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled'>('all');
   const [isUpdatingPayment, setIsUpdatingPayment] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'pos'>('cash');
@@ -55,6 +74,15 @@ const CheckInHistoryPage: React.FC = () => {
   // Earnings state
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
+
+  // Active check-ins functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [passcodeError, setPasscodeError] = useState<string>('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [sendingSMS, setSendingSMS] = useState<string | null>(null);
 
   // Helper function to get current date in YYYY-MM-DD format
   const getCurrentDate = () => {
@@ -89,67 +117,106 @@ const CheckInHistoryPage: React.FC = () => {
     }
   }, [startDate, endDate]);
 
-  // Fetch real data from API
-  useEffect(() => {
-    const fetchCheckIns = async () => {
-      try {
-        setIsLoading(true);
+  // Fetch washers from API
+  const fetchWashers = async () => {
+    try {
+      const response = await fetch('/api/admin/washers');
+      const result = await response.json();
+      
+      if (result.success) {
+        const allWashers = result.washers || [];
+        // Filter to only show active and available washers for assignment
+        const availableWashers = allWashers.filter((washer: { isActive: boolean; isAvailable: boolean }) => 
+          washer.isActive && washer.isAvailable
+        );
+        setWashers(availableWashers);
+      }
+    } catch (err) {
+      console.error('Error fetching washers:', err);
+    }
+  };
+
+  // Fetch all check-ins from API
+  const fetchCheckIns = async (search = '') => {
+    try {
+      const searchParams = new URLSearchParams({
+        status: 'all',
+        limit: '100',
+        sortBy: 'check_in_time',
+        sortOrder: 'desc'
+      });
+      
+      if (search.trim()) {
+        searchParams.append('search', search.trim());
+      }
+      
+      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        const transformedCheckIns: CheckIn[] = result.checkIns.map((checkIn: CheckIn) => ({
+          id: checkIn.id,
+          customerName: checkIn.customerName,
+          customerPhone: checkIn.customerPhone,
+          licensePlate: checkIn.licensePlate,
+          vehicleType: checkIn.vehicleType,
+          vehicleColor: checkIn.vehicleColor,
+          vehicleModel: checkIn.vehicleModel,
+          washType: checkIn.washType,
+          services: checkIn.services || [],
+          status: checkIn.status,
+          checkInTime: new Date(checkIn.checkInTime),
+          completedTime: checkIn.completedTime ? new Date(checkIn.completedTime) : undefined,
+          paidTime: checkIn.paidTime ? new Date(checkIn.paidTime) : undefined,
+          assignedWasher: checkIn.assignedWasher,
+          assignedWasherId: checkIn.assignedWasherId,
+          assignedAdmin: checkIn.assignedAdmin,
+          estimatedDuration: checkIn.estimatedDuration || 0,
+          actualDuration: checkIn.actualDuration,
+          totalPrice: checkIn.totalPrice || 0,
+          specialInstructions: checkIn.specialInstructions,
+          paymentStatus: checkIn.paymentStatus,
+          paymentMethod: checkIn.paymentMethod,
+          reason: checkIn.reason,
+          customerId: checkIn.customerId,
+          createdAt: checkIn.createdAt,
+          updatedAt: checkIn.updatedAt,
+          passcode: checkIn.passcode,
+          userCode: checkIn.userCode,
+          washerCompletionStatus: checkIn.washerCompletionStatus
+        })).filter((checkIn: CheckIn) => {
+          // Filter out check-ins with invalid dates
+          return !isNaN(checkIn.checkInTime.getTime());
+        });
         
-        // Fetch check-ins that are completed, paid, or cancelled for history
-        const response = await fetch('/api/admin/check-ins?status=all&limit=100');
-        const data = await response.json();
+        setCheckIns(transformedCheckIns);
+      } else {
+        throw new Error(result.error || 'Failed to fetch check-ins');
+      }
+    } catch (err) {
+      console.error('Error fetching check-ins:', err);
+    }
+  };
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch check-ins');
-        }
-
-        if (data.success && data.checkIns) {
-          // Transform the API response to match our interface
-          const transformedCheckIns: CheckIn[] = data.checkIns
-            .filter((checkIn: CheckIn) => 
-              ['completed', 'paid', 'cancelled'].includes(checkIn.status)
-            )
-            .map((checkIn: CheckIn) => ({
-              id: checkIn.id,
-              customerName: checkIn.customerName,
-              customerPhone: checkIn.customerPhone,
-              licensePlate: checkIn.licensePlate,
-              vehicleType: checkIn.vehicleType,
-              vehicleColor: checkIn.vehicleColor,
-              vehicleModel: checkIn.vehicleModel,
-              services: checkIn.services || [],
-              status: checkIn.status,
-              checkInTime: new Date(checkIn.checkInTime),
-              completedTime: checkIn.completedTime ? new Date(checkIn.completedTime) : undefined,
-              paidTime: checkIn.paidTime ? new Date(checkIn.paidTime) : undefined,
-              assignedWasher: checkIn.assignedWasher,
-              assignedWasherId: checkIn.assignedWasherId,
-              assignedAdmin: checkIn.assignedAdmin,
-              estimatedDuration: checkIn.estimatedDuration || 0,
-              actualDuration: checkIn.actualDuration,
-              totalPrice: checkIn.totalPrice || 0,
-              specialInstructions: checkIn.specialInstructions,
-              paymentStatus: checkIn.paymentStatus,
-              paymentMethod: checkIn.paymentMethod,
-              reason: checkIn.reason,
-              customerId: checkIn.customerId,
-              createdAt: checkIn.createdAt,
-              updatedAt: checkIn.updatedAt
-            }));
-
-          setCheckIns(transformedCheckIns);
-        } else {
-          throw new Error('Invalid response format');
-        }
-      } catch (error) {
-        console.error('Error fetching check-ins:', error);
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      
+      try {
+        await Promise.all([
+          fetchCheckIns(),
+          fetchWashers(),
+          fetchEarnings()
+        ]);
+      } catch (err) {
+        console.error('Error loading data:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCheckIns();
-    fetchEarnings(); // Also fetch earnings on initial load
+    loadData();
   }, [fetchEarnings]);
 
   // Refetch earnings when date filters change
@@ -161,7 +228,7 @@ const CheckInHistoryPage: React.FC = () => {
     // First filter by status
     let statusMatch = false;
     if (filter === 'all') {
-      statusMatch = checkIn.status === 'completed' || checkIn.status === 'paid' || checkIn.status === 'cancelled';
+      statusMatch = true; // Show all statuses
     } else {
       statusMatch = checkIn.status === filter;
     }
@@ -173,6 +240,15 @@ const CheckInHistoryPage: React.FC = () => {
       const searchTerm = nameSearch.toLowerCase().trim();
       const customerName = checkIn.customerName.toLowerCase();
       if (!customerName.includes(searchTerm)) return false;
+    }
+    
+    // Then filter by search query if provided
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesName = checkIn.customerName.toLowerCase().includes(query);
+      const matchesPhone = checkIn.customerPhone.toLowerCase().includes(query);
+      const matchesPlate = checkIn.licensePlate.toLowerCase().includes(query);
+      if (!matchesName && !matchesPhone && !matchesPlate) return false;
     }
     
     // Then filter by date range if dates are selected
@@ -191,6 +267,50 @@ const CheckInHistoryPage: React.FC = () => {
   const handleMarkAsPaid = (checkInId: string) => {
     setSelectedCheckInId(checkInId);
     setShowPaymentModal(true);
+  };
+
+  const handleMarkInProgress = async (checkInId: string) => {
+    try {
+      setUpdatingStatus(checkInId);
+      
+      console.log('Updating check-in status to in_progress:', checkInId);
+      
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'in_progress',
+          userId: user?.id // Include user ID for role verification
+        }),
+      });
+
+      const result = await response.json();
+      console.log('Update response:', result);
+
+      if (response.ok && result.success) {
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, status: 'in_progress' as const }
+            : checkIn
+        ));
+        
+        // Show success message
+        alert('Status updated successfully! Work started.');
+        
+        // Refresh the list to get any additional updates
+        await fetchCheckIns();
+      } else {
+        throw new Error(result.error || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update status';
+      alert(`Failed to update status: ${errorMessage}`);
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const handlePaymentConfirm = async () => {
@@ -259,8 +379,190 @@ const CheckInHistoryPage: React.FC = () => {
     setSelectedCheckIn(null);
   };
 
+  // Active check-ins functionality
+  const performSearch = useCallback(async (query: string) => {
+    setSearchLoading(true);
+    try {
+      await fetchCheckIns(query);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    performSearch('');
+  };
+
+  const handleStatusChange = async (checkInId: string, newStatus: string, passcode?: string, reason?: string) => {
+    try {
+      const requestBody: { status: string; passcode?: string; reason?: string } = { status: newStatus };
+      
+      if (newStatus === 'completed' && passcode) {
+        requestBody.passcode = passcode;
+      }
+
+      if (newStatus === 'cancelled' && reason) {
+        requestBody.reason = reason;
+      }
+
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update local state with the response data
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, ...result.checkIn }
+            : checkIn
+        ));
+        
+        // Close modal and clear error on success
+        if (newStatus === 'completed') {
+          setShowPasscodeModal(false);
+          setPasscodeError('');
+          setSelectedCheckInId('');
+        }
+        
+        if (newStatus === 'cancelled') {
+          setShowCancelModal(false);
+          setCancelReason('');
+          setSelectedCheckInId('');
+        }
+      } else {
+        throw new Error(result.error || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      if (newStatus === 'completed') {
+        setPasscodeError(err instanceof Error ? err.message : 'Failed to update status');
+      } else {
+        alert(err instanceof Error ? err.message : 'Failed to update status');
+      }
+    }
+  };
+
+  const handleOpenPasscodeModal = (checkInId: string) => {
+    const checkIn = checkIns.find(c => c.id === checkInId);
+    
+    if (checkIn?.washType === 'instant') {
+      handleStatusChange(checkInId, 'completed');
+      return;
+    }
+    
+    if (!checkIn?.passcode) {
+      handleStatusChange(checkInId, 'completed');
+      return;
+    }
+    
+    setSelectedCheckInId(checkInId);
+    setShowPasscodeModal(true);
+    setPasscodeError('');
+  };
+
+  const handlePasscodeConfirm = (passcode: string) => {
+    handleStatusChange(selectedCheckInId, 'completed', passcode);
+  };
+
+  const handlePasscodeModalClose = () => {
+    setShowPasscodeModal(false);
+    setSelectedCheckInId('');
+    setPasscodeError('');
+  };
+
+  const handleOpenCancelModal = (checkInId: string) => {
+    setSelectedCheckInId(checkInId);
+    setShowCancelModal(true);
+    setCancelReason('');
+  };
+
+  const handleCancelModalClose = () => {
+    setShowCancelModal(false);
+    setSelectedCheckInId('');
+    setCancelReason('');
+  };
+
+  const handleCancelConfirm = () => {
+    if (cancelReason.trim()) {
+      handleStatusChange(selectedCheckInId, 'cancelled', undefined, cancelReason);
+    } else {
+      alert('Please provide a reason for cancellation');
+    }
+  };
+
+  const handleAssignWasher = async (checkInId: string, washerId: string) => {
+    try {
+      const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignedWasherId: washerId,
+          status: 'in_progress'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setCheckIns(prev => prev.map(checkIn => 
+          checkIn.id === checkInId 
+            ? { ...checkIn, ...result.checkIn }
+            : checkIn
+        ));
+      } else {
+        throw new Error(result.error || 'Failed to assign washer');
+      }
+    } catch (err) {
+      console.error('Error assigning washer:', err);
+      alert(err instanceof Error ? err.message : 'Failed to assign washer');
+    }
+  };
+
+  const handleSendSMS = async (checkInId: string) => {
+    try {
+      setSendingSMS(checkInId);
+      
+      const response = await fetch(`/api/admin/check-ins/${checkInId}/send-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('SMS sent successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to send SMS');
+      }
+    } catch (err) {
+      console.error('Error sending SMS:', err);
+      alert(err instanceof Error ? err.message : 'Failed to send SMS');
+    } finally {
+      setSendingSMS(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'pending':
+        return <Badge color="warning">Pending</Badge>;
+      case 'in_progress':
+        return <Badge color="info">In Progress</Badge>;
       case 'completed':
         return <Badge color="success">Completed</Badge>;
       case 'paid':
@@ -274,6 +576,10 @@ const CheckInHistoryPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending':
+        return 'border-orange-200 bg-orange-50 dark:bg-orange-900/30 dark:border-orange-800';
+      case 'in_progress':
+        return 'border-blue-200 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-800';
       case 'completed':
         return 'border-green-200 bg-green-50 dark:bg-green-900/30 dark:border-green-800';
       case 'paid':
@@ -317,10 +623,10 @@ const CheckInHistoryPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Check-in History
+            Check-ins Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            View completed, paid, and cancelled car wash services
+            Manage all check-ins including active, completed, and cancelled car wash services
           </p>
         </div>
         <Button
@@ -524,22 +830,78 @@ const CheckInHistoryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Search Check-ins
+          </h3>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search by customer name, phone, or license plate..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex items-end space-x-2">
+              <Button
+                onClick={() => performSearch(searchQuery)}
+                disabled={searchLoading}
+                className="px-6 py-3"
+              >
+                {searchLoading ? 'Searching...' : 'Search'}
+              </Button>
+              <Button
+                onClick={clearSearch}
+                variant="outline"
+                className="px-6 py-3"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filter Tabs */}
       <div className="mb-6">
-        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg overflow-x-auto">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               filter === 'all'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            All History ({filteredCheckIns.length})
+            All ({filteredCheckIns.length})
+          </button>
+          <button
+            onClick={() => setFilter('pending')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              filter === 'pending'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Pending ({checkIns.filter(c => c.status === 'pending').length})
+          </button>
+          <button
+            onClick={() => setFilter('in_progress')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              filter === 'in_progress'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            In Progress ({checkIns.filter(c => c.status === 'in_progress').length})
           </button>
           <button
             onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               filter === 'completed'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -549,7 +911,7 @@ const CheckInHistoryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setFilter('paid')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               filter === 'paid'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -559,7 +921,7 @@ const CheckInHistoryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setFilter('cancelled')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               filter === 'cancelled'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -722,6 +1084,69 @@ const CheckInHistoryPage: React.FC = () => {
                   >
                     View Details
                   </Button>
+             
+                  {/* Active check-ins actions */}
+                  {checkIn.status === 'pending' && (
+                    <>
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAssignWasher(checkIn.id, e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">Assign Washer</option>
+                        {washers.map((washer) => (
+                          <option key={washer.id} value={washer.id}>
+                            {washer.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          console.log('Start Work button clicked for check-in:', checkIn.id);
+                          handleMarkInProgress(checkIn.id);
+                        }}
+                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                        disabled={updatingStatus === checkIn.id}
+                      >
+                        {updatingStatus === checkIn.id ? 'Starting...' : 'Start Work'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenCancelModal(checkIn.id)}
+                        variant="outline"
+                        className="w-full sm:w-auto text-red-600 border-red-300 hover:bg-red-50"
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  
+                  {checkIn.status === 'in_progress' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenPasscodeModal(checkIn.id)}
+                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                      >
+                        Mark Complete
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenCancelModal(checkIn.id)}
+                        variant="outline"
+                        className="w-full sm:w-auto text-red-600 border-red-300 hover:bg-red-50"
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  
+                  {/* Payment actions for completed check-ins */}
                   {checkIn.status === 'completed' && checkIn.paymentStatus === 'pending' && (
                     <Button
                       size="sm"
@@ -732,10 +1157,24 @@ const CheckInHistoryPage: React.FC = () => {
                       {isUpdatingPayment === checkIn.id ? 'Updating...' : 'Mark as Paid'}
                     </Button>
                   )}
+                  
                   {checkIn.status === 'completed' && checkIn.paymentStatus === 'paid' && (
                     <span className="px-3 py-2 text-sm font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 rounded-lg">
                       ✓ Paid
                     </span>
+                  )}
+                  
+                  {/* SMS functionality for delayed wash type only */}
+                  {(checkIn.status === 'pending' || checkIn.status === 'in_progress') && checkIn.washType === 'delayed' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSendSMS(checkIn.id)}
+                      disabled={sendingSMS === checkIn.id}
+                      className="w-full sm:w-auto"
+                    >
+                      {sendingSMS === checkIn.id ? 'Sending...' : 'Send SMS'}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -780,6 +1219,52 @@ const CheckInHistoryPage: React.FC = () => {
               disabled={isUpdatingPayment === selectedCheckInId}
             >
               {isUpdatingPayment === selectedCheckInId ? 'Updating...' : 'Confirm Payment'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Passcode Modal */}
+      <PasscodeModal
+        isOpen={showPasscodeModal}
+        onClose={handlePasscodeModalClose}
+        onConfirm={handlePasscodeConfirm}
+        error={passcodeError}
+      />
+
+      {/* Cancel Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={handleCancelModalClose}
+        className="max-w-md mx-4"
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Cancel Check-in
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please provide a reason for cancelling this check-in:
+          </p>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Enter cancellation reason..."
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent mb-6"
+            rows={3}
+          />
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={handleCancelModalClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCancelConfirm}
+              className="flex-1 bg-red-600 hover:bg-red-700"
+            >
+              Confirm Cancellation
             </Button>
           </div>
         </div>

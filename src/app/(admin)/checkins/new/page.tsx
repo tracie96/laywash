@@ -240,9 +240,10 @@ const NewCheckInPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        // Only show active washers for assignment
-        const activeWashers = result.washers.filter((washer: { isActive: boolean }) => washer.isActive);
-        setAvailableWashers(activeWashers);
+        const availableWashers = result.washers.filter((washer: { isActive: boolean; isAvailable: boolean }) => 
+          washer.isActive && washer.isAvailable
+        );
+        setAvailableWashers(availableWashers);
       } else {
         console.error('Failed to fetch washers:', result.error);
       }

@@ -37,7 +37,6 @@ const superAdminItems: NavItem[] = [
     icon: <CheckLineIcon />,
     name: "Check-ins",
     subItems: [
-      { name: "Active Check-ins", path: "/checkins/active", pro: false },
       { name: "New Check-in", path: "/checkins/new", pro: false },
       { name: "Check-in History", path: "/checkins/history", pro: false }
     ],
@@ -99,7 +98,7 @@ const superAdminItems: NavItem[] = [
     name: "Reports & Analytics",
     subItems: [
       // { name: "Performance Reports", path: "/reports/performance", pro: false },
-      { name: "Sales Reports", path: "/reports/sales", pro: false },
+      // { name: "Sales Reports", path: "/reports/sales", pro: false },
       { name: "Stock Reports", path: "/reports/stock", pro: false }
     ],
     roles: ["super_admin"]
@@ -126,7 +125,6 @@ const adminItems: NavItem[] = [
     icon: <CheckLineIcon />,
     name: "Check-ins",
     subItems: [
-      { name: "Active Check-ins", path: "/checkins/active", pro: false },
       { name: "New Check-in", path: "/checkins/new", pro: false },
       { name: "Check-in History", path: "/checkins/history", pro: false }
     ],
@@ -210,7 +208,12 @@ const washerItems: NavItem[] = [
     path: "/payment-requests",
     roles: ["car_washer"]
   },
- 
+  {
+    icon: <DollarIcon />,
+    name: "Income History",
+    path: "/income-history",
+    roles: ["car_washer"]
+  },
   {
     icon: <ReportIcon />,
     name: "My Tools",

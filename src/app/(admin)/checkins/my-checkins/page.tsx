@@ -417,7 +417,8 @@ const MyCheckInsPage: React.FC = () => {
                               const nestedService = (firstService as { services: { washer_commission_percentage?: number } }).services;
                               if (nestedService?.washer_commission_percentage) {
                                 const commission = (checkIn.totalPrice * nestedService.washer_commission_percentage) / 100;
-                                return `$${commission.toFixed(2)}`;
+                                return `NGN${commission.toFixed(2)}`;
+                        
                               }
                             }
                           }
@@ -429,7 +430,7 @@ const MyCheckInsPage: React.FC = () => {
                       <span className="font-medium">Services:</span> {getServiceNames(checkIn.services)}
                     </div>
                     <div>
-                      <span className="font-medium">Amount:</span> ${checkIn.totalPrice}
+                      <span className="font-medium">Amount:</span> NGN{checkIn.totalPrice}
                     </div>
                     <div>
                       <span className="font-medium">Check-in:</span> {checkIn.checkInTime.toLocaleString()}
