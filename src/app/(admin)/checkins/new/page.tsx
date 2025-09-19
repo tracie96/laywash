@@ -529,7 +529,7 @@ const NewCheckInPage: React.FC = () => {
               serviceData: service ? {
             id: service.id,
             name: service.name,
-            price: service.price,
+            price: serviceItem.customPrice !== undefined ? serviceItem.customPrice : service.price,
             duration: service.duration
               } : null
             };

@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
         license_plate,
         vehicle_type,
         total_amount,
+        washer_income,
         actual_completion_time,
         customers (
           id,
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate today's metrics
     const todayCompleted = recentCompleted || [];
-    const todayEarnings = todayCompleted.reduce((sum, job) => sum + (job.total_amount || 0), 0);
+    const todayEarnings = todayCompleted.reduce((sum, job) => sum + (job.washer_income || 0), 0);
     const carsCompleted = todayCompleted.length;
     const pendingAssignments = currentAssignments?.length || 0;
 
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
       licensePlate: completed.license_plate,
       vehicleType: completed.vehicle_type,
       completedAt: new Date(completed.actual_completion_time),
-      earnings: completed.total_amount || 0
+      earnings: completed.washer_income || 0
     }));
 
     const dashboardData = {

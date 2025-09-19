@@ -182,8 +182,8 @@ const CheckInHistoryPage: React.FC = () => {
           userCode: checkIn.userCode,
           washerCompletionStatus: checkIn.washerCompletionStatus
         })).filter((checkIn: CheckIn) => {
-          // Filter out check-ins with invalid dates
-          return !isNaN(checkIn.checkInTime.getTime());
+          // Filter out check-ins with invalid dates and cancelled check-ins
+          return !isNaN(checkIn.checkInTime.getTime()) && checkIn.status !== 'cancelled';
         });
         
         setCheckIns(transformedCheckIns);

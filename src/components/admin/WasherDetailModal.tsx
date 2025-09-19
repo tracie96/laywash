@@ -134,7 +134,7 @@ const WasherDetailModal: React.FC<WasherDetailModalProps> = ({
   const calculatePerformanceStats = () => {
     if (!carWashHistory.length) return null;
 
-    const totalRevenue = carWashHistory.reduce((sum, record) => sum + record.price, 0);
+    const totalRevenue = washer.totalEarnings;
     const averageRating = carWashHistory.reduce((sum, record) => sum + record.rating, 0) / carWashHistory.length;
     const totalDuration = carWashHistory.reduce((sum, record) => sum + record.duration, 0);
     const averageDuration = totalDuration / carWashHistory.length;

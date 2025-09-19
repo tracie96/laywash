@@ -454,7 +454,7 @@ export async function PATCH(
     }
 
     // Transform frontend field names to database field names
-    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean; reason?: string } = {};
+    const dbUpdateData: { status?: string; payment_status?: string; payment_method?: string; assigned_washer_id?: string; assigned_admin_id?: string; remarks?: string; valuable_items?: string; actual_completion_time?: string; washer_completion_status?: boolean; reason?: string; washer_income?: number; company_income?: number } = {};
     console.log('dbUpdateData keys:', Object.keys(dbUpdateData));
 
     // Handle status updates (for admins)
@@ -503,6 +503,53 @@ export async function PATCH(
     // Set completion time when status changes to completed
     if (updateData.status === 'completed' && !dbUpdateData.actual_completion_time) {
       dbUpdateData.actual_completion_time = new Date().toISOString();
+    }
+
+    // Calculate and update washer income when check-in is completed
+    if (updateData.status === 'completed') {
+      try {
+        // Fetch check-in services to calculate washer income
+        const { data: checkInServices, error: servicesError } = await supabaseAdmin
+          .from('check_in_services')
+          .select(`
+            service_id,
+            price,
+            services (
+              id,
+              washer_commission_percentage,
+              company_commission_percentage
+            )
+          `)
+          .eq('check_in_id', id);
+
+        if (!servicesError && checkInServices) {
+          let totalWasherIncome = 0;
+          let totalCompanyIncome = 0;
+
+          for (const checkInService of checkInServices) {
+            const service = Array.isArray(checkInService.services) ? checkInService.services[0] : checkInService.services;
+            if (service && service.washer_commission_percentage && checkInService.price) {
+              const washerIncome = (checkInService.price * service.washer_commission_percentage) / 100;
+              totalWasherIncome += washerIncome;
+            }
+            if (service && service.company_commission_percentage && checkInService.price) {
+              const companyIncome = (checkInService.price * service.company_commission_percentage) / 100;
+              totalCompanyIncome += companyIncome;
+            }
+          }
+
+          // Update the washer_income and company_income fields
+          if (totalWasherIncome > 0) {
+            dbUpdateData.washer_income = totalWasherIncome;
+          }
+          if (totalCompanyIncome > 0) {
+            dbUpdateData.company_income = totalCompanyIncome;
+          }
+        }
+      } catch (incomeError) {
+        console.error('Error calculating washer income:', incomeError);
+        // Don't fail the update if income calculation fails
+      }
     }
 
     // Set payment time when payment status changes to paid

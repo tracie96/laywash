@@ -221,6 +221,7 @@ export interface Database {
           actual_completion_time: string | null;
           total_amount: number;
           company_income: number | null;
+          washer_income: number | null;
           payment_status: 'pending' | 'paid';
           payment_method: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items: string | null;
@@ -246,6 +247,7 @@ export interface Database {
           actual_completion_time?: string | null;
           total_amount?: number;
           company_income?: number | null;
+          washer_income?: number | null;
           payment_status?: 'pending' | 'paid';
           payment_method?: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items?: string | null;
@@ -271,6 +273,7 @@ export interface Database {
           actual_completion_time?: string | null;
           total_amount?: number;
           company_income?: number | null;
+          washer_income?: number | null;
           payment_status?: 'pending' | 'paid';
           payment_method?: 'cash' | 'card' | 'mobile_money' | null;
           valuable_items?: string | null;
