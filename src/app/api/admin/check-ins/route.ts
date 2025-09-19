@@ -382,8 +382,8 @@ export async function POST(request: NextRequest) {
       vehicleModel,
       services,
       remarks,
-      passcode,
       valuableItems,
+      securityCode,
       userCode,
       reason
     } = body;
@@ -461,7 +461,7 @@ export async function POST(request: NextRequest) {
         estimated_completion_time: new Date(Date.now() + (serviceDuration * 60 * 1000)).toISOString(),
         total_amount: serviceAmount,
         user_code: userCode,
-        passcode: passcode,
+        passcode: securityCode,
         reason,
         status: 'pending',
         payment_status: 'pending',
