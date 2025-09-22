@@ -9,9 +9,10 @@ interface ToolAssignment {
   toolName: string;
   workerName: string;
   quantity: number;
+  returnedQuantity?: number;
   assignedDate: string;
   returnDate?: string;
-  status: "assigned" | "returned" | "overdue";
+  status: "assigned" | "returned" | "overdue" | "partially_returned";
   notes: string;
 }
 
@@ -52,6 +53,7 @@ interface WasherToolWithWorker {
   toolName: string;
   toolType: string;
   quantity: number;
+  returnedQuantity?: number;
   assignedDate: string;
   returnedDate?: string;
   isReturned: boolean;
@@ -83,6 +85,8 @@ const ToolsAssignmentsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [returningToolId, setReturningToolId] = useState<string | null>(null);
+  const [returnQuantity, setReturnQuantity] = useState<number>(1);
+  const [maxReturnQuantity, setMaxReturnQuantity] = useState<number>(1);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const { isOpen, openModal, closeModal } = useModal();
@@ -124,10 +128,11 @@ const ToolsAssignmentsPage: React.FC = () => {
             toolName: tool.toolName,
             workerName: tool.washer?.name || 'Unknown Worker',
             quantity: tool.quantity,
-
+            returnedQuantity: tool.returnedQuantity,
             assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
             returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
             status: tool.isReturned ? "returned" : 
+                   (tool.returnedQuantity && tool.returnedQuantity > 0) ? "partially_returned" :
                    new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000) ? "overdue" : "assigned",
             notes: tool.notes || 'No notes'
           }))
@@ -191,11 +196,26 @@ const ToolsAssignmentsPage: React.FC = () => {
 
   const handleReturnTool = async (assignmentId: string) => {
     setReturningToolId(assignmentId);
+    
+    // Find the assignment to get the current quantity and returned quantity
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (assignment) {
+      const currentReturned = assignment.returnedQuantity || 0;
+      const maxCanReturn = assignment.quantity - currentReturned;
+      setMaxReturnQuantity(maxCanReturn);
+      setReturnQuantity(1); // Default to 1, but user can change
+    }
+    
     openReturnModal();
   };
 
   const confirmReturnTool = async () => {
     if (!returningToolId) return;
+    
+    if (returnQuantity <= 0 || returnQuantity > maxReturnQuantity) {
+      setError(`Please enter a valid quantity between 1 and ${maxReturnQuantity}`);
+      return;
+    }
     
     try {
       setSubmitting(true);
@@ -208,7 +228,8 @@ const ToolsAssignmentsPage: React.FC = () => {
         },
         body: JSON.stringify({
           washerToolId: returningToolId,
-          isReturned: true
+          returnedQuantity: returnQuantity,
+          isCumulative: true
         })
       });
 
@@ -222,7 +243,7 @@ const ToolsAssignmentsPage: React.FC = () => {
       await fetchData();
       
       // Show success message
-      setSuccessMessage('Tool returned successfully!');
+      setSuccessMessage(`Successfully returned ${returnQuantity} item(s)!`);
       setError(null);
       
       // Clear success message after 3 seconds
@@ -231,6 +252,7 @@ const ToolsAssignmentsPage: React.FC = () => {
       // Close modal and reset
       closeReturnModal();
       setReturningToolId(null);
+      setReturnQuantity(1);
       
     } catch (error) {
       console.error('Error returning tool:', error);
@@ -319,6 +341,8 @@ const ToolsAssignmentsPage: React.FC = () => {
     switch (status) {
       case "assigned":
         return "bg-blue-light-100 text-blue-light-800 dark:bg-blue-light-900/30 dark:text-blue-light-300";
+      case "partially_returned":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
       case "returned":
         return "bg-green-light-100 text-green-light-800 dark:bg-green-light-900/30 dark:text-green-light-300";
       case "overdue":
@@ -492,7 +516,19 @@ const ToolsAssignmentsPage: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              {assignment.quantity}
+                              <div>
+                                <div>Total: {assignment.quantity}</div>
+                                {assignment.returnedQuantity && assignment.returnedQuantity > 0 && (
+                                  <div className="text-green-600 dark:text-green-400">
+                                    Returned: {assignment.returnedQuantity}
+                                  </div>
+                                )}
+                                {assignment.returnedQuantity && assignment.returnedQuantity < assignment.quantity && (
+                                  <div className="text-orange-600 dark:text-orange-400">
+                                    Remaining: {assignment.quantity - assignment.returnedQuantity}
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
                               {assignment.returnDate ? new Date(assignment.returnDate).toLocaleDateString() : "-"}
@@ -510,11 +546,11 @@ const ToolsAssignmentsPage: React.FC = () => {
                                     disabled={submitting}
                                     className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    Return
+                                    {assignment.status === "partially_returned" ? "Return More" : "Return"}
                                   </button>
                                 )}
                                 {assignment.status === "returned" && (
-                                  <span className="text-gray-400 dark:text-gray-500">Returned</span>
+                                  <span className="text-gray-400 dark:text-gray-500">Fully Returned</span>
                                 )}
                               </div>
                             </td>
@@ -662,11 +698,29 @@ const ToolsAssignmentsPage: React.FC = () => {
       <Modal isOpen={isReturnModalOpen} onClose={closeReturnModal} className="max-w-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Tool Return</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Return Tool</h3>
           </div>
           
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Quantity to Return
+            </label>
+            <input
+              type="number"
+              min="1"
+              max={maxReturnQuantity}
+              value={returnQuantity}
+              onChange={(e) => setReturnQuantity(parseInt(e.target.value) || 1)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter quantity"
+            />
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Maximum: {maxReturnQuantity} item(s)
+            </div>
+          </div>
+
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Are you sure you want to mark this tool as returned? This action cannot be undone.
+            Are you sure you want to return {returnQuantity} item(s)? This action cannot be undone.
           </p>
 
           <div className="flex justify-end space-x-3">
@@ -679,7 +733,7 @@ const ToolsAssignmentsPage: React.FC = () => {
             </button>
             <button
               onClick={confirmReturnTool}
-              disabled={submitting}
+              disabled={submitting || returnQuantity <= 0 || returnQuantity > maxReturnQuantity}
               className="px-4 py-2 bg-green-light-600 hover:bg-green-light-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Returning...' : 'Confirm Return'}

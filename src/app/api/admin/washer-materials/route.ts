@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       toolName: tool.tool_name,
       toolType: tool.tool_type,
       quantity: tool.quantity,
+      returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
       price: tool.amount, // Changed from amount to price
       assignedDate: tool.assigned_date,
       returnedDate: tool.returned_date,

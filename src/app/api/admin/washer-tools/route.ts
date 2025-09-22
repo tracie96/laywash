@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
       toolName: tool.tool_name,
       toolType: tool.tool_type,
       quantity: tool.quantity,
+      returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
       assignedDate: tool.assigned_date,
       returnedDate: tool.returned_date,
       isReturned: tool.is_returned,
@@ -226,13 +227,14 @@ export async function PUT(request: NextRequest) {
   try {
     const { 
       washerToolId, 
-      isReturned
+      returnedQuantity,
+      isCumulative
     } = await request.json();
 
     // Validate required input
-    if (!washerToolId || isReturned === undefined) {
+    if (!washerToolId) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: washerToolId and isReturned are required' },
+        { success: false, error: 'Missing required field: washerToolId is required' },
         { status: 400 }
       );
     }
@@ -251,13 +253,65 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Validate returned quantity if provided
+    if (returnedQuantity !== undefined) {
+      const currentReturnedQuantity = washerTool.returned_quantity || 0;
+      const maxCanReturn = washerTool.quantity - currentReturnedQuantity;
+      
+      if (returnedQuantity < 0) {
+        return NextResponse.json(
+          { success: false, error: 'Returned quantity must be greater than or equal to 0' },
+          { status: 400 }
+        );
+      }
+      
+      if (isCumulative && returnedQuantity > maxCanReturn) {
+        return NextResponse.json(
+          { success: false, error: `Cannot return more than ${maxCanReturn} items (${currentReturnedQuantity} already returned out of ${washerTool.quantity})` },
+          { status: 400 }
+        );
+      }
+      
+      if (!isCumulative && returnedQuantity > washerTool.quantity) {
+        return NextResponse.json(
+          { success: false, error: `Returned quantity must be between 0 and ${washerTool.quantity}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Calculate new returned quantity
+    const currentReturnedQuantity = washerTool.returned_quantity || 0;
+    let newReturnedQuantity;
+    
+    if (returnedQuantity !== undefined) {
+      if (isCumulative) {
+        // Add to existing returned quantity
+        newReturnedQuantity = currentReturnedQuantity + returnedQuantity;
+      } else {
+        // Replace with new returned quantity
+        newReturnedQuantity = returnedQuantity;
+      }
+    } else {
+      newReturnedQuantity = currentReturnedQuantity;
+    }
+    
+    const isFullyReturned = newReturnedQuantity >= washerTool.quantity;
+
     // Update the washer tool status
+    const updateData: {
+      returned_quantity: number;
+      is_returned: boolean;
+      returned_date: string | null;
+    } = {
+      returned_quantity: newReturnedQuantity,
+      is_returned: isFullyReturned,
+      returned_date: isFullyReturned ? new Date().toISOString() : null
+    };
+
     const { error: updateError } = await supabaseAdmin
       .from('washer_tools')
-      .update({ 
-        is_returned: isReturned,
-        returned_date: isReturned ? new Date().toISOString() : null
-      })
+      .update(updateData)
       .eq('id', washerToolId);
 
     if (updateError) {
@@ -268,8 +322,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // If tool is being returned, increase the available quantity in worker_tools
-    if (isReturned) {
+    // If there's a change in returned quantity, update the available quantity in worker_tools
+    const quantityDifference = newReturnedQuantity - currentReturnedQuantity;
+    if (quantityDifference !== 0) {
       // First get current amount
       const { data: currentTool, error: fetchToolError } = await supabaseAdmin
         .from('worker_tools')
@@ -288,7 +343,7 @@ export async function PUT(request: NextRequest) {
       const { error: quantityError } = await supabaseAdmin
         .from('worker_tools')
         .update({ 
-          amount: currentTool.amount + washerTool.quantity
+          amount: currentTool.amount + quantityDifference
         })
         .eq('name', washerTool.tool_name);
 

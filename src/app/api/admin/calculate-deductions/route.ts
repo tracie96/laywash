@@ -23,17 +23,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all unreturned washer tools for this washer
-    const { data: unreturnedTools, error: toolsError } = await supabaseAdmin
+    // Get all washer tools for this washer (both returned and unreturned)
+    const { data: allTools, error: toolsError } = await supabaseAdmin
       .from('washer_tools')
       .select('*')
-      .eq('washer_id', washerId)
-      .eq('is_returned', false);
+      .eq('is_returned', false)
+      .eq('washer_id', washerId);
 
     if (toolsError) {
-      console.error('Error fetching unreturned tools:', toolsError);
+      console.error('Error fetching washer tools:', toolsError);
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch unreturned tools' },
+        { success: false, error: 'Failed to fetch washer tools' },
         { status: 500 }
       );
     }
@@ -52,26 +52,33 @@ export async function GET(request: NextRequest) {
       notes?: string;
     }> = [];
 
-    if (unreturnedTools && unreturnedTools.length > 0) {
-      for (const tool of unreturnedTools) {
-        const totalValue = (tool.amount || 0) * (tool.quantity || 1);
+    if (allTools && allTools.length > 0) {
+      for (const tool of allTools) {
+        // Calculate unreturned quantity: quantity - returned_quantity (default to 0 if not set)
+        const returnedQuantity = tool.returned_quantity || 0;
+        const unreturnedQuantity = tool.quantity - returnedQuantity;
         
-        unreturnedItems.push({
-          id: tool.id,
-          toolName: tool.tool_name,
-          toolType: tool.tool_type,
-          quantity: tool.quantity,
-          amount: tool.amount || 0,
-          totalValue,
-          assignedDate: tool.assigned_date,
-          notes: tool.notes
-        });
+        // Only include tools that have unreturned items
+        if (unreturnedQuantity > 0) {
+          const totalValue = (tool.amount || 0) * unreturnedQuantity;
+          
+          unreturnedItems.push({
+            id: tool.id,
+            toolName: tool.tool_name,
+            toolType: tool.tool_type,
+            quantity: unreturnedQuantity, // Show unreturned quantity instead of total quantity
+            amount: tool.amount || 0,
+            totalValue,
+            assignedDate: tool.assigned_date,
+            notes: tool.notes
+          });
 
-        // Categorize deductions based on tool type
-        if (tool.tool_type === 'material' || tool.tool_type === 'supply') {
-          materialDeductions += totalValue;
-        } else {
-          toolDeductions += totalValue;
+          // Categorize deductions based on tool type
+          if (tool.tool_type === 'material' || tool.tool_type === 'supply') {
+            materialDeductions += totalValue;
+          } else {
+            toolDeductions += totalValue;
+          }
         }
       }
     }
