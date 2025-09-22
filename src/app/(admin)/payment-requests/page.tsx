@@ -154,12 +154,6 @@ const PaymentRequestsPage: React.FC = () => {
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if there are unreturned tools
-    if (hasUnreturnedTools) {
-      alert('❌ Cannot create payment request. You must return all assigned tools first.');
-      return;
-    }
-    
     const requestedAmount = parseFloat(formData.requestedAmount);
     const materialDeductions = calculatedDeductions.materialDeductions;
     const toolDeductions = calculatedDeductions.toolDeductions;
@@ -170,8 +164,15 @@ const PaymentRequestsPage: React.FC = () => {
     }
 
     const totalRequested = requestedAmount + materialDeductions + toolDeductions;
+    const remainingBalance = currentEarnings - totalRequested;
+    
     if (totalRequested > currentEarnings) {
       alert(`Requested amount (₦${totalRequested}) exceeds available earnings (₦${currentEarnings})`);
+      return;
+    }
+    
+    if (remainingBalance < 0) {
+      alert(`Cannot create payment request. Remaining balance would be negative (₦${remainingBalance.toLocaleString()}). Please reduce the requested amount or return some tools first.`);
       return;
     }
 
@@ -377,19 +378,19 @@ const PaymentRequestsPage: React.FC = () => {
 
       <div className="mb-6">
         {hasUnreturnedTools && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                  Cannot Create Payment Request
+                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                  Unreturned Tools Detected
                 </h3>
-                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                  <p>You must return all assigned tools before creating a payment request.</p>
+                <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                  <p>You have unreturned tools that will be deducted from your payment request.</p>
                   <p className="mt-1">Unreturned tools: {unreturnedItems.map(item => item.toolName).join(', ')}</p>
                 </div>
               </div>
@@ -400,13 +401,9 @@ const PaymentRequestsPage: React.FC = () => {
         <div className="flex space-x-3">
           <Button
             onClick={openCreateForm}
-            disabled={hasUnreturnedTools}
-            className={`${hasUnreturnedTools 
-              ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {hasUnreturnedTools ? 'Return Tools First' : 'Create Payment Request'}
+            Create Payment Request
           </Button>
           
           {currentEarnings <= 0 && (
@@ -545,6 +542,10 @@ const PaymentRequestsPage: React.FC = () => {
                       <div className="font-medium mt-1 text-yellow-900 dark:text-yellow-100">
                         Total Deductions: ₦{calculatedDeductions.totalDeductions.toLocaleString()}
                       </div>
+                      <div className="text-xs mt-2 p-2 bg-yellow-100 dark:bg-yellow-800 rounded">
+                        <div>Available Earnings: ₦{currentEarnings.toLocaleString()}</div>
+                        <div>After Deductions: ₦{(currentEarnings - calculatedDeductions.totalDeductions).toLocaleString()}</div>
+                      </div>
                     </div>
                     <button
                       onClick={fetchCalculatedDeductions}
@@ -576,6 +577,11 @@ const PaymentRequestsPage: React.FC = () => {
                 <div className="text-xs text-gray-500 mt-1">
                   Available: ₦{currentEarnings.toLocaleString()}
                 </div>
+                {hasUnreturnedTools && (
+                  <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    After deductions: ₦{(currentEarnings - calculatedDeductions.totalDeductions).toLocaleString()}
+                  </div>
+                )}
               </div>
               
               <div>

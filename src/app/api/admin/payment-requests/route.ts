@@ -181,38 +181,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check for unreturned washer tools
-    const { data: unreturnedTools, error: toolsError } = await supabaseAdmin
-      .from('washer_tools')
-      .select('id, tool_name, tool_type, quantity, amount')
-      .eq('washer_id', washerId)
-      .eq('is_returned', false);
+    // Note: We no longer block payment requests based on unreturned tools
+    // The frontend handles showing deductions and preventing negative balances
 
-    if (toolsError) {
-      console.error('Error checking unreturned tools:', toolsError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to check tool return status' },
-        { status: 500 }
-      );
-    }
-
-    // If there are unreturned tools, prevent payment request creation (only for regular payments)
-    if (!isAdvance && unreturnedTools && unreturnedTools.length > 0) {
-      const toolNames = unreturnedTools.map(tool => tool.tool_name).join(', ');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Cannot create payment request. You must return all assigned tools first. Unreturned tools: ${toolNames}`,
-          unreturnedTools: unreturnedTools.map(tool => ({
-            id: tool.id,
-            toolName: tool.tool_name,
-            toolType: tool.tool_type,
-            quantity: tool.quantity,
-            amount: tool.amount
-          }))
-        },
-        { status: 400 }
-      );
+    // For regular payments, check if remaining balance would be negative after deductions
+    if (!isAdvance) {
+      const remainingBalance = currentEarnings - totalRequested;
+      if (remainingBalance < 0) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Cannot create payment request. Remaining balance would be negative (₦${remainingBalance.toLocaleString()}). Please reduce the requested amount or return some tools first.`
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Create payment request
