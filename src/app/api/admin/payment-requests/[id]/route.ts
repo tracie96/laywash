@@ -123,7 +123,16 @@ export async function PATCH(
       const paymentAmount = existingRequest.amount;
       const materialDeductions = existingRequest.material_deductions || 0;
       const toolDeductions = existingRequest.tool_deductions || 0;
-      const totalDeduction = paymentAmount + materialDeductions + toolDeductions;
+      const isAdvance = existingRequest.is_advance || false;
+      
+      let totalDeduction;
+      if (isAdvance) {
+        // For advance payments, only deduct the requested amount (no material/tool deductions)
+        totalDeduction = paymentAmount;
+      } else {
+        // For regular payments, deduct the full amount including deductions
+        totalDeduction = paymentAmount + materialDeductions + toolDeductions;
+      }
 
       // Update washer's total earnings
       const { error: earningsError } = await supabaseAdmin

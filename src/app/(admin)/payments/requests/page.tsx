@@ -298,6 +298,7 @@ const PaymentRequestsPage: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Washer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Request Details</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Deductions</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
@@ -326,10 +327,19 @@ const PaymentRequestsPage: React.FC = () => {
                         <div className="text-sm text-gray-900 dark:text-white">
                           Request #{request.id.slice(0, 8)}...
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className={`text-xs ${request.total_earnings < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
                           Total Earnings: ₦{request.total_earnings.toLocaleString()}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        request.is_advance 
+                          ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                      }`}>
+                        {request.is_advance ? 'Advance' : 'Regular'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-lg font-bold text-green-600 dark:text-green-400">
@@ -337,13 +347,19 @@ const PaymentRequestsPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="text-xs">
-                        <div>Material: ₦{request.material_deductions.toLocaleString()}</div>
-                        <div>Tools: ₦{request.tool_deductions.toLocaleString()}</div>
-                        <div className="font-medium text-red-600 dark:text-red-400">
-                          Total: ₦{(request.material_deductions + request.tool_deductions).toLocaleString()}
+                      {request.is_advance ? (
+                        <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                          No Deductions
                         </div>
-                      </div>
+                      ) : (
+                        <div className="text-xs">
+                          <div>Material: ₦{request.material_deductions.toLocaleString()}</div>
+                          <div>Tools: ₦{request.tool_deductions.toLocaleString()}</div>
+                          <div className="font-medium text-red-600 dark:text-red-400">
+                            Total: ₦{(request.material_deductions + request.tool_deductions).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>

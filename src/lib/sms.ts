@@ -1,15 +1,23 @@
-import twilio from 'twilio';
-
-// SMS service using Twilio
-// Configure with: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER environment variables
+// SMS service using Kudisms
+// Configure with: KUDISMS_TOKEN, KUDISMS_SENDER_ID environment variables
 
 export interface SMSData {
   to: string;
   message: string;
 }
 
-export class SMSService {
-  private static client: twilio.Twilio | null = null;
+export interface KudismsResponse {
+  status: string;
+  error_code: string;
+  cost: string;
+  data: string;
+  msg: string;
+  length: number;
+  page: number;
+  balance: string;
+}
+
+export class SMSService {;
 
   /**
    * Formats a Nigerian phone number to international format (+234)
@@ -47,51 +55,63 @@ export class SMSService {
     return `+${cleaned}`;
   }
 
-  private static getClient(): twilio.Twilio {
-    if (!this.client) {
-      const accountSid = process.env.TWILIO_ACCOUNT_SID;
-      const authToken = process.env.TWILIO_AUTH_TOKEN;
+  private static async sendSMS(phoneNumber: string, message: string): Promise<KudismsResponse> {
+    const token = process.env.KUDISMS_TOKEN;
+    const senderId = process.env.KUDISMS_SENDER_ID;
 
-      if (!accountSid || !authToken) {
-        throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.');
-      }
-
-      this.client = twilio(accountSid, authToken);
+    if (!token || !senderId) {
+      throw new Error('Kudisms credentials not configured. Please set KUDISMS_TOKEN and KUDISMS_SENDER_ID environment variables.');
     }
 
-    return this.client;
+    console.log('SMS Debug Info:', {
+      token: token ? `${token.substring(0, 10)}...` : 'NOT SET',
+      senderId,
+      phoneNumber,
+      messageLength: message.length
+    });
+
+    const formData = new FormData();
+    formData.append('token', token);
+    formData.append('senderID', senderId);
+    formData.append('recipients', phoneNumber);
+    formData.append('message', message);
+
+    const response = await fetch('https://my.kudisms.net/api/corporate', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Kudisms API error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Kudisms API Response:', result);
+    return result;
   }
 
   static async sendKeyCode(
     phoneNumber: string,
     customerName: string,
-    keyCode: string,
-    locationName?: string
+    keyCode: string
   ): Promise<boolean> {
     try {
-      const client = this.getClient();
-      const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-
-      if (!fromNumber) {
-        throw new Error('TWILIO_PHONE_NUMBER not configured');
-      }
-
-      // Format phone number to Nigerian international format
-      // TEMPORARY: Hardcoded test number for development
-      const formattedPhone = '+2348033242104';
+      // Format phone number to Nigerian international format (remove + for Kudisms)
+      const formattedPhone = this.formatNigerianPhoneNumber(phoneNumber).replace('+', '');
 
       // Create the message
-      const message = `Hi ${customerName}! Your car wash key code is: ${keyCode}${locationName ? ` at ${locationName}` : ''}. Please keep this code safe and present it when picking up your vehicle.`;
+      const message = `Hi ${customerName}! Your car wash key code is: ${keyCode}. Please keep this code safe and present it when picking up your vehicle.`;
 
-      // Send SMS
-      const messageResponse = await client.messages.create({
-        body: message,
-        from: fromNumber,
-        to: formattedPhone
-      });
+      // Send SMS via Kudisms
+      const response = await this.sendSMS(formattedPhone, message);
 
-      console.log('SMS sent successfully:', messageResponse.sid);
-      return true;
+      if (response.status === 'success') {
+        console.log('SMS sent successfully via Kudisms:', response.data);
+        return true;
+      } else {
+        console.error('Kudisms SMS failed:', response.msg);
+        return false;
+      }
 
     } catch (error) {
       console.error('Failed to send SMS:', error);
@@ -104,26 +124,19 @@ export class SMSService {
     message: string
   ): Promise<boolean> {
     try {
-      const client = this.getClient();
-      const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+      // Format phone number to Nigerian international format (remove + for Kudisms)
+      const formattedPhone = this.formatNigerianPhoneNumber(phoneNumber).replace('+', '');
 
-      if (!fromNumber) {
-        throw new Error('TWILIO_PHONE_NUMBER not configured');
+      // Send SMS via Kudisms
+      const response = await this.sendSMS(formattedPhone, message);
+
+      if (response.status === 'success') {
+        console.log('SMS sent successfully via Kudisms:', response.data);
+        return true;
+      } else {
+        console.error('Kudisms SMS failed:', response.msg);
+        return false;
       }
-
-      // Format phone number to Nigerian international format
-      // TEMPORARY: Hardcoded test number for development
-      const formattedPhone = '+2348033242104';
-
-      // Send SMS
-      const messageResponse = await client.messages.create({
-        body: message,
-        from: fromNumber,
-        to: formattedPhone
-      });
-
-      console.log('SMS sent successfully:', messageResponse.sid);
-      return true;
 
     } catch (error) {
       console.error('Failed to send SMS:', error);

@@ -17,6 +17,7 @@ interface PaymentRequest {
   created_at: string;
   updated_at: string;
   amount: number;
+  is_advance?: boolean;
   washer: {
     id: string;
     name: string;
@@ -208,8 +209,13 @@ const AdminPaymentRequestsPage: React.FC = () => {
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">
+                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         Worker ID: {request.washer_id.slice(0, 8)}
+                        {request.is_advance && (
+                          <Badge color="warning">
+                            Advance
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Requested: {new Date(request.created_at).toLocaleDateString()}
@@ -223,7 +229,7 @@ const AdminPaymentRequestsPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
-                      <div className="font-semibold text-green-600 dark:text-green-400">
+                      <div className={`font-semibold ${request.total_earnings < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                         ₦{request.total_earnings.toLocaleString()}
                       </div>
                     </div>

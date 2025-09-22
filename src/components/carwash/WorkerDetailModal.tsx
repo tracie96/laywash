@@ -72,7 +72,7 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
         const response = await fetch(`/api/admin/washers/${workerId}/details`);
         const data = await response.json();
         
-        console.log('Worker details response:', data); // Debug log
+        console.log('Worker details response:', data); 
         
         if (data.success) {
           setWorker(data.worker);

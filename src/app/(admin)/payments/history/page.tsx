@@ -22,6 +22,21 @@ interface Payment {
   assignedWasherId?: string;
   assignedAdminId?: string;
   remarks?: string;
+  // Additional fields to match CheckIn interface
+  customerPhone?: string;
+  washType?: string;
+  paymentStatus?: string;
+  estimatedDuration?: number;
+  actualDuration?: number;
+  totalPrice?: number;
+  specialInstructions?: string;
+  assignedWasher?: string;
+  assignedAdmin?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  userCode?: string;
+  reason?: string;
+  passcode?: string;
 }
 
 const PaymentHistoryPage: React.FC = () => {
@@ -103,8 +118,8 @@ const PaymentHistoryPage: React.FC = () => {
       total: payments.length,
       pending: payments.filter(p => p.status === 'pending').length,
       completed: payments.filter(p => p.status === 'completed').length,
-      totalAmount: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0),
-      pendingAmount: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
+      totalAmount: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
+      pendingAmount: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
       cashPayments: payments.filter(p => p.paymentMethod === 'cash' && p.status === 'completed').length,
       cardPayments: payments.filter(p => p.paymentMethod === 'card' && p.status === 'completed').length,
       mobilePayments: payments.filter(p => p.paymentMethod === 'mobile_money' && p.status === 'completed').length
@@ -244,7 +259,7 @@ const PaymentHistoryPage: React.FC = () => {
                 Total Revenue
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ₦ {stats.totalAmount.toFixed(2)}
+                NGN {stats.totalAmount.toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -262,7 +277,7 @@ const PaymentHistoryPage: React.FC = () => {
                 Pending Amount
               </p>
               <p className="text-2xl font-bold text-orange-600">
-                ₦ {stats.pendingAmount.toFixed(2)}
+                NGN {stats.pendingAmount.toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -353,14 +368,18 @@ const PaymentHistoryPage: React.FC = () => {
                     </h3>
                     {getStatusBadge(payment.status)}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">License Plate</p>
                       <p className="font-medium text-gray-900 dark:text-white">{payment.licensePlate}</p>
                     </div>
                     <div>
+                      <p className="text-gray-600 dark:text-gray-400">Vehicle Type</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{payment.vehicleType}</p>
+                    </div>
+                    <div>
                       <p className="text-gray-600 dark:text-gray-400">Amount</p>
-                      <p className="font-medium text-gray-900 dark:text-white">₦ {payment.amount.toFixed(2)}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">NGN {payment.totalPrice || payment.amount}</p>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Date</p>

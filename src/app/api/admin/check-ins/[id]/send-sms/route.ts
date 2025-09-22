@@ -12,7 +12,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const currentAdminId = request.headers.get('X-Admin-ID');
 
@@ -36,9 +39,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-
-    const body = await request.json();
-    const { checkInId } = body;
+    const { id: checkInId } = await params;
+    console.log('Check-in ID:', checkInId);
 
     if (!checkInId) {
       return NextResponse.json(
@@ -47,6 +49,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Parse request body to get phone number
+    const body = await request.json();
+    const { phoneNumber } = body;
+
+    if (!phoneNumber) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number is required' },
+        { status: 400 }
+      );
+    }
     // Get check-in details from database
     const { data: checkIn, error: checkInError } = await supabaseAdmin
       .from('car_check_ins')
@@ -75,34 +87,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get customer details from customers table
-    let customerPhone = '';
-    let customerName = '';
-
+    // Get customer name
+    let customerName = 'Customer';
     if (checkIn.customer_id && checkIn.customers) {
-      // Customer exists in customers table
-      customerPhone = checkIn.customers.phone || '';
       customerName = checkIn.customers.name || 'Customer';
-    } else {
-      // For walk-in customers without customer_id, we can't send SMS
-      return NextResponse.json(
-        { success: false, error: 'Cannot send SMS to walk-in customers without phone number' },
-        { status: 400 }
-      );
     }
 
-    if (!customerPhone) {
-      return NextResponse.json(
-        { success: false, error: 'Customer phone number not found' },
-        { status: 400 }
-      );
-    }
-
-    // Send SMS with key code
+    // Send SMS with key code to the provided phone number
     const smsSent = await SMSService.sendKeyCode(
-      customerPhone,
+      phoneNumber,
       customerName,
-      checkIn.user_code,
+      checkIn.user_code
     );
 
     if (smsSent) {

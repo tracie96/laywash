@@ -523,7 +523,7 @@ const CheckInHistoryPage: React.FC = () => {
     }
   };
 
-  const handleSendSMS = async (checkInId: string) => {
+  const handleSendSMS = async (checkInId: string, customerPhone: string) => {
     try {
       setSendingSMS(checkInId);
       
@@ -531,7 +531,11 @@ const CheckInHistoryPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
+        body: JSON.stringify({
+          phoneNumber: customerPhone
+        }),
       });
 
       const result = await response.json();
@@ -1144,7 +1148,7 @@ const CheckInHistoryPage: React.FC = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleSendSMS(checkIn.id)}
+                      onClick={() => handleSendSMS(checkIn.id, checkIn.customerPhone)}
                       disabled={sendingSMS === checkIn.id}
                       className="w-full sm:w-auto"
                     >

@@ -19,6 +19,7 @@ interface PaymentRequest {
   created_at: string;
   updated_at: string;
   amount: number;
+  is_advance?: boolean;
   washer: {
     id: string;
     name: string;
@@ -32,6 +33,7 @@ const PaymentRequestsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isOpen: showCreateForm, openModal: openCreateForm, closeModal: closeCreateForm } = useModal();
+  const { isOpen: showAdvanceForm, openModal: openAdvanceForm, closeModal: closeAdvanceForm } = useModal();
   const [currentEarnings, setCurrentEarnings] = useState(0);
   
   // Form state
@@ -39,6 +41,12 @@ const PaymentRequestsPage: React.FC = () => {
     requestedAmount: '',
     materialDeductions: '0',
     toolDeductions: '0',
+    notes: ''
+  });
+  
+  // Advance form state
+  const [advanceFormData, setAdvanceFormData] = useState({
+    requestedAmount: '',
     notes: ''
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
@@ -224,6 +232,71 @@ const PaymentRequestsPage: React.FC = () => {
     }
   };
 
+  const handleAdvanceRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const requestedAmount = parseFloat(advanceFormData.requestedAmount);
+    
+    if (!requestedAmount || requestedAmount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    if (requestedAmount > 2000) {
+      alert('Advance payment cannot exceed ₦2,000');
+      return;
+    }
+
+    try {
+      setFormSubmitting(true);
+      
+      if (!user?.id) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      const washerId = user.id;
+      const response = await fetch('/api/admin/payment-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          washerId,
+          requestedAmount,
+          materialDeductions: 0,
+          toolDeductions: 0,
+          notes: advanceFormData.notes || null,
+          isAdvance: true
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Reset form and close modal
+        setAdvanceFormData({
+          requestedAmount: '',
+          notes: ''
+        });
+        closeAdvanceForm();
+        
+        // Refresh the list and earnings
+        await fetchPaymentRequests();
+        await fetchCurrentEarnings();
+        
+        alert('Advance payment request created successfully!');
+      } else {
+        alert(result.error || 'Failed to create advance payment request');
+      }
+    } catch (err) {
+      console.error('Error creating advance payment request:', err);
+      alert('Failed to create advance payment request');
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
   const handleCancelRequest = async (requestId: string) => {
     if (!confirm('Are you sure you want to cancel this payment request?')) {
       return;
@@ -296,7 +369,7 @@ const PaymentRequestsPage: React.FC = () => {
         {/* Current Earnings Display */}
         <div className="text-right">
           <div className="text-sm text-gray-600 dark:text-gray-400">Available Earnings</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <div className={`text-2xl font-bold ${currentEarnings < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
             ₦{currentEarnings.toLocaleString()}
           </div>
         </div>
@@ -324,16 +397,27 @@ const PaymentRequestsPage: React.FC = () => {
           </div>
         )}
         
-        <Button
-          onClick={openCreateForm}
-          disabled={hasUnreturnedTools}
-          className={`${hasUnreturnedTools 
-            ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
-            : 'bg-blue-600 hover:bg-blue-700 text-white'
-          }`}
-        >
-          {hasUnreturnedTools ? 'Return Tools First' : 'Create Payment Request'}
-        </Button>
+        <div className="flex space-x-3">
+          <Button
+            onClick={openCreateForm}
+            disabled={hasUnreturnedTools}
+            className={`${hasUnreturnedTools 
+              ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {hasUnreturnedTools ? 'Return Tools First' : 'Create Payment Request'}
+          </Button>
+          
+          {currentEarnings <= 0 && (
+            <Button
+              onClick={openAdvanceForm}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              Request Advance
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Payment Requests List */}
@@ -357,8 +441,13 @@ const PaymentRequestsPage: React.FC = () => {
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">
+                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         Payment Request #{request.id.slice(0, 8)}
+                        {request.is_advance && (
+                          <Badge color="warning">
+                            Advance
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Created: {new Date(request.created_at).toLocaleDateString()}
@@ -372,7 +461,7 @@ const PaymentRequestsPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                     <div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</div>
-                      <div className="font-semibold text-green-600 dark:text-green-400">
+                      <div className={`font-semibold ${request.total_earnings < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                         ₦{request.total_earnings.toLocaleString()}
                       </div>
                     </div>
@@ -574,6 +663,81 @@ const PaymentRequestsPage: React.FC = () => {
                 </Button>
               </div>
             </form>
+      </Modal>
+
+      {/* Advance Request Modal */}
+      <Modal
+        isOpen={showAdvanceForm}
+        onClose={closeAdvanceForm}
+        className="max-w-md p-6"
+      >
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Request Advance Payment
+        </h3>
+        
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mb-4">
+          <div className="text-sm text-orange-800 dark:text-orange-200">
+            <div className="font-medium mb-1">⚠️ Advance Payment Rules</div>
+            <ul className="text-xs space-y-1">
+              <li>• Only available when total earnings is ₦0 or negative</li>
+              <li>• Maximum advance amount: ₦2,000</li>
+              <li>• No tool return requirements</li>
+              <li>• Will result in negative earnings balance</li>
+            </ul>
+          </div>
+        </div>
+        
+        <form onSubmit={handleAdvanceRequest} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Advance Amount (₦)
+            </label>
+            <input
+              type="number"
+              value={advanceFormData.requestedAmount}
+              onChange={(e) => setAdvanceFormData({ ...advanceFormData, requestedAmount: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter amount (max ₦2,000)"
+              min="1"
+              max="2000"
+              required
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Maximum: ₦2,000
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              value={advanceFormData.notes}
+              onChange={(e) => setAdvanceFormData({ ...advanceFormData, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Add any additional notes..."
+              rows={3}
+            />
+          </div>
+          
+          <div className="flex space-x-3 pt-4">
+            <Button
+              type="submit"
+              disabled={formSubmitting}
+              className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {formSubmitting ? 'Creating...' : 'Request Advance'}
+            </Button>
+            <Button
+              type="button"
+              onClick={closeAdvanceForm}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

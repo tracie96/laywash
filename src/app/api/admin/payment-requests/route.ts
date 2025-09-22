@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
-    // Build the query with washer information
     let query = supabaseAdmin
       .from('payment_request')
       .select(`
@@ -76,6 +75,7 @@ export async function GET(request: NextRequest) {
       status: request.status,
       admin_notes: request.admin_notes,
       created_at: request.created_at,
+      is_advance: request.is_advance,
       updated_at: request.updated_at,
       amount: parseFloat(request.amount || '0'),
       washer: {
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { washerId, requestedAmount, materialDeductions = 0, toolDeductions = 0, notes } = body;
+    const { washerId, requestedAmount, materialDeductions = 0, toolDeductions = 0, notes, isAdvance = false } = body;
 
     if (!washerId || !requestedAmount) {
       return NextResponse.json(
@@ -147,15 +147,38 @@ export async function POST(request: NextRequest) {
     const currentEarnings = washerProfile.total_earnings || 0;
     const totalRequested = requestedAmount + materialDeductions + toolDeductions;
 
-    // Check if requested amount exceeds earnings
-    if (totalRequested > currentEarnings) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Requested amount (₦${totalRequested}) exceeds available earnings (₦${currentEarnings})` 
-        },
-        { status: 400 }
-      );
+    // For advance payments, check if washer has 0 or negative earnings and amount doesn't exceed 2000
+    if (isAdvance) {
+      if (currentEarnings > 0) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Advance payments can only be requested when total earnings is 0 or negative' 
+          },
+          { status: 400 }
+        );
+      }
+      
+      if (requestedAmount > 2000) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Advance payment cannot exceed ₦2,000' 
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // For regular payments, check if requested amount exceeds earnings
+      if (totalRequested > currentEarnings) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Requested amount (₦${totalRequested}) exceeds available earnings (₦${currentEarnings})` 
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Check for unreturned washer tools
@@ -173,8 +196,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If there are unreturned tools, prevent payment request creation
-    if (unreturnedTools && unreturnedTools.length > 0) {
+    // If there are unreturned tools, prevent payment request creation (only for regular payments)
+    if (!isAdvance && unreturnedTools && unreturnedTools.length > 0) {
       const toolNames = unreturnedTools.map(tool => tool.tool_name).join(', ');
       return NextResponse.json(
         { 
@@ -203,6 +226,7 @@ export async function POST(request: NextRequest) {
         tool_deductions: toolDeductions,
         status: 'pending',
         admin_notes: notes || null,
+        is_advance: isAdvance,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

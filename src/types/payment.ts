@@ -11,6 +11,7 @@ export interface PaymentRequest {
   created_at: string;
   updated_at: string;
   amount: number; // The actual amount requested for withdrawal by the washer
+  is_advance?: boolean; // Whether this is an advance payment request
 }
 
 export interface WasherInfo {

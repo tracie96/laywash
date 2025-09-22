@@ -82,8 +82,9 @@ export async function GET(
         check_in_time,
         actual_completion_time,
         estimated_completion_time,
-        license_plate,
+        license_plate,    
         vehicle_type,
+        washer_income,
         vehicle_model,
         vehicle_color,
         status,
@@ -96,7 +97,7 @@ export async function GET(
           services (
             id,
             name,
-            description,
+            description,    
             base_price,
             category
           )
@@ -133,7 +134,7 @@ export async function GET(
         color: checkIn.vehicle_color || 'Unknown',
         licensePlate: checkIn.license_plate || 'N/A',
         serviceType: serviceName,
-        price: checkIn.total_amount || 0,
+        price: checkIn.washer_income || 0,
         rating: 4.5, // TODO: Implement actual rating system
         completedAt: new Date(checkIn.actual_completion_time || checkIn.check_in_time),
         duration,

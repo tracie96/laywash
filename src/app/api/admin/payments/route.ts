@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Build the query with customer information
+    // Build the query with customer information - use same structure as check-ins API
     let query = supabaseAdmin
       .from('car_check_ins')
       .select(`
@@ -37,20 +37,21 @@ export async function GET(request: NextRequest) {
           id,
           service_name,
           price,
-          company_income
+          duration
         )
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .limit(limit);
 
-    // Apply search filter
+    // Apply search filter - use same logic as check-ins API
     if (search) {
-      query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%`);
+      query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%,license_plate.ilike.%${search}%`);
     }
 
-    // Apply status filter
+    // Apply status filter - map to payment_status like check-ins API
     if (status !== 'all') {
-      query = query.eq('payment_status', status);
+      const paymentStatus = status === 'completed' ? 'paid' : status;
+      query = query.eq('payment_status', paymentStatus);
     }
 
     // Apply payment method filter
@@ -77,22 +78,36 @@ export async function GET(request: NextRequest) {
       return {
         id: checkIn.id,
         customerName: checkIn.customers?.name || 'Walk-in Customer',
-        amount: checkIn.company_income || 0,
+        customerPhone: checkIn.customers?.phone || 'N/A',
+        amount: checkIn.total_amount || 0, // Use total_amount like check-in history
+        totalPrice: checkIn.total_amount || 0, // Add totalPrice field for consistency
         date: checkIn.check_in_time,
         status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
         paymentMethod: checkIn.payment_method || 'Not specified',
+        paymentStatus: checkIn.payment_status, // Add paymentStatus field
         serviceType: serviceType,
         services: services,
         licensePlate: checkIn.license_plate,
         vehicleType: checkIn.vehicle_type,
         vehicleModel: checkIn.vehicle_model,
         vehicleColor: checkIn.vehicle_color,
+        washType: checkIn.wash_type, // Add washType field
         checkInTime: checkIn.check_in_time,
         completionTime: checkIn.actual_completion_time,
         customerId: checkIn.customer_id,
         assignedWasherId: checkIn.assigned_washer_id,
         assignedAdminId: checkIn.assigned_admin_id,
-        remarks: checkIn.remarks
+        remarks: checkIn.remarks,
+        specialInstructions: checkIn.remarks || checkIn.valuable_items, // Add specialInstructions
+        estimatedDuration: checkIn.check_in_services?.reduce((total: number, service: { duration?: number }) => total + (service.duration || 0), 0) || 0,
+        actualDuration: checkIn.actual_completion_time && checkIn.check_in_time 
+          ? Math.round((new Date(checkIn.actual_completion_time).getTime() - new Date(checkIn.check_in_time).getTime()) / (1000 * 60))
+          : undefined,
+        createdAt: checkIn.created_at,
+        updatedAt: checkIn.updated_at,
+        userCode: checkIn.user_code,
+        reason: checkIn.reason,
+        passcode: checkIn.passcode
       };
     }) || [];
 
