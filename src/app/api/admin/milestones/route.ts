@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
       createdBy 
     } = body;
 
+    console.log({body});
     // Validate required fields
     if (!name || !description || !type || !condition || !createdBy) {
       return NextResponse.json(

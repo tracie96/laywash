@@ -4,6 +4,7 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/button/Button";
 import InputField from "@/components/form/input/InputField";
+import { useAuth } from "@/context/AuthContext";
 
 interface MilestoneFormData {
   name: string;
@@ -33,6 +34,7 @@ const CreateMilestonePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +62,7 @@ const CreateMilestonePage: React.FC = () => {
 
       // For demo purposes, using a placeholder admin ID
       // In a real app, this would come from the authenticated user
-      const adminId = 'current-admin-id'; // This should be replaced with actual admin ID from auth context
+      const adminId = user?.id; // This should be replaced with actual admin ID from auth context
 
       const milestoneData = {
         name: formData.name.trim(),

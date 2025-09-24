@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useAuth } from "@/context/AuthContext";
-import { PlusIcon, CheckCircleIcon, CloseIcon, TrashBinIcon } from "@/icons";
+import { PlusIcon, TrashBinIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
@@ -76,7 +76,9 @@ const FinancialBonusesPage: React.FC = () => {
   // Customer filtering states
   const [minVisits, setMinVisits] = useState<string>('');
   const [minSpent, setMinSpent] = useState<string>('');
+  const [recipientSearch, setRecipientSearch] = useState<string>('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [filteredWashers, setFilteredWashers] = useState<Washer[]>([]);
   
   const { user } = useAuth();
 
@@ -109,7 +111,7 @@ const FinancialBonusesPage: React.FC = () => {
     }
   }, [filterType, filterStatus]);
 
-  // Filter customers based on visits and spending
+  // Filter customers based on visits, spending, and search
   const filterCustomers = useCallback(() => {
     let filtered = customers;
     
@@ -127,8 +129,34 @@ const FinancialBonusesPage: React.FC = () => {
       }
     }
     
+    if (recipientSearch) {
+      const searchTerm = recipientSearch.toLowerCase();
+      filtered = filtered.filter(customer => 
+        customer.name.toLowerCase().includes(searchTerm) ||
+        // customer.licensePlate.toLowerCase().includes(searchTerm) ||
+        customer.email?.toLowerCase().includes(searchTerm) ||
+        customer.phone.includes(searchTerm)
+      );
+    }
+    
     setFilteredCustomers(filtered);
-  }, [customers, minVisits, minSpent]);
+  }, [customers, minVisits, minSpent, recipientSearch]);
+
+  // Filter washers based on search
+  const filterWashers = useCallback(() => {
+    let filtered = washers;
+    
+    if (recipientSearch) {
+      const searchTerm = recipientSearch.toLowerCase();
+      filtered = filtered.filter(washer => 
+        washer.name.toLowerCase().includes(searchTerm) ||
+        washer.email.toLowerCase().includes(searchTerm) ||
+        washer.phone.includes(searchTerm)
+      );
+    }
+    
+    setFilteredWashers(filtered);
+  }, [washers, recipientSearch]);
 
   useEffect(() => {
     fetchBonuses();
@@ -136,10 +164,11 @@ const FinancialBonusesPage: React.FC = () => {
     fetchWashers();
   }, [fetchBonuses]);
 
-  // Filter customers when filters change
+  // Filter customers and washers when filters change
   useEffect(() => {
     filterCustomers();
-  }, [filterCustomers]);
+    filterWashers();
+  }, [filterCustomers, filterWashers]);
 
   const fetchCustomers = async () => {
     try {
@@ -629,14 +658,14 @@ const FinancialBonusesPage: React.FC = () => {
                               className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
                               title="Approve"
                             >
-                              <CheckCircleIcon className="w-4 h-4" />
+                              Approve
                             </button>
                             <button
                               onClick={() => handleBonusAction(bonus.id, 'reject')}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                               title="Reject"
                             >
-                              <CloseIcon className="w-4 h-4" />
+                              Reject
                             </button>
                           </>
                         )}
@@ -646,9 +675,7 @@ const FinancialBonusesPage: React.FC = () => {
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                             title="Mark as Paid"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
+                            Mark as Paid
                           </button>
                         )}
                         {bonus.status !== 'paid' && (
@@ -693,7 +720,10 @@ const FinancialBonusesPage: React.FC = () => {
             <Label>Bonus Type <span className="text-error-500">*</span></Label>
             <select
               value={createForm.type}
-              onChange={(e) => setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer'})}
+              onChange={(e) => {
+                setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer', recipientId: ''});
+                setRecipientSearch(''); // Clear search when type changes
+              }}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             >
               <option value="customer">Customer</option>
@@ -704,6 +734,21 @@ const FinancialBonusesPage: React.FC = () => {
           {/* Recipient */}
           <div>
             <Label>Recipient <span className="text-error-500">*</span></Label>
+            
+            {/* Search input for recipients */}
+            <div className="mb-2">
+              <Input
+                type="text"
+                placeholder={createForm.type === 'customer' 
+                  ? "Search customers by name, license plate, email, or phone..."
+                  : "Search washers by name or email..."
+                }
+                value={recipientSearch}
+                onChange={(e) => setRecipientSearch(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            
             <select
               value={createForm.recipientId}
               onChange={(e) => setCreateForm({...createForm, recipientId: e.target.value})}
@@ -716,7 +761,7 @@ const FinancialBonusesPage: React.FC = () => {
                       {customer.name} - {customer.licensePlate} (Visits: {customer.totalVisits}, Spent: ₦{customer.totalSpent.toFixed(2)})
                     </option>
                   ))
-                : washers.map(washer => (
+                : filteredWashers.map(washer => (
                     <option key={washer.id} value={washer.id}>
                       {washer.name} - {washer.email}
                     </option>

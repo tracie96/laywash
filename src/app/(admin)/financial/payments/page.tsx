@@ -7,7 +7,7 @@ interface CarWashPayment {
   customerName: string;
   amount: number;
   date: string;
-  status: "completed" | "pending" | "failed";
+  status: "completed" | "pending" | "failed" | "cancelled";
   paymentMethod: string;
   serviceType: string;
   licensePlate?: string;
@@ -55,7 +55,7 @@ interface PaymentRecord {
   customerName: string;
   amount: number;
   date: string;
-  status: "completed" | "pending" | "failed";
+  status: "completed" | "pending" | "failed" | "cancelled";
   paymentMethod: string;
   serviceType: string;
   licensePlate?: string;
@@ -216,7 +216,7 @@ const FinancialPaymentsPage: React.FC = () => {
             customerName: transaction.customer?.name || transaction.customer_name || 'Walk-in Customer',
             amount: transaction.total_amount,
             date: transaction.created_at,
-            status: transaction.status === 'completed' ? 'completed' : 'pending',
+            status: transaction.status,
             paymentMethod: transaction.payment_method || 'Not specified',
             serviceType: 'Product Sales',
             customerId: transaction.customer_id,
@@ -311,6 +311,8 @@ const FinancialPaymentsPage: React.FC = () => {
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
       case "failed":
         return "bg-error-100 text-error-800 dark:bg-error-900/30 dark:text-error-300";
+      case "cancelled":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
     }
@@ -339,6 +341,7 @@ const FinancialPaymentsPage: React.FC = () => {
   const totalRevenue = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
   const completedPayments = filteredPayments.filter(p => p.status === "completed").length;
   const pendingPayments = filteredPayments.filter(p => p.status === "pending").length;
+  const cancelledPayments = filteredPayments.filter(p => p.status === "cancelled").length;
   const carWashCount = filteredPayments.filter(p => p.type === 'car_wash').length;
   const salesCount = filteredPayments.filter(p => p.type === 'sales_transaction').length;
 
@@ -457,7 +460,7 @@ const FinancialPaymentsPage: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -504,6 +507,23 @@ const FinancialPaymentsPage: React.FC = () => {
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
               <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Cancelled</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{cancelledPayments}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {filteredPayments.length > 0 ? ((cancelledPayments / filteredPayments.length) * 100).toFixed(1) : 0}% cancelled
+              </p>
+            </div>
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
           </div>

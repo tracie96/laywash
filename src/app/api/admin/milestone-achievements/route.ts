@@ -14,13 +14,14 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    console.log("u got here")
+
     const customerId = searchParams.get('customerId');
     const milestoneId = searchParams.get('milestoneId');
     const rewardClaimed = searchParams.get('rewardClaimed');
     const sortBy = searchParams.get('sortBy') || 'achieved_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
-
     // Build the query
     let query = supabaseAdmin
       .from('customer_milestone_achievements')
@@ -31,7 +32,6 @@ export async function GET(request: NextRequest) {
           name,
           email,
           phone,
-          license_plate,
           total_visits,
           total_spent
         ),
@@ -149,6 +149,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate actual visits from check-ins
+    const { data: checkIns, error: checkInsError } = await supabaseAdmin
+      .from('car_check_ins')
+      .select('id, total_amount, status')
+      .eq('customer_id', customerId)
+      .eq('status', 'completed');
+
+    if (checkInsError) {
+      console.error('Error fetching check-ins:', checkInsError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch customer check-ins' },
+        { status: 500 }
+      );
+    }
+
+    const actualVisits = checkIns?.length || 0;
+    const actualSpent = checkIns?.reduce((sum, ci) => sum + (ci.total_amount || 0), 0) || 0;
+
     // Get active milestones
     const { data: milestones, error: milestonesError } = await supabaseAdmin
       .from('milestones')
@@ -190,12 +208,12 @@ export async function POST(request: NextRequest) {
       let qualified = false;
       let achievedValue = 0;
 
-      // Check milestone condition
+      // Check milestone condition using actual check-in data
       if (milestone.type === 'visits') {
-        achievedValue = customer.total_visits || 0;
+        achievedValue = actualVisits;
         qualified = checkCondition(achievedValue, milestone.condition);
       } else if (milestone.type === 'spending') {
-        achievedValue = parseFloat(customer.total_spent || '0');
+        achievedValue = actualSpent;
         qualified = checkCondition(achievedValue, milestone.condition);
       }
 
@@ -227,6 +245,144 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Check milestone achievements error:', error);
+    return NextResponse.json(
+      { success: false, error: 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
+// Function to get customers who qualify for a specific milestone
+export async function PUT(request: NextRequest) {
+  try {
+    const { milestoneId } = await request.json();
+
+    if (!milestoneId) {
+      return NextResponse.json(
+        { success: false, error: 'Milestone ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Get milestone details
+    const { data: milestone, error: milestoneError } = await supabaseAdmin
+      .from('milestones')
+      .select('*')
+      .eq('id', milestoneId)
+      .single();
+
+    if (milestoneError || !milestone) {
+      return NextResponse.json(
+        { success: false, error: 'Milestone not found' },
+        { status: 404 }
+      );
+    }
+
+    // Use a more efficient approach: get customers with aggregated check-in data
+    const { data: customers, error: customersError } = await supabaseAdmin
+      .from('customers')
+      .select(`
+        id,
+        name,
+        email,
+        phone
+        `);
+
+    if (customersError) {
+      console.error('Error fetching customers:', customersError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch customers' },
+        { status: 500 }
+      );
+    }
+
+    const qualifyingCustomers: Array<{
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      actualVisits: number;
+      actualSpent: number;
+      achievedValue: number;
+    }> = [];
+
+    // Process customers in batches to avoid overwhelming the database
+    const batchSize = 50;
+    for (let i = 0; i < customers.length; i += batchSize) {
+      const batch = customers.slice(i, i + batchSize);
+      const customerIds = batch.map(c => c.id);
+
+      // Get check-in statistics for this batch of customers
+      const { data: checkInStats, error: checkInStatsError } = await supabaseAdmin
+        .from('car_check_ins')
+        .select('customer_id, total_amount')
+        .in('customer_id', customerIds)
+        .eq('status', 'completed');
+
+      if (checkInStatsError) {
+        console.error('Error fetching check-in statistics:', checkInStatsError);
+        continue;
+      }
+
+      // Group check-ins by customer
+      const statsByCustomer = new Map();
+      checkInStats?.forEach((checkIn: { customer_id: string; total_amount: number }) => {
+        const customerId = checkIn.customer_id;
+        if (!statsByCustomer.has(customerId)) {
+          statsByCustomer.set(customerId, { visits: 0, spent: 0 });
+        }
+        const stats = statsByCustomer.get(customerId);
+        stats.visits += 1;
+        stats.spent += checkIn.total_amount || 0;
+      });
+
+      // Check each customer in this batch against the milestone
+      batch.forEach(customer => {
+        const stats = statsByCustomer.get(customer.id) || { visits: 0, spent: 0 };
+        const actualVisits = stats.visits;
+        const actualSpent = stats.spent;
+
+        let qualified = false;
+        let achievedValue = 0;
+
+        // Check milestone condition
+        if (milestone.type === 'visits') {
+          achievedValue = actualVisits;
+          qualified = checkCondition(achievedValue, milestone.condition);
+        } else if (milestone.type === 'spending') {
+          achievedValue = actualSpent;
+          qualified = checkCondition(achievedValue, milestone.condition);
+        }
+
+        if (qualified) {
+          qualifyingCustomers.push({
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            actualVisits,
+            actualSpent,
+            achievedValue
+          });
+        }
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      milestone: {
+        id: milestone.id,
+        name: milestone.name,
+        description: milestone.description,
+        type: milestone.type,
+        condition: milestone.condition
+      },
+      qualifyingCustomers,
+      total: qualifyingCustomers.length
+    });
+
+  } catch (error) {
+    console.error('Get qualifying customers error:', error);
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred' },
       { status: 500 }

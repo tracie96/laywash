@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         amount: checkIn.total_amount || 0, // Use total_amount like check-in history
         totalPrice: checkIn.total_amount || 0, // Add totalPrice field for consistency
         date: checkIn.check_in_time,
-        status: checkIn.payment_status === 'paid' ? 'completed' : 'pending',
+        status: checkIn.status === 'cancelled' ? 'cancelled' : (checkIn.payment_status === 'paid' ? 'completed' : 'pending'),
         paymentMethod: checkIn.payment_method || 'Not specified',
         paymentStatus: checkIn.payment_status, // Add paymentStatus field
         serviceType: serviceType,

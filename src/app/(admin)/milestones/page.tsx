@@ -358,12 +358,7 @@ const MilestonesPage: React.FC = () => {
           >
             {isCheckingMilestones ? 'Checking...' : 'Check All Milestones'}
           </Button>
-          <Button
-            onClick={() => router.push('/milestone-achievements')}
-            variant="outline"
-          >
-            View Achievements
-          </Button>
+        
           <Button
             onClick={() => router.push('/milestones/create')}
           >
@@ -443,10 +438,16 @@ const MilestonesPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
                         <button 
-                          onClick={() => router.push(`/milestones/edit?id=${milestone.id}`)}
+                          onClick={() => router.push(`/milestone-achievements?milestoneId=${milestone.id}`)}
+                          className="text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                        >
+                          View Achievements
+                        </button>
+                        <button 
+                          onClick={() => router.push(`/milestone-achievements?milestoneId=${milestone.id}`)}
                           className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
                         >
-                          Edit
+                          View Details
                         </button>
                         <button 
                           onClick={() => handleToggleActive(milestone.id, milestone.isActive)}

@@ -10,7 +10,7 @@ interface Payment {
   licensePlate: string;
   amount: number;
   paymentMethod: 'cash' | 'card' | 'mobile_money' | 'pos' | 'Not specified';
-  status: 'pending' | 'completed';
+  status: 'pending' | 'completed' | 'cancelled';
   date: string;
   serviceType?: string;
   services?: string[];
@@ -44,7 +44,7 @@ const PaymentHistoryPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'cancelled'>('all');
   const [error, setError] = useState<string | null>(null);
   
   // Details modal state
@@ -59,7 +59,7 @@ const PaymentHistoryPage: React.FC = () => {
       // Build query parameters
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
-      if (filter !== 'all') params.append('status', filter === 'completed' ? 'paid' : filter);
+      if (filter !== 'all') params.append('status', filter === 'completed' ? 'paid' : filter === 'cancelled' ? 'cancelled' : filter);
       params.append('sortBy', 'check_in_time');
       params.append('sortOrder', 'desc');
       params.append('limit', '100');
@@ -133,6 +133,7 @@ const PaymentHistoryPage: React.FC = () => {
       total: payments.length,
       pending: payments.filter(p => p.status === 'pending').length,
       completed: payments.filter(p => p.status === 'completed').length,
+      cancelled: payments.filter(p => p.status === 'cancelled').length,
       totalAmount: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
       pendingAmount: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
       cashPayments: payments.filter(p => p.paymentMethod === 'cash' && p.status === 'completed').length,
@@ -150,6 +151,8 @@ const PaymentHistoryPage: React.FC = () => {
         return <Badge color="success">Completed</Badge>;
       case 'pending':
         return <Badge color="warning">Pending</Badge>;
+      case 'cancelled':
+        return <Badge color="error">Cancelled</Badge>;
       default:
         return <Badge color="primary">{status}</Badge>;
     }

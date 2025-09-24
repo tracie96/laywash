@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
 
@@ -43,15 +43,39 @@ interface CustomerMilestoneAchievement {
   notes?: string;
 }
 
+interface QualifyingCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  actualVisits: number;
+  actualSpent: number;
+  achievedValue: number;
+}
+
 const MilestoneAchievementsPage: React.FC = () => {
   const [achievements, setAchievements] = useState<CustomerMilestoneAchievement[]>([]);
+  const [qualifyingCustomers, setQualifyingCustomers] = useState<QualifyingCustomer[]>([]);
+  const [currentMilestone, setCurrentMilestone] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    type: 'visits' | 'spending' | 'custom';
+    condition: {
+      operator: string;
+      value: number;
+    };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'claimed' | 'unclaimed'>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'visits' | 'spending' | 'custom'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [viewMode, setViewMode] = useState<'achievements' | 'qualifying'>('achievements');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const milestoneId = searchParams.get('milestoneId');
 
   const fetchAchievements = useCallback(async () => {
     try {
@@ -61,6 +85,9 @@ const MilestoneAchievementsPage: React.FC = () => {
       const params = new URLSearchParams();
       if (selectedFilter !== 'all') {
         params.append('rewardClaimed', selectedFilter === 'claimed' ? 'true' : 'false');
+      }
+      if (milestoneId) {
+        params.append('milestoneId', milestoneId);
       }
 
       const response = await fetch(`/api/admin/milestone-achievements?${params.toString()}`);
@@ -77,11 +104,58 @@ const MilestoneAchievementsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedFilter]);
+  }, [selectedFilter, milestoneId]);
+
+  const fetchQualifyingCustomers = useCallback(async () => {
+    if (!milestoneId) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Add a timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch('/api/admin/milestone-achievements', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ milestoneId }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setQualifyingCustomers(data.qualifyingCustomers);
+        setCurrentMilestone(data.milestone);
+        setViewMode('qualifying');
+      } else {
+        setError(data.error || 'Failed to fetch qualifying customers');
+      }
+    } catch (err) {
+      console.error('Error fetching qualifying customers:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      } else {
+        setError('Failed to connect to server');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [milestoneId]);
 
   useEffect(() => {
+    if (milestoneId) {
+      fetchQualifyingCustomers();
+    } else {
     fetchAchievements();
-  }, [selectedFilter, selectedType, searchTerm, fetchAchievements]);
+    }
+  }, [milestoneId, selectedFilter, selectedType, searchTerm, fetchAchievements, fetchQualifyingCustomers]);
 
   const handleClaimReward = async (achievementId: string, customerName: string) => {
     const confirmClaim = window.confirm(
@@ -161,12 +235,25 @@ const MilestoneAchievementsPage: React.FC = () => {
     }
   };
 
+  const getOperatorText = (operator: string) => {
+    switch (operator) {
+      case '>=': return 'at least';
+      case '<=': return 'at most';
+      case '=': return 'exactly';
+      case '>': return 'more than';
+      case '<': return 'less than';
+      default: return operator;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-light-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading milestone achievements...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">
+            {milestoneId ? 'Analyzing customer data...' : 'Loading milestone achievements...'}
+          </p>
         </div>
       </div>
     );
@@ -201,9 +288,13 @@ const MilestoneAchievementsPage: React.FC = () => {
     );
   }
 
+  const pageTitle = milestoneId && currentMilestone 
+    ? `Milestone: ${currentMilestone.name}` 
+    : "Milestone Achievements";
+
   return (
     <div className="space-y-6">
-      <PageBreadCrumb pageTitle="Milestone Achievements" />
+      <PageBreadCrumb pageTitle={pageTitle} />
 
       {/* Notification */}
       {notification && (
@@ -231,8 +322,12 @@ const MilestoneAchievementsPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Achievements</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{achievements.length}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {viewMode === 'qualifying' ? 'Qualifying Customers' : 'Total Achievements'}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {viewMode === 'qualifying' ? qualifyingCustomers.length : achievements.length}
+              </p>
             </div>
             <div className="p-3 bg-blue-light-100 dark:bg-blue-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-blue-light-600 dark:text-blue-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -291,6 +386,51 @@ const MilestoneAchievementsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Milestone Information */}
+      {milestoneId && currentMilestone && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Milestone Details</h3>
+            <Button
+              onClick={() => router.push('/milestones')}
+              variant="outline"
+              className="text-sm"
+            >
+              ← Back to Milestones
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Name</p>
+              <p className="text-lg text-gray-900 dark:text-white">{currentMilestone.name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Type</p>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(currentMilestone.type)}`}>
+                {currentMilestone.type}
+              </span>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Description</p>
+              <p className="text-gray-900 dark:text-white">{currentMilestone.description}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Condition</p>
+              <p className="text-gray-900 dark:text-white">
+                {currentMilestone.type === 'visits' 
+                  ? `${getOperatorText(currentMilestone.condition.operator)} ${currentMilestone.condition.value} visit${currentMilestone.condition.value === 1 ? '' : 's'}`
+                  : `${getOperatorText(currentMilestone.condition.operator)} $${currentMilestone.condition.value.toFixed(2)} spent`
+                }
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Qualifying Customers</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{qualifyingCustomers.length}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap gap-4">
@@ -342,20 +482,77 @@ const MilestoneAchievementsPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Achievements Table */}
+      {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Milestone Achievements</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {viewMode === 'qualifying' ? 'Qualifying Customers' : 'Customer Milestone Achievements'}
+          </h2>
         </div>
         <div className="overflow-x-auto">
-          {filteredAchievements.length === 0 ? (
+          {viewMode === 'qualifying' ? (
+            qualifyingCustomers.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto h-12 w-12 text-gray-400">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                 </svg>
               </div>
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No achievements found</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No qualifying customers found</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                No customers currently meet the criteria for this milestone.
+              </p>
+            </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Visits</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Spent</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Achieved Value</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {qualifyingCustomers.map((customer) => (
+                    <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {customer.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div>{customer.email}</div>
+                          <div>{customer.phone}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {customer.actualVisits}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        ${customer.actualSpent.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                          {currentMilestone?.type === 'visits' ? customer.achievedValue : `$${customer.achievedValue.toFixed(2)}`}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          ) : (
+            filteredAchievements.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="mx-auto h-12 w-12 text-gray-400">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806 1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                </div>
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No achievements found</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 No customers have reached any milestones yet, or your filters are too restrictive.
               </p>
@@ -459,6 +656,7 @@ const MilestoneAchievementsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            )
           )}
         </div>
       </div>

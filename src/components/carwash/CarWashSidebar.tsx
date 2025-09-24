@@ -209,10 +209,16 @@ const washerItems: NavItem[] = [
     roles: ["car_washer"]
   },
   {
-    icon: <DollarIcon />,
-    name: "Income History",
-    path: "/income-history",
-    roles: ["car_washer"]
+   icon: <DollarIcon />,
+   name: "Income History",
+   path: "/income-history",
+   roles: ["car_washer"]
+  },
+  {
+   icon: <DollarIcon />,
+   name: "My Bonuses",
+   path: "/worker-bonuses",
+   roles: ["car_washer"]
   },
   {
     icon: <ReportIcon />,
