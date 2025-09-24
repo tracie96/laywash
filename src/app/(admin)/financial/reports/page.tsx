@@ -269,7 +269,7 @@ const FinancialReportsPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Net Profit</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Company Income</p>
               <p className={`text-2xl font-bold ${totals.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
                 ₦ {totals.netProfit.toFixed(2)}
               </p>
@@ -397,7 +397,7 @@ const FinancialReportsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Period</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Expenses</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Net Profit</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Companny Income</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Margin</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transactions</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
@@ -573,8 +573,8 @@ const FinancialReportsPage: React.FC = () => {
                 Performance Metrics
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Net Profit</p>
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4">  
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Company Profit</p>
                   <p className={`text-2xl font-bold ${selectedReport.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
                     ₦ {selectedReport.netProfit.toFixed(2)}
                   </p>

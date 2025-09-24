@@ -123,7 +123,6 @@ export async function GET() {
       console.error('Error fetching pending check-ins amount:', pendingAmountError);
     }
 
-    console.log('Pending check-ins data:', pendingCheckInsAmount);
 
     const pendingPaymentAmount = pendingCheckInsAmount?.reduce((sum, checkIn) => {
       const amount = checkIn.company_income || checkIn.total_amount || 0;

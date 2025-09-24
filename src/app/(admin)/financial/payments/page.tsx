@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 
 interface CarWashPayment {
@@ -18,7 +18,9 @@ interface CarWashPayment {
   completionTime?: string;
   customerId?: string;
   assignedWasherId?: string;
+  assignedWasherName?: string;
   assignedAdminId?: string;
+  assignedAdminName?: string;
   remarks?: string;
 }
 
@@ -66,6 +68,7 @@ interface PaymentRecord {
   completionTime?: string;
   customerId?: string;
   assignedWasherId?: string;
+  assignedWasherName?: string;
   assignedAdminId?: string;
   assignedAdminName?: string;
   remarks?: string;
@@ -113,6 +116,7 @@ const FinancialPaymentsPage: React.FC = () => {
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
     { value: 'quarter', label: 'This Quarter' },
+    { value: 'custom', label: 'Custom Range' },
   ];
 
   // Handle period change
@@ -127,17 +131,21 @@ const FinancialPaymentsPage: React.FC = () => {
   };
 
   // Filter payments by date range
-  const filterPaymentsByDate = (payments: PaymentRecord[]) => {
+  const filterPaymentsByDate = useCallback((payments: PaymentRecord[]) => {
     if (selectedPeriod === 'custom') {
       if (!customStartDate || !customEndDate) return payments;
       const startDate = new Date(customStartDate);
       const endDate = new Date(customEndDate);
       endDate.setHours(23, 59, 59, 999);
       
-      return payments.filter(payment => {
+      const filtered = payments.filter(payment => {
         const paymentDate = new Date(payment.date);
-        return paymentDate >= startDate && paymentDate <= endDate;
+        const isInRange = paymentDate >= startDate && paymentDate <= endDate;
+        return isInRange;
       });
+      
+      console.log('Filtered payments count:', filtered.length);
+      return filtered;
     }
 
     const now = new Date();
@@ -169,7 +177,7 @@ const FinancialPaymentsPage: React.FC = () => {
       const paymentDate = new Date(payment.date);
       return paymentDate >= startDate && paymentDate <= endDate;
     });
-  };
+  }, [selectedPeriod, customStartDate, customEndDate]);
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -197,7 +205,7 @@ const FinancialPaymentsPage: React.FC = () => {
             ...payment,
             type: 'car_wash' as const,
             transactionType: 'Car Wash Service',
-            assignedAdminName: payment.assignedAdminId ? adminNames[payment.assignedAdminId] || 'Unknown Admin' : undefined
+            assignedAdminName: payment.assignedAdminName || (payment.assignedAdminId ? adminNames[payment.assignedAdminId] || 'Unknown Admin' : undefined)
           })) || [];
           
           console.log('Transformed car wash payments:', carWashPayments);
@@ -330,13 +338,13 @@ const FinancialPaymentsPage: React.FC = () => {
   };
 
   // Filter payments based on selected type and date
-  const filteredPayments = (() => {
+  const filteredPayments = useMemo(() => {
     const filtered = filterType === 'all' 
       ? payments 
       : payments.filter(p => p.type === filterType);
     
     return filterPaymentsByDate(filtered);
-  })();
+  }, [payments, filterType, filterPaymentsByDate]);
 
   const totalRevenue = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
   const completedPayments = filteredPayments.filter(p => p.status === "completed").length;
@@ -559,7 +567,7 @@ const FinancialPaymentsPage: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Car Wash Value</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${(filteredPayments.filter(p => p.type === 'car_wash').reduce((sum, p) => sum + p.amount, 0) / carWashCount).toFixed(2)}
+                    NGN{(filteredPayments.filter(p => p.type === 'car_wash').reduce((sum, p) => sum + p.amount, 0) / carWashCount).toFixed(2)}
                   </p>
                 </div>
                 <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
@@ -784,7 +792,7 @@ const FinancialPaymentsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {payment.type === 'car_wash' && payment.assignedWasherId ? (
                         <div className="text-sm text-gray-900 dark:text-white">
-                          Washer #{payment.assignedWasherId.slice(0, 8)}...
+                          {payment.assignedWasherName || `Washer #${payment.assignedWasherId.slice(0, 8)}...`}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400 dark:text-gray-500">-</span>

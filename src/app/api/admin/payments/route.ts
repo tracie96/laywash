@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Build the query with customer information - use same structure as check-ins API
+    // Build the query with customer and washer information - use same structure as check-ins API
     let query = supabaseAdmin
       .from('car_check_ins')
       .select(`
@@ -38,6 +38,18 @@ export async function GET(request: NextRequest) {
           service_name,
           price,
           duration
+        ),
+        assigned_washer:users!car_check_ins_assigned_washer_id_fkey (
+          id,
+          name,
+          email,
+          phone
+        ),
+        assigned_admin:users!car_check_ins_assigned_admin_id_fkey (
+          id,
+          name,
+          email,
+          phone
         )
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })
@@ -96,7 +108,9 @@ export async function GET(request: NextRequest) {
         completionTime: checkIn.actual_completion_time,
         customerId: checkIn.customer_id,
         assignedWasherId: checkIn.assigned_washer_id,
+        assignedWasherName: checkIn.assigned_washer?.name,
         assignedAdminId: checkIn.assigned_admin_id,
+        assignedAdminName: checkIn.assigned_admin?.name,
         remarks: checkIn.remarks,
         specialInstructions: checkIn.remarks || checkIn.valuable_items, // Add specialInstructions
         estimatedDuration: checkIn.check_in_services?.reduce((total: number, service: { duration?: number }) => total + (service.duration || 0), 0) || 0,
