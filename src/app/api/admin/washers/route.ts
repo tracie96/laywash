@@ -120,7 +120,6 @@ export async function GET() {
       };
     }) || [];
 
-    console.log(transformedWashers);
     return NextResponse.json({
       success: true,
       washers: transformedWashers

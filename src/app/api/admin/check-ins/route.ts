@@ -375,6 +375,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       customerId,
+      customerName,
+      customerPhone,
+      customerEmail,
       licensePlate,
       vehicleType,
       washType,
@@ -394,6 +397,68 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    // Handle walk-in customers (customers without an ID)
+    let finalCustomerId = customerId;
+    
+    if (!customerId) {
+      // Validate required customer fields for walk-in customers
+      if (!customerName || !customerPhone) {
+        return NextResponse.json(
+          { success: false, error: 'Customer name and phone are required for walk-in customers' },
+          { status: 400 }
+        );
+      }
+
+      // Create a new customer record for walk-in customer
+      const { data: newCustomer, error: customerError } = await supabaseAdmin
+        .from('customers')
+        .insert({
+          name: customerName,
+          phone: customerPhone,
+          email: customerEmail || null,
+          is_registered: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+
+      if (customerError) {
+        console.error('Error creating walk-in customer:', customerError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to create customer record' },
+          { status: 500 }
+        );
+      }
+
+      finalCustomerId = newCustomer.id;
+      console.log('Created walk-in customer with ID:', finalCustomerId);
+
+      // Save vehicle information for the walk-in customer
+      if (licensePlate && vehicleType) {
+        const vehicleData = {
+          customer_id: finalCustomerId,
+          license_plate: licensePlate,
+          vehicle_type: vehicleType,
+          vehicle_model: vehicleModel || null,
+          vehicle_color: vehicleColor || null,
+          is_primary: true // This is their primary vehicle since it's their first
+        };
+
+        const { error: vehicleError } = await supabaseAdmin
+          .from('vehicles')
+          .insert(vehicleData);
+
+        if (vehicleError) {
+          console.error('Error creating vehicle for walk-in customer:', vehicleError);
+          // Note: We don't fail here as the customer was created successfully
+          // The check-in can still proceed without the vehicle record
+        } else {
+          console.log('Created vehicle record for walk-in customer:', licensePlate);
+        }
+      }
     }
 
     // Validate that all services have workers assigned
@@ -448,7 +513,7 @@ export async function POST(request: NextRequest) {
       const serviceAmount = service.serviceData.price || 0;
       
       const insertData = {
-        customer_id: customerId || null,
+        customer_id: finalCustomerId,
         license_plate: licensePlate,
         vehicle_type: vehicleType,
         wash_type: washType,

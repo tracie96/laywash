@@ -25,10 +25,12 @@ export async function GET(request: NextRequest) {
 
     // Apply date filters if provided
     if (startDate) {
-      query = query.gte('check_in_time', startDate);
+      const startDateTime = new Date(startDate + 'T00:00:00');
+      query = query.gte('check_in_time', startDateTime.toISOString());
     }
     if (endDate) {
-      query = query.lte('check_in_time', endDate);
+      const endDateTime = new Date(endDate + 'T23:59:59');
+      query = query.lte('check_in_time', endDateTime.toISOString());
     }
 
     const { data: checkIns, error } = await query;
