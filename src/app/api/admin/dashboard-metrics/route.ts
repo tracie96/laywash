@@ -113,6 +113,24 @@ export async function GET() {
 
     const pendingCheckInsCount = pendingCheckIns?.length || 0;
 
+    // Calculate pending check-ins total amount
+    const { data: pendingCheckInsAmount, error: pendingAmountError } = await supabaseAdmin
+      .from('car_check_ins')
+      .select('company_income, total_amount, status')
+      .in('status', ['pending', 'in_progress']);
+
+    if (pendingAmountError) {
+      console.error('Error fetching pending check-ins amount:', pendingAmountError);
+    }
+
+    console.log('Pending check-ins data:', pendingCheckInsAmount);
+
+    const pendingPaymentAmount = pendingCheckInsAmount?.reduce((sum, checkIn) => {
+      const amount = checkIn.company_income || checkIn.total_amount || 0;
+      console.log(`Check-in amount: ${amount} (company_income: ${checkIn.company_income}, total_amount: ${checkIn.total_amount})`);
+      return sum + amount;
+    }, 0) || 0;
+
     // 5. Fetch low stock items count
     const { data: inventoryData, error: inventoryError } = await supabaseAdmin
       .from('stock_items')
@@ -288,6 +306,7 @@ export async function GET() {
       },
       activeWashers,
       pendingCheckIns: pendingCheckInsCount,
+      pendingPayments: pendingPaymentAmount,
       lowStockItems,
       topPerformingWashers,
       recentActivities: limitedRecentActivities,

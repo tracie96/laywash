@@ -24,6 +24,7 @@ interface DashboardMetrics {
   };
   activeWashers: number;
   pendingCheckIns: number;
+  pendingPayments: number;
   lowStockItems: number;
   topPerformingWashers: TopPerformingWasher[];
   recentActivities: RecentActivity[];
@@ -90,7 +91,6 @@ const AdminDashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to load metrics');
     }
   };
-
   // Fetch recent check-ins
   const fetchRecentCheckIns = async () => {
     try {
@@ -230,12 +230,16 @@ const AdminDashboard: React.FC = () => {
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {metrics?.pendingCheckIns || 0}
               </p>
+              <span className="text-orange-600">
+                ₦ {metrics?.pendingPayments?.toLocaleString()}
+              </span>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
               <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
+          
           </div>
         </div>
 
