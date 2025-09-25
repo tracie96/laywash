@@ -149,11 +149,11 @@ export async function POST(request: NextRequest) {
 
     // For advance payments, check if washer has 0 or negative earnings and amount doesn't exceed 2000
     if (isAdvance) {
-      if (currentEarnings > 0) {
+      if (currentEarnings > 2000) {
         return NextResponse.json(
           { 
             success: false, 
-            error: 'Advance payments can only be requested when total earnings is 0 or negative' 
+            error: 'Advance payments can only be requested when total earnings is 2000 or negative' 
           },
           { status: 400 }
         );

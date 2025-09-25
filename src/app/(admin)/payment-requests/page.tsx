@@ -406,7 +406,7 @@ const PaymentRequestsPage: React.FC = () => {
             Create Payment Request
           </Button>
           
-          {currentEarnings <= 0 && (
+          {currentEarnings <= 2000 && (
             <Button
               onClick={openAdvanceForm}
               className="bg-orange-600 hover:bg-orange-700 text-white"
