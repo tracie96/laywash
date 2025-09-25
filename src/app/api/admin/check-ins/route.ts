@@ -96,6 +96,8 @@ export async function GET(request: NextRequest) {
     const paymentStatus = searchParams.get('paymentStatus') || 'all';
     const licensePlate = searchParams.get('licensePlate') || '';
     const date = searchParams.get('date') || '';
+    const startDate = searchParams.get('startDate') || '';
+    const endDate = searchParams.get('endDate') || '';
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -179,11 +181,30 @@ export async function GET(request: NextRequest) {
         );
       }
       
+      // Apply date filtering - support both single date and date range
       if (date) {
         const targetDate = new Date(date);
         checkIns = checkIns.filter(checkIn => {
           const checkInDate = new Date(checkIn.check_in_time);
           return checkInDate.toDateString() === targetDate.toDateString();
+        });
+      } else if (startDate || endDate) {
+        checkIns = checkIns.filter(checkIn => {
+          const checkInDate = new Date(checkIn.check_in_time);
+          
+          if (startDate && endDate) {
+            const start = new Date(startDate + 'T00:00:00');
+            const end = new Date(endDate + 'T23:59:59');
+            return checkInDate >= start && checkInDate <= end;
+          } else if (startDate) {
+            const start = new Date(startDate + 'T00:00:00');
+            return checkInDate >= start;
+          } else if (endDate) {
+            const end = new Date(endDate + 'T23:59:59');
+            return checkInDate <= end;
+          }
+          
+          return true;
         });
       }
 
@@ -252,16 +273,25 @@ export async function GET(request: NextRequest) {
       query = query.eq('license_plate', licensePlate);
     }
 
-    // Apply date filter
+    // Apply date filter - support both single date and date range
     if (date) {
-      const startDate = new Date(date);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(date);
-      endDate.setHours(23, 59, 59, 999);
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
       
       query = query
-        .gte('check_in_time', startDate.toISOString())
-        .lte('check_in_time', endDate.toISOString());
+        .gte('check_in_time', targetDate.toISOString())
+        .lte('check_in_time', endOfDay.toISOString());
+    } else if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate + 'T00:00:00');
+        query = query.gte('check_in_time', start.toISOString());
+      }
+      if (endDate) {
+        const end = new Date(endDate + 'T23:59:59');
+        query = query.lte('check_in_time', end.toISOString());
+      }
     }
 
     // Apply status filter

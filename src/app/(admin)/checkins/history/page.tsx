@@ -134,7 +134,7 @@ const CheckInHistoryPage: React.FC = () => {
   };
 
   // Fetch all check-ins from API
-  const fetchCheckIns = async (search = '') => {
+  const fetchCheckIns = useCallback(async (search = '') => {
     try {
       const searchParams = new URLSearchParams({
         status: 'all',
@@ -145,6 +145,14 @@ const CheckInHistoryPage: React.FC = () => {
       
       if (search.trim()) {
         searchParams.append('search', search.trim());
+      }
+      
+      // Add date range parameters if they exist
+      if (startDate) {
+        searchParams.append('startDate', startDate);
+      }
+      if (endDate) {
+        searchParams.append('endDate', endDate);
       }
       
       const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`);
@@ -193,7 +201,7 @@ const CheckInHistoryPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching check-ins:', err);
     }
-  };
+  }, [startDate, endDate]);
 
   // Load data on component mount
   useEffect(() => {
@@ -214,12 +222,19 @@ const CheckInHistoryPage: React.FC = () => {
     };
 
     loadData();
-  }, [fetchEarnings]);
+  }, [fetchCheckIns, fetchEarnings]);
 
   // Refetch earnings when date filters change
   useEffect(() => {
     fetchEarnings();
   }, [fetchEarnings]);
+
+  // Refetch check-ins when date filters change
+  useEffect(() => {
+    if (startDate || endDate) {
+      fetchCheckIns(searchQuery);
+    }
+  }, [startDate, endDate, searchQuery, fetchCheckIns]);
 
   const filteredCheckIns = checkIns.filter(checkIn => {
     // First filter by status
@@ -379,7 +394,7 @@ const CheckInHistoryPage: React.FC = () => {
     } finally {
       setSearchLoading(false);
     }
-  }, []);
+  }, [fetchCheckIns]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
