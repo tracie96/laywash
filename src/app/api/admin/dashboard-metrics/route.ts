@@ -100,11 +100,13 @@ export async function GET() {
       washer.car_washer_profiles?.[0]?.is_available
     ).length || 0;
 
-    // 4. Fetch pending check-ins count
+    // 4. Fetch pending check-ins count for today
     const { data: pendingCheckIns, error: pendingError } = await supabaseAdmin
       .from('car_check_ins')
       .select('id')
-      .in('status', ['pending', 'in_progress']);
+      .in('status', ['pending', 'in_progress'])
+      .gte('check_in_time', today.toISOString())
+      .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
     if (pendingError) {
       console.error('Error fetching pending check-ins:', pendingError);
@@ -113,11 +115,13 @@ export async function GET() {
 
     const pendingCheckInsCount = pendingCheckIns?.length || 0;
 
-    // Calculate pending check-ins total amount
+    // Calculate pending check-ins total amount for today
     const { data: pendingCheckInsAmount, error: pendingAmountError } = await supabaseAdmin
       .from('car_check_ins')
       .select('company_income, total_amount, status')
-      .in('status', ['pending', 'in_progress']);
+      .in('status', ['pending', 'in_progress'])
+      .gte('check_in_time', today.toISOString())
+      .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
     if (pendingAmountError) {
       console.error('Error fetching pending check-ins amount:', pendingAmountError);
@@ -130,7 +134,6 @@ export async function GET() {
       return sum + amount;
     }, 0) || 0;
 
-    // 5. Fetch low stock items count
     const { data: inventoryData, error: inventoryError } = await supabaseAdmin
       .from('stock_items')
       .select('id, current_stock, minimum_stock')
