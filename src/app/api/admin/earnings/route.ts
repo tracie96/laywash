@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Build the query to calculate total earnings from paid check-ins
     let query = supabaseAdmin
       .from('car_check_ins')
-      .select('company_income, payment_status, check_in_time')
+      .select('company_income,total_amount, payment_status, check_in_time')
       .eq('payment_status', 'paid');
 
     // Apply date filters if provided
@@ -43,8 +43,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate total earnings
-    const totalEarnings = checkIns?.reduce((total, checkIn) => {
+    // Calculate total amount (company income + washer income)
+    const totalAmount = checkIns?.reduce((total, checkIn) => {
+      return total + (checkIn.total_amount || 0);
+    }, 0) || 0;
+
+    // Calculate company income
+    const companyIncome = checkIns?.reduce((total, checkIn) => {
       return total + (checkIn.company_income || 0);
     }, 0) || 0;
 
@@ -52,12 +57,13 @@ export async function GET(request: NextRequest) {
     const totalPaidCheckIns = checkIns?.length || 0;
     
     // Calculate average earnings per check-in
-    const averageEarnings = totalPaidCheckIns > 0 ? totalEarnings / totalPaidCheckIns : 0;
+    const averageEarnings = totalPaidCheckIns > 0 ? companyIncome / totalPaidCheckIns : 0;
 
     return NextResponse.json({
       success: true,
       data: {
-        totalEarnings,
+        totalAmount,
+        companyIncome,
         totalPaidCheckIns,
         averageEarnings: Math.round(averageEarnings * 100) / 100, // Round to 2 decimal places
         dateRange: {
