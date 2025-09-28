@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Build the query to calculate total earnings from paid check-ins
     let query = supabaseAdmin
       .from('car_check_ins')
-      .select('total_amount, payment_status, check_in_time')
+      .select('company_income, payment_status, check_in_time')
       .eq('payment_status', 'paid');
 
     // Apply date filters if provided
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate total earnings
     const totalEarnings = checkIns?.reduce((total, checkIn) => {
-      return total + (checkIn.total_amount || 0);
+      return total + (checkIn.company_income || 0);
     }, 0) || 0;
 
     // Get additional statistics
