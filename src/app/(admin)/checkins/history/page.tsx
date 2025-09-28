@@ -45,7 +45,6 @@ interface Washer {
   status: string;
   isAvailable: boolean;
   hourlyRate: number;
-  totalEarnings: number;
 }
 
 const CheckInHistoryPage: React.FC = () => {
