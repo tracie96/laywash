@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     const paymentMethod = searchParams.get('paymentMethod') || 'all';
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
-    const limit = parseInt(searchParams.get('limit') || '50');
 
     // Build the query with customer and washer information - use same structure as check-ins API
     let query = supabaseAdmin
@@ -52,8 +51,7 @@ export async function GET(request: NextRequest) {
           phone
         )
       `)
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-      .limit(limit);
+      .order(sortBy, { ascending: sortOrder === 'asc' });
 
     // Apply search filter - use same logic as check-ins API
     if (search) {
