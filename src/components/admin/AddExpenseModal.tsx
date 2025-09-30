@@ -29,9 +29,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const serviceTypes = [
     { value: 'checkin', label: 'Free Car Wash' },
-    { value: 'salary', label: 'Admin/Washer Salary' },
     { value: 'sales', label: 'Free Sales' },
-    { value: 'free_will', label: 'Voluntary Expense' },
     { value: 'deposit_to_bank', label: 'Bank Deposit' },
     { value: 'other', label: 'Other' }
   ];

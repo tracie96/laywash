@@ -125,62 +125,28 @@ export async function GET(request: NextRequest) {
       index === self.findIndex(c => c.id === customer.id)
     );
 
-    // Get all customer IDs to fetch their check-in statistics
-    const customerIds = uniqueCustomers.map(c => c.id);
-    
-    
+    // Fetch all check-ins and match them to customers in memory
+    // This is more efficient than using .in() with potentially thousands of customer IDs
     const { data: checkInStats, error: statsError } = await supabaseAdmin
       .from('car_check_ins')
-      .select('customer_id, total_amount, status, actual_completion_time, license_plate')
-      .in('customer_id', customerIds);
-        
-    // Also try to get check-ins by license plate for customers without customer_id
-    const customerLicensePlates = (customers || []).map(c => c.license_plate?.toUpperCase()).filter(Boolean);
-    const { data: checkInStatsByPlate, error: statsByPlateError } = await supabaseAdmin
-      .from('car_check_ins')
-      .select('customer_id, total_amount, status, actual_completion_time, license_plate')
-      .in('license_plate', customerLicensePlates)
-      .is('customer_id', null);
-        
-    // Combine both results
-    const allCheckInStats = [...(checkInStats || []), ...(checkInStatsByPlate || [])];
+      .select('customer_id, total_amount, status, actual_completion_time')
+      .not('customer_id', 'is', null);
 
     if (statsError) {
       console.error('Error fetching check-in stats:', statsError);
     }
-    
-    if (statsByPlateError) {
-      console.error('Error fetching check-in stats by plate:', statsByPlateError);
-    }
+
+    // Create a Set of customer IDs for quick lookup
+    const customerIdSet = new Set(uniqueCustomers.map(c => c.id));
 
     // Calculate statistics for each customer
     const customerStats: { [key: string]: { totalVisits: number; totalSpent: number; lastVisit?: string } } = {};
     
-    // Create a map of license plates to customer IDs for matching
-    const licensePlateToCustomerId: { [key: string]: string } = {};
-    uniqueCustomers.forEach(customer => {
-      if (customer.license_plate) {
-        licensePlateToCustomerId[customer.license_plate.toUpperCase()] = customer.id;
-      }
-      // Also check vehicles for license plates
-      if (customer.vehicles) {
-        customer.vehicles.forEach((vehicle: Vehicle) => {
-          if (vehicle.license_plate) {
-            licensePlateToCustomerId[vehicle.license_plate.toUpperCase()] = customer.id;
-          }
-        });
-      }
-    });
-    
-    allCheckInStats.forEach(checkIn => {
-      let customerId = checkIn.customer_id;
+    (checkInStats || []).forEach(checkIn => {
+      const customerId = checkIn.customer_id;
       
-      // If customer_id is null, try to match by license plate
-      if (!customerId && checkIn.license_plate) {
-        customerId = licensePlateToCustomerId[checkIn.license_plate.toUpperCase()];
-      }
-      
-      if (!customerId) return; // Skip if we can't match to a customer
+      // Only count check-ins for customers in our current list
+      if (!customerId || !customerIdSet.has(customerId)) return;
       
       if (!customerStats[customerId]) {
         customerStats[customerId] = { totalVisits: 0, totalSpent: 0 };

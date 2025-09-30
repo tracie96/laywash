@@ -342,7 +342,7 @@ const PaymentReportsPage: React.FC = () => {
             onClick={() => setIsExpenseModalOpen(true)}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            + Add Expense
+            + Cash Out
           </Button>
           <Button
             onClick={exportToCSV}

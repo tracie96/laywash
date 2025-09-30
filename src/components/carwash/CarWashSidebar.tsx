@@ -60,6 +60,7 @@ const superAdminItems: NavItem[] = [
       { name: "Payment History", path: "/financial/payments", pro: false },
       { name: "Financial Reports", path: "/financial/reports", pro: false },
       { name: "Bonuses", path: "/financial/bonuses", pro: false },
+      { name: "Cash Out", path: "/financial/cash-out", pro: false },
     ],
     roles: ["super_admin"]
   },
@@ -155,7 +156,7 @@ const adminItems: NavItem[] = [
       { name: "Payment History", path: "/payments/history", pro: false },
       { name: "Payment Reports", path: "/payments/reports", pro: false },
       { name: "Payment Requests", path: "/payments/requests", pro: false },
-
+      { name: "Cash Out", path: "/financial/cash-out", pro: false },
     ],
     roles: ["admin"]
   },

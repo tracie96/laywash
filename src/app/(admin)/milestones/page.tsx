@@ -443,12 +443,12 @@ const MilestonesPage: React.FC = () => {
                         >
                           View Achievements
                         </button>
-                        <button 
+                        {/* <button 
                           onClick={() => router.push(`/milestone-achievements?milestoneId=${milestone.id}`)}
                           className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
                         >
                           View Details
-                        </button>
+                        </button> */}
                         <button 
                           onClick={() => handleToggleActive(milestone.id, milestone.isActive)}
                           className="text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
