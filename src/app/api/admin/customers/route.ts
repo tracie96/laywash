@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
     // This is more efficient than using .in() with potentially thousands of customer IDs
     const { data: checkInStats, error: statsError } = await supabaseAdmin
       .from('car_check_ins')
-      .select('customer_id, total_amount, status, actual_completion_time')
+      .select('customer_id, total_amount, status, actual_completion_time, payment_status')
       .not('customer_id', 'is', null);
 
     if (statsError) {
@@ -152,15 +152,18 @@ export async function GET(request: NextRequest) {
         customerStats[customerId] = { totalVisits: 0, totalSpent: 0 };
       }
       
-      customerStats[customerId].totalVisits += 1;
+      // Only count paid check-ins for total visits
+      if (checkIn.payment_status === 'paid') {
+        customerStats[customerId].totalVisits += 1;
+      }
       
       // Only count completed check-ins for spending
       if (checkIn.status === 'completed' && checkIn.total_amount) {
         customerStats[customerId].totalSpent += checkIn.total_amount;
       }
       
-      // Track last visit
-      if (checkIn.actual_completion_time) {
+      // Track last visit (only for paid check-ins)
+      if (checkIn.payment_status === 'paid' && checkIn.actual_completion_time) {
         const visitDate = new Date(checkIn.actual_completion_time);
         if (!customerStats[customerId].lastVisit || visitDate > new Date(customerStats[customerId].lastVisit!)) {
           customerStats[customerId].lastVisit = checkIn.actual_completion_time;

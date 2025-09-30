@@ -37,6 +37,14 @@ interface FinancialReport {
   averageTransaction: number;
 }
 
+// Utility function to format currency with commas
+const formatCurrency = (amount: number): string => {
+  return amount.toLocaleString('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const FinancialReportsPage: React.FC = () => {
   const [reports, setReports] = useState<FinancialReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,7 +239,7 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {formatCurrency(totals.totalRevenue)}</p>
             </div>
             <div className="p-3 bg-green-light-100 dark:bg-green-light-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-light-600 dark:text-green-light-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,11 +250,11 @@ const FinancialReportsPage: React.FC = () => {
           <div className="mt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Car Wash:</span>
-              <span className="text-green-600 dark:text-green-400">₦ {totals.carWashRevenue.toFixed(2)}</span>
+              <span className="text-green-600 dark:text-green-400">₦ {formatCurrency(totals.carWashRevenue)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Product Sales:</span>
-              <span className="text-green-600 dark:text-green-400">₦ {totals.productSalesRevenue.toFixed(2)}</span>
+              <span className="text-green-600 dark:text-green-400">₦ {formatCurrency(totals.productSalesRevenue)}</span>
             </div>
           </div>
         </div>
@@ -255,7 +263,7 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {formatCurrency(totals.totalExpenses)}</p>
             </div>
             <div className="p-3 bg-error-100 dark:bg-error-900/30 rounded-lg">
               <svg className="w-6 h-6 text-error-600 dark:text-error-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +279,7 @@ const FinancialReportsPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Company Income</p>
               <p className={`text-2xl font-bold ${totals.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
-                ₦ {totals.netProfit.toFixed(2)}
+                ₦ {formatCurrency(totals.netProfit)}
               </p>
             </div>
             <div className={`p-3 rounded-lg ${totals.netProfit >= 0 ? 'bg-blue-light-100 dark:bg-blue-light-900/30' : 'bg-error-100 dark:bg-error-900/30'}`}>
@@ -321,7 +329,7 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Workers Pay</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.totalWages.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {formatCurrency(totals.totalWages)}</p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,7 +348,7 @@ const FinancialReportsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Amount Paid</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {totals.pendingWages.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">₦ {formatCurrency(totals.pendingWages)}</p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,26 +420,26 @@ const FinancialReportsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="text-green-600 dark:text-green-400 font-medium">
-                          ₦ {report.totalRevenue.toFixed(2)}
+                          ₦ {formatCurrency(report.totalRevenue)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          CW: ₦ {report.carWashRevenue.toFixed(2)} | PS: ₦ {report.productSalesRevenue.toFixed(2)}
+                          CW: ₦ {formatCurrency(report.carWashRevenue)} | PS: ₦ {formatCurrency(report.productSalesRevenue)}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="text-error-600 dark:text-error-400 font-medium">
-                          ₦ {report.totalExpenses.toFixed(2)}
+                          ₦ {formatCurrency(report.totalExpenses)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          WS: ₦ {report.washerSalaries.toFixed(2)} | WB: ₦ {report.washerBonuses.toFixed(2)} | CB: ₦ {report.customerBonuses.toFixed(2)}
+                          WS: ₦ {formatCurrency(report.washerSalaries)} | WB: ₦ {formatCurrency(report.washerBonuses)} | CB: ₦ {formatCurrency(report.customerBonuses)}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`text-sm font-medium ${report.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-error-600 dark:text-error-400'}`}>
-                            ₦ {report.netProfit.toFixed(2)}
+                            ₦ {formatCurrency(report.netProfit)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -489,19 +497,19 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    ₦ {selectedReport.totalRevenue.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.totalRevenue)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Car Wash Revenue</p>
                   <p className="text-xl font-semibold text-green-600 dark:text-green-400">
-                    ₦ {selectedReport.carWashRevenue.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.carWashRevenue)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Product Sales Revenue</p>
                   <p className="text-xl font-semibold text-green-600 dark:text-green-400">
-                    ₦ {selectedReport.productSalesRevenue.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.productSalesRevenue)}
                   </p>
                 </div>
               </div>
@@ -516,25 +524,25 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    ₦ {selectedReport.totalExpenses.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.totalExpenses)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Washer Salaries</p>
                   <p className="text-xl font-semibold text-red-600 dark:text-red-400">
-                    ₦ {selectedReport.washerSalaries.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.washerSalaries)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Washer Bonuses</p>
                   <p className="text-xl font-semibold text-red-600 dark:text-red-400">
-                    ₦ {selectedReport.washerBonuses.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.washerBonuses)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Customer Bonuses</p>
                   <p className="text-xl font-semibold text-red-600 dark:text-red-400">
-                    ₦ {selectedReport.customerBonuses.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.customerBonuses)}
                   </p>
                 </div>
               </div>
@@ -549,7 +557,7 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Workers Pay</p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    ₦ {selectedReport.totalWages.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.totalWages)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Sum of total_earnings from all worker profiles
@@ -558,7 +566,7 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Amount Paid</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    ₦ {selectedReport.pendingWages.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.pendingWages)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Sum of approved payment requests (status = &apos;paid&apos;)
@@ -576,7 +584,7 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4">  
                   <p className="text-sm text-gray-600 dark:text-gray-400">Company Profit</p>
                   <p className={`text-2xl font-bold ${selectedReport.netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
-                    ₦ {selectedReport.netProfit.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.netProfit)}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
@@ -594,7 +602,7 @@ const FinancialReportsPage: React.FC = () => {
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Average Transaction</p>
                   <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    ₦ {selectedReport.averageTransaction.toFixed(2)}
+                    ₦ {formatCurrency(selectedReport.averageTransaction)}
                   </p>
                 </div>
               </div>
