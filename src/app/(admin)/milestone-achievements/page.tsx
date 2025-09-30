@@ -4,6 +4,7 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
+import { Modal } from "@/components/ui/modal";
 
 interface CustomerMilestoneAchievement {
   id: string;
@@ -70,9 +71,30 @@ const MilestoneAchievementsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'claimed' | 'unclaimed'>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'visits' | 'spending' | 'custom'>('all');
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [viewMode, setViewMode] = useState<'achievements' | 'qualifying'>('achievements');
+  
+  // Bonus modal states
+  const [showBonusModal, setShowBonusModal] = useState(false);
+  const [bonusForm, setBonusForm] = useState({
+    customerId: '',
+    customerName: '',
+    amount: '',
+    reason: '',
+    milestone: ''
+  });
+  const [bonusError, setBonusError] = useState<string | null>(null);
+  const [bonusSubmitting, setBonusSubmitting] = useState(false);
+  
+  // Track existing bonuses
+  const [existingBonuses, setExistingBonuses] = useState<Array<{
+    recipientId: string;
+    milestone: string;
+    status: string;
+  }>>([]);
+  
   const router = useRouter();
   const searchParams = useSearchParams();
   const milestoneId = searchParams.get('milestoneId');
@@ -149,13 +171,64 @@ const MilestoneAchievementsPage: React.FC = () => {
     }
   }, [milestoneId]);
 
+  // Fetch bonuses to check which customers already have bonuses
+  const fetchBonuses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/bonuses?type=customer');
+      const data = await response.json();
+      
+      if (data.success) {
+        setExistingBonuses(data.bonuses || []);
+      }
+    } catch (error) {
+      console.error('Error fetching bonuses:', error);
+    }
+  }, []);
+
   useEffect(() => {
+    fetchBonuses();
     if (milestoneId) {
       fetchQualifyingCustomers();
     } else {
     fetchAchievements();
     }
-  }, [milestoneId, selectedFilter, selectedType, searchTerm, fetchAchievements, fetchQualifyingCustomers]);
+  }, [milestoneId, selectedFilter, selectedType, searchTerm, fetchAchievements, fetchQualifyingCustomers, fetchBonuses]);
+
+  // Get bonus status for customer and milestone
+  const getBonusStatus = (customerId: string, milestoneName: string): string | null => {
+    const bonus = existingBonuses.find(
+      bonus => 
+        bonus.recipientId === customerId && 
+        bonus.milestone === milestoneName &&
+        bonus.status !== 'rejected'
+    );
+    return bonus?.status || null;
+  };
+
+  // Get status badge color
+  const getStatusBadgeClass = (status: string): string => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200';
+      case 'approved':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
+      case 'paid':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
+  // Handle search button click
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchTerm('');
+  };
 
   const handleClaimReward = async (achievementId: string, customerName: string) => {
     const confirmClaim = window.confirm(
@@ -193,6 +266,100 @@ const MilestoneAchievementsPage: React.FC = () => {
     } catch (err) {
       console.error('Error claiming reward:', err);
       alert('Failed to claim reward. Please try again.');
+    }
+  };
+
+  const handleOpenBonusModal = (customerId: string, customerName: string, milestone: string) => {
+    setBonusForm({
+      customerId,
+      customerName,
+      amount: '',
+      reason: `Milestone Achievement: ${milestone}`,
+      milestone
+    });
+    setBonusError(null);
+    setShowBonusModal(true);
+  };
+
+  const handleCreateBonus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!bonusForm.amount || !bonusForm.reason) {
+      setBonusError('Please fill in all required fields');
+      return;
+    }
+
+    const amount = parseFloat(bonusForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      setBonusError('Bonus amount must be greater than 0');
+      return;
+    }
+
+    setBonusSubmitting(true);
+    setBonusError(null);
+
+    try {
+      // Create bonus entry
+      const bonusResponse = await fetch('/api/admin/bonuses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'customer',
+          recipientId: bonusForm.customerId,
+          amount: amount,
+          reason: bonusForm.reason,
+          milestone: bonusForm.milestone || null,
+        }),
+      });
+
+      const bonusData = await bonusResponse.json();
+
+      if (bonusData.success) {
+        // Create expense entry for customer bonuses (free wash)
+        const expenseResponse = await fetch('/api/admin/expenses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serviceType: 'checkin',
+            amount: amount,
+            reason: `Free Car Wash Bonus: ${bonusForm.reason}`,
+            description: `Free wash bonus awarded to ${bonusForm.customerName} - ${bonusForm.milestone}`,
+            expenseDate: new Date().toISOString()
+          }),
+        });
+
+        const expenseData = await expenseResponse.json();
+        if (!expenseData.success) {
+          console.warn('Bonus created but expense entry failed:', expenseData.error);
+        }
+
+        setShowBonusModal(false);
+        setBonusForm({
+          customerId: '',
+          customerName: '',
+          amount: '',
+          reason: '',
+          milestone: ''
+        });
+        // Refresh bonuses list to update button state
+        fetchBonuses();
+        
+        setNotification({ 
+          type: 'success', 
+          message: `Free wash bonus of ₦${amount} created successfully for ${bonusForm.customerName}!` 
+        });
+        setTimeout(() => setNotification(null), 5000);
+      } else {
+        setBonusError(bonusData.error || 'Failed to create bonus');
+      }
+    } catch {
+      setBonusError('Failed to create bonus');
+    } finally {
+      setBonusSubmitting(false);
     }
   };
 
@@ -456,13 +623,40 @@ const MilestoneAchievementsPage: React.FC = () => {
             </select>
           </div>
           <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-light-500 dark:bg-gray-700 dark:text-white text-sm w-64"
-            />
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-light-500 dark:bg-gray-700 dark:text-white text-sm"
+              />
+            </div>
+            <button
+              onClick={handleSearch}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search
+            </button>
+            {searchTerm && (
+              <button
+                onClick={handleClearSearch}
+                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear
+              </button>
+            )}
             <button
               onClick={fetchAchievements}
               className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 text-sm"
@@ -512,6 +706,7 @@ const MilestoneAchievementsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Visits</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Spent</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Achieved Value</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -538,6 +733,26 @@ const MilestoneAchievementsPage: React.FC = () => {
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                           {currentMilestone?.type === 'visits' ? customer.achievedValue : `$${customer.achievedValue.toFixed(2)}`}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const bonusStatus = getBonusStatus(customer.id, currentMilestone?.name || '');
+                          if (bonusStatus) {
+                            return (
+                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(bonusStatus)}`}>
+                                Bonus: {bonusStatus.charAt(0).toUpperCase() + bonusStatus.slice(1)}
+                              </span>
+                            );
+                          }
+                          return (
+                            <button 
+                              onClick={() => handleOpenBonusModal(customer.id, customer.name, currentMilestone?.name || '')}
+                              className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors font-medium"
+                            >
+                              Give Bonus
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -636,12 +851,24 @@ const MilestoneAchievementsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex space-x-2">
-                        <button 
-                          onClick={() => router.push(`/customers/list?search=${achievement.customer.licensePlate}`)}
-                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
-                        >
-                          View Customer
-                        </button>
+                        {(() => {
+                          const bonusStatus = getBonusStatus(achievement.customer.id, achievement.milestone.name);
+                          if (bonusStatus) {
+                            return (
+                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(bonusStatus)}`}>
+                                Bonus: {bonusStatus.charAt(0).toUpperCase() + bonusStatus.slice(1)}
+                              </span>
+                            );
+                          }
+                          return (
+                            <button 
+                              onClick={() => handleOpenBonusModal(achievement.customer.id, achievement.customer.name, achievement.milestone.name)}
+                              className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors font-medium"
+                            >
+                              Give Bonus
+                            </button>
+                          );
+                        })()}
                         {!achievement.rewardClaimed && (
                           <button 
                             onClick={() => handleClaimReward(achievement.id, achievement.customer.name)}
@@ -660,6 +887,83 @@ const MilestoneAchievementsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Bonus Modal */}
+      <Modal
+        isOpen={showBonusModal}
+        onClose={() => setShowBonusModal(false)}
+        className="max-w-md"
+      >
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Give Free Wash Bonus
+          </h2>
+
+          {/* Customer Info Display */}
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Customer</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{bonusForm.customerName}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Milestone: {bonusForm.milestone}</p>
+          </div>
+
+          {bonusError && (
+            <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <span className="text-red-800 dark:text-red-200 text-sm">{bonusError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateBonus} className="space-y-4">
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Free Wash Value (₦) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Enter free wash value"
+                value={bonusForm.amount}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBonusForm({...bonusForm, amount: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Brief reason for free wash"
+                value={bonusForm.reason}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBonusForm({...bonusForm, reason: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="submit"
+                disabled={bonusSubmitting}
+                className="flex-1"
+              >
+                {bonusSubmitting ? 'Creating...' : 'Give Free Wash'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowBonusModal(false)}
+                className="px-6"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 };

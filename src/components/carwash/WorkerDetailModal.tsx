@@ -249,13 +249,13 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
           
           <div className="flex items-center space-x-3">
             {getAvailabilityBadge(worker?.isAvailable || false)}
-            <Button
+            {/* <Button
               size="sm"
               variant="outline"
               onClick={() => window.location.href = `/workers/edit/${worker?.id}`}
             >
               Edit Worker
-            </Button>
+            </Button> */}
           </div>
         </div>
 

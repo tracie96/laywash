@@ -5,6 +5,13 @@ import Button from '@/components/ui/button/Button';
 import InputField from '@/components/form/input/InputField';
 import { LocationSelect } from '@/components/ui/LocationSelect';
 
+interface NextOfKin {
+  name: string;
+  phone: string;
+  address: string;
+  relationship: string;
+}
+
 interface WorkerData {
   id: string;
   name: string;
@@ -21,6 +28,8 @@ interface WorkerData {
   createdAt: string;
   lastActive: string;
   assigned_location?: string;
+  bank_information?: string;
+  next_of_kin?: NextOfKin[];
 }
 
 const WorkerEditPage: React.FC = () => {
@@ -63,7 +72,7 @@ const WorkerEditPage: React.FC = () => {
 
     fetchWorkerData();
   }, [workerId]);
-
+console.log({workerData});
   const handleSave = async () => {
     if (!workerData || !workerId) return;
 
@@ -82,6 +91,8 @@ const WorkerEditPage: React.FC = () => {
           phone: workerData.phone,
           isAvailable: workerData.isAvailable,
           assigned_location: workerData.assigned_location,
+          bank_information: workerData.bank_information,
+          next_of_kin: workerData.next_of_kin,
         }),
       });
 
@@ -224,7 +235,138 @@ const WorkerEditPage: React.FC = () => {
               <option value="unavailable">Unavailable</option>
             </select>
           </div>
-        
+        </div>
+
+        {/* Bank Information Section */}
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Bank Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+           
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Bank Information
+              </label>
+              <InputField
+                type="text"
+                value={workerData?.bank_information || 'Not provided'}
+                onChange={(e) => setWorkerData(prev => prev ? ({
+                  ...prev,
+                  bank_information: e.target.value
+                }) : null)}
+                placeholder="Enter bank name"
+              />
+           
+           
+          </div>
+        </div>
+
+        {/* Next of Kin Section */}
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Next of Kin</h2>
+            <Button
+              variant="outline"
+              onClick={() => setWorkerData(prev => prev ? ({
+                ...prev,
+                next_of_kin: [
+                  ...(prev.next_of_kin || []),
+                  { name: '', phone: '', address: '', relationship: '' }
+                ]
+              }) : null)}
+            >
+              + Add Next of Kin
+            </Button>
+          </div>
+          
+          {(workerData?.next_of_kin || []).map((kin, index) => (
+            <div key={index} className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Next of Kin #{index + 1}
+                </h3>
+                <button
+                  onClick={() => setWorkerData(prev => prev ? ({
+                    ...prev,
+                    next_of_kin: prev.next_of_kin?.filter((_, i) => i !== index)
+                  }) : null)}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Name
+                  </label>
+                  <InputField
+                    type="text"
+                    value={kin.name}
+                    onChange={(e) => setWorkerData(prev => {
+                      if (!prev) return null;
+                      const updated = [...(prev.next_of_kin || [])];
+                      updated[index] = { ...updated[index], name: e.target.value };
+                      return { ...prev, next_of_kin: updated };
+                    })}
+                    placeholder="Enter name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Phone
+                  </label>
+                  <InputField
+                    type="tel"
+                    value={kin.phone}
+                    onChange={(e) => setWorkerData(prev => {
+                      if (!prev) return null;
+                      const updated = [...(prev.next_of_kin || [])];
+                      updated[index] = { ...updated[index], phone: e.target.value };
+                      return { ...prev, next_of_kin: updated };
+                    })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Address
+                  </label>
+                  <InputField
+                    type="text"
+                    value={kin.address}
+                    onChange={(e) => setWorkerData(prev => {
+                      if (!prev) return null;
+                      const updated = [...(prev.next_of_kin || [])];
+                      updated[index] = { ...updated[index], address: e.target.value };
+                      return { ...prev, next_of_kin: updated };
+                    })}
+                    placeholder="Enter address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Relationship
+                  </label>
+                  <InputField
+                    type="text"
+                    value={kin.relationship}
+                    onChange={(e) => setWorkerData(prev => {
+                      if (!prev) return null;
+                      const updated = [...(prev.next_of_kin || [])];
+                      updated[index] = { ...updated[index], relationship: e.target.value };
+                      return { ...prev, next_of_kin: updated };
+                    })}
+                    placeholder="e.g., Wife, Brother, etc."
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {(!workerData?.next_of_kin || workerData.next_of_kin.length === 0) && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              No next of kin added. Click &quot;Add Next of Kin&quot; to add one.
+            </p>
+          )}
         </div>
         
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">

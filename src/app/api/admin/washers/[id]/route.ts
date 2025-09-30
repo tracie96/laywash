@@ -38,10 +38,18 @@ export async function PATCH(
     if (updateData.is_active !== undefined) userUpdateData.is_active = updateData.is_active;
 
     // Prepare update data for car_washer_profiles table
-    const profileUpdateData: { is_available?: boolean; assigned_admin_id?: string; assigned_location?: string } = {};
+    const profileUpdateData: { 
+      is_available?: boolean; 
+      assigned_admin_id?: string; 
+      assigned_location?: string;
+      bank_information?: { account_number?: string; bank_name?: string; account_name?: string } | null;
+      next_of_kin?: Array<{ name: string; phone: string; address: string; relationship: string }>;
+    } = {};
     if (updateData.isAvailable !== undefined) profileUpdateData.is_available = updateData.isAvailable;
     if (updateData.assignedAdminId !== undefined) profileUpdateData.assigned_admin_id = updateData.assignedAdminId;
     if (updateData.assigned_location !== undefined) profileUpdateData.assigned_location = updateData.assigned_location;
+    if (updateData.bank_information !== undefined) profileUpdateData.bank_information = updateData.bank_information;
+    if (updateData.next_of_kin !== undefined) profileUpdateData.next_of_kin = updateData.next_of_kin;
 
     // Update user data if there are changes
     if (Object.keys(userUpdateData).length > 0) {
@@ -93,6 +101,8 @@ export async function PATCH(
           total_earnings,
           assigned_location,
           is_available,
+          bank_information,
+          next_of_kin,
           picture_url
         )
       `)
@@ -124,6 +134,8 @@ export async function PATCH(
       totalEarnings: updatedWasher.car_washer_profiles?.[0]?.total_earnings || 0,
       isAvailable: updatedWasher.car_washer_profiles?.[0]?.is_available || false,
       assignedAdminId: updatedWasher.car_washer_profiles?.[0]?.assigned_admin_id || null,
+      bank_information: updatedWasher.car_washer_profiles?.[0]?.bank_information || null,
+      next_of_kin: updatedWasher.car_washer_profiles?.[0]?.next_of_kin || [],
       picture_url: updatedWasher.car_washer_profiles?.[0]?.picture_url || null
     };
     return NextResponse.json({

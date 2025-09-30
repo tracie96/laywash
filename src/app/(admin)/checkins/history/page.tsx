@@ -81,6 +81,9 @@ const CheckInHistoryPage: React.FC = () => {
   const [cancelReason, setCancelReason] = useState<string>('');
   const [sendingSMS, setSendingSMS] = useState<string | null>(null);
 
+  // Track customer bonuses
+  const [customerBonuses, setCustomerBonuses] = useState<Set<string>>(new Set());
+
   // Helper function to get current date in YYYY-MM-DD format
   const getCurrentDate = () => {
     const today = new Date();
@@ -204,6 +207,26 @@ const CheckInHistoryPage: React.FC = () => {
     }
   }, [startDate, endDate]);
 
+  // Fetch customer bonuses
+  const fetchCustomerBonuses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/bonuses?type=customer');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Create a Set of customer IDs who have active bonuses
+        const customerIds = new Set<string>(
+          data.bonuses
+            .filter((bonus: { status: string }) => bonus.status !== 'rejected')
+            .map((bonus: { recipientId: string }) => bonus.recipientId)
+        );
+        setCustomerBonuses(customerIds);
+      }
+    } catch (error) {
+      console.error('Error fetching customer bonuses:', error);
+    }
+  }, []);
+
   // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
@@ -213,7 +236,8 @@ const CheckInHistoryPage: React.FC = () => {
         await Promise.all([
           fetchCheckIns(),
           fetchWashers(),
-          fetchEarnings()
+          fetchEarnings(),
+          fetchCustomerBonuses()
         ]);
       } catch (err) {
         console.error('Error loading data:', err);
@@ -223,7 +247,7 @@ const CheckInHistoryPage: React.FC = () => {
     };
 
     loadData();
-  }, [fetchCheckIns, fetchEarnings]);
+  }, [fetchCheckIns, fetchEarnings, fetchCustomerBonuses]);
 
   // Refetch earnings when date filters change
   useEffect(() => {
@@ -991,6 +1015,14 @@ const CheckInHistoryPage: React.FC = () => {
                           size="sm"
                         >
                           {checkIn.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
+                        </Badge>
+                      )}
+                      {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (
+                        <Badge
+                          color="info"
+                          size="sm"
+                        >
+                          🎁 Has Bonus
                         </Badge>
                       )}
                     </div>

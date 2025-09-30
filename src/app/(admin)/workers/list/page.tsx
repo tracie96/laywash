@@ -148,7 +148,6 @@ const WorkerListPage: React.FC = () => {
   };
 
   const handleViewWorker = (workerId: string) => {
-    console.log('handleViewWorker called with ID:', workerId); // Debug log
     setSelectedWorkerId(workerId);
     setIsModalOpen(true);
   };
@@ -571,13 +570,7 @@ const WorkerListPage: React.FC = () => {
                         >
                           View
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => window.location.href = `/workers/edit/${worker.id}`}
-                        >
-                          Edit
-                        </Button>
+                     
                         {worker.isActive ? (
                           <>
                             <Button

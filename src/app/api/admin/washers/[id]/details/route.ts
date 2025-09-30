@@ -38,6 +38,7 @@ export async function GET(
           assigned_location,
           address,
           next_of_kin,
+          bank_information,
           picture_url
         )
       `)
@@ -56,7 +57,10 @@ export async function GET(
     }
 
     // Fetch assigned admin name
-    const profile = worker.car_washer_profiles?.[0];
+    const profile = Array.isArray(worker?.car_washer_profiles) 
+      ? worker?.car_washer_profiles?.[0] 
+      : worker?.car_washer_profiles;
+    console.log('Profile:', profile);
     let assignedAdminName = 'Unassigned';
     
     if (profile?.assigned_admin_id) {
@@ -162,7 +166,8 @@ export async function GET(
       address: profile?.address || 'Address not provided',
       emergencyContact: profile?.next_of_kin?.[0]?.name || 'Not provided',
       emergencyPhone: profile?.next_of_kin?.[0]?.phone || 'Not provided',
-      nextOfKin: profile?.next_of_kin || [],
+      next_of_kin: profile?.next_of_kin || [],
+      bank_information: profile?.bank_information || null,
       skills: ['Car Washing', 'Customer Service'],
       certifications: [],
       notes: 'No additional notes.',
