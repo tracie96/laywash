@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     const paymentMethod = searchParams.get('paymentMethod') || 'all';
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     // Build the query with customer and washer information - use same structure as check-ins API
     let query = supabaseAdmin
@@ -67,6 +69,14 @@ export async function GET(request: NextRequest) {
     // Apply payment method filter
     if (paymentMethod !== 'all') {
       query = query.eq('payment_method', paymentMethod);
+    }
+
+    // Apply date range filter
+    if (startDate) {
+      query = query.gte('check_in_time', startDate);
+    }
+    if (endDate) {
+      query = query.lte('check_in_time', endDate);
     }
 
     const { data: checkIns, error } = await query;

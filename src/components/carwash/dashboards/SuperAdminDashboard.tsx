@@ -56,6 +56,7 @@ const SuperAdminDashboard: React.FC = () => {
           })),
         };
 
+        console.log('processedData', processedData);
         setMetrics(processedData);
         setLastUpdated(new Date());
       } else {

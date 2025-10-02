@@ -19,11 +19,12 @@ export async function GET() {
     const weekStart = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+ 
     const { data: incomeData, error: incomeError } = await supabaseAdmin
       .from('car_check_ins')
       .select('company_income, check_in_time, payment_status')
       .eq('payment_status', 'paid')
-      .gte('check_in_time', monthStart.toISOString());
+      .gte('check_in_time', monthStart.toISOString().split('T')[0]);
 
     if (incomeError) {
       console.error('Error fetching income data:', incomeError);
@@ -34,7 +35,7 @@ export async function GET() {
       .from('sales_transactions')
       .select('total_amount, created_at, status')
       .eq('status', 'completed')
-      .gte('created_at', monthStart.toISOString());
+      .gte('created_at', monthStart.toISOString().split('T')[0]);
 
     if (stockSalesError) {
       console.error('Error fetching stock sales data:', stockSalesError);
@@ -52,7 +53,7 @@ export async function GET() {
         .reduce((sum, item) => sum + (item.company_income || 0), 0) || 0;
     };
 
-    // Car wash income
+
     const dailyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', today);
     const weeklyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', weekStart);
     const monthlyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', monthStart);
@@ -130,7 +131,6 @@ export async function GET() {
 
     const pendingPaymentAmount = pendingCheckInsAmount?.reduce((sum, checkIn) => {
       const amount = checkIn.company_income || checkIn.total_amount || 0;
-      console.log(`Check-in amount: ${amount} (company_income: ${checkIn.company_income}, total_amount: ${checkIn.total_amount})`);
       return sum + amount;
     }, 0) || 0;
 

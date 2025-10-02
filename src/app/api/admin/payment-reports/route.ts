@@ -26,10 +26,8 @@ export async function GET(request: NextRequest) {
     let endDate = new Date(now);
     
     if (period === 'custom' && customStartDate && customEndDate) {
-      // Use custom date range
       startDate = new Date(customStartDate);
       endDate = new Date(customEndDate);
-      // Set end date to end of day for better inclusivity
       endDate.setHours(23, 59, 59, 999);
     } else {
       // Use predefined periods
@@ -42,10 +40,12 @@ export async function GET(request: NextRequest) {
           endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
           break;
         case 'week':
-          startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+          startDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+          endDate = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
           break;
         case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          startDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+          endDate = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
           break;
         case 'quarter':
           startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());

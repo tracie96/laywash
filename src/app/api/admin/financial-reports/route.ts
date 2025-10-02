@@ -36,10 +36,29 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '6'; // Default to last 6 months
     const location = searchParams.get('location'); // Optional location filter
-
+console.log('period', period);
     const now = new Date();
     const startDate = new Date();
-    startDate.setMonth(now.getMonth() - parseInt(period));
+    
+    // Fix period calculation - "1" should mean current month, not previous month
+    if (period === '1') {
+      // Current month - start from first day of current month
+      startDate.setFullYear(now.getFullYear(), now.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      // For other periods, go back the specified number of months
+      startDate.setMonth(now.getMonth() - parseInt(period));
+    }
+
+    // Create date strings without timezone conversion
+    const startDateStr = startDate.getFullYear() + '-' + 
+      String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(startDate.getDate()).padStart(2, '0');
+    const currentDateStr = now.getFullYear() + '-' + 
+      String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(now.getDate()).padStart(2, '0');
+    
+    console.log(`Financial Reports - Period: ${period}, Start Date: ${startDateStr}, Current Date: ${currentDateStr}`);
 
     // Get admin IDs for the selected location if location filter is provided
     let adminIdsForLocation: string[] = [];
@@ -98,8 +117,8 @@ export async function GET(request: NextRequest) {
             name
           )
         `)
-        .gte('check_in_time', startDate.toISOString())
-        .lte('check_in_time', now.toISOString())
+        .gte('check_in_time', startDateStr)
+        .lte('check_in_time', currentDateStr + 'T23:59:59.999Z')
         .order('check_in_time', { ascending: false }),
 
       // Product sales transactions
@@ -118,8 +137,8 @@ export async function GET(request: NextRequest) {
             name
           )
         `)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', now.toISOString())
+        .gte('created_at', startDateStr)
+        .lte('created_at', currentDateStr + 'T23:59:59.999Z')
         .order('created_at', { ascending: false }),
 
       // Car washer profiles with earnings data
@@ -135,8 +154,8 @@ export async function GET(request: NextRequest) {
             role
           )
         `)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', now.toISOString())
+        .gte('created_at', startDateStr)
+        .lte('created_at', currentDateStr + 'T23:59:59.999Z')
         .order('created_at', { ascending: false }),
 
       // Customer and washer bonuses
@@ -150,8 +169,8 @@ export async function GET(request: NextRequest) {
           created_at,
           recipient_id
         `)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', now.toISOString())
+        .gte('created_at', startDateStr)
+        .lte('created_at', currentDateStr + 'T23:59:59.999Z')
         .order('created_at', { ascending: false }),
 
       supabaseAdmin
@@ -166,8 +185,8 @@ export async function GET(request: NextRequest) {
           material_deductions,
           tool_deductions
         `)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', now.toISOString())
+        .gte('created_at', startDateStr)
+        .lte('created_at', currentDateStr + 'T23:59:59.999Z')
         .order('created_at', { ascending: false }),
 
       // Expenses from the new expenses table
@@ -234,6 +253,7 @@ export async function GET(request: NextRequest) {
       washerSalaries: number;
       washerBonuses: number;
       customerBonuses: number;
+      bankDeposits: number;
       totalExpenses: number;
       
       // Worker Wages
@@ -261,6 +281,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -302,6 +323,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -337,6 +359,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -371,6 +394,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -399,15 +423,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Process payment requests for amount paid (approved payment requests)
-    console.log('Payment requests data:', paymentRequestsResponse.data);
     paymentRequestsResponse.data?.forEach(paymentRequest => {
-      console.log('Processing payment request:', {
-        id: paymentRequest.id,
-        status: paymentRequest.status,
-        total_earnings: paymentRequest.total_earnings,
-        amount: paymentRequest.amount,
-        created_at: paymentRequest.created_at
-      });
+    
       
       const date = new Date(paymentRequest.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -420,6 +437,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -436,7 +454,6 @@ export async function GET(request: NextRequest) {
       // Only count approved (paid) payment requests as "Amount Paid"
       if (paymentRequest.status === 'paid') {
         const amountPaid = parseFloat(paymentRequest.amount || '0');
-        console.log('Adding to amount paid:', amountPaid);
         monthData.pendingWages += amountPaid;
       }
     });
@@ -454,6 +471,7 @@ export async function GET(request: NextRequest) {
           washerSalaries: 0,
           washerBonuses: 0,
           customerBonuses: 0,
+          bankDeposits: 0,
           totalExpenses: 0,
           totalWages: 0,
           pendingWages: 0,
@@ -487,7 +505,7 @@ export async function GET(request: NextRequest) {
           // Voluntary expenses
           break;
         case 'deposit_to_bank':
-          // Bank deposits
+          monthData.bankDeposits += amount;
           break;
         case 'other':
           // Other expenses
@@ -515,6 +533,7 @@ export async function GET(request: NextRequest) {
         washerSalaries: data.washerSalaries,
         washerBonuses: data.washerBonuses,
         customerBonuses: data.customerBonuses,
+        bankDeposits: data.bankDeposits,
         
         // Worker Wages
         totalWages: data.totalWages,

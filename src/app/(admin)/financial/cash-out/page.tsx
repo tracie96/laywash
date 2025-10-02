@@ -274,9 +274,8 @@ const CashOutPage: React.FC = () => {
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
             >
               <option value="all">All Types</option>
-              <option value="checkin">Free Car Wash</option>
 
-              <option value="sales">Free Sales</option>
+              <option value="sales">Expenses</option>
               <option value="deposit_to_bank">Bank Deposit</option>
               <option value="other">Other</option>
             </select>

@@ -56,6 +56,19 @@ const PaymentHistoryPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      
+      // Format dates for API
+      const startDateStr = startOfMonth.getFullYear() + '-' + 
+        String(startOfMonth.getMonth() + 1).padStart(2, '0') + '-' + 
+        String(startOfMonth.getDate()).padStart(2, '0');
+      const endDateStr = endOfMonth.getFullYear() + '-' + 
+        String(endOfMonth.getMonth() + 1).padStart(2, '0') + '-' + 
+        String(endOfMonth.getDate()).padStart(2, '0') + 'T23:59:59.999Z';
+      
       // Build query parameters
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
@@ -63,6 +76,9 @@ const PaymentHistoryPage: React.FC = () => {
       params.append('sortBy', 'check_in_time');
       params.append('sortOrder', 'desc');
       params.append('limit', '100');
+      // Add current month date filter
+      params.append('startDate', startDateStr);
+      params.append('endDate', endDateStr);
       
       const response = await fetch(`/api/admin/payments?${params.toString()}`);
       const data = await response.json();
@@ -243,10 +259,10 @@ const PaymentHistoryPage: React.FC = () => {
     <div className="p-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Check-in History
+          Payment History
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          View all payment transactions and records
+          View payment transactions for the current month
         </p>
       </div>
 

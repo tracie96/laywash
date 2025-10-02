@@ -20,6 +20,7 @@ interface FinancialReport {
   washerSalaries: number;
   washerBonuses: number;
   customerBonuses: number;
+  bankDeposits: number;
   
   // Worker Wages
   totalWages: number; // Workers Pay - sum of total_earnings from car_washer_profiles
@@ -112,6 +113,7 @@ const FinancialReportsPage: React.FC = () => {
     washerSalaries: acc.washerSalaries + report.washerSalaries,
     washerBonuses: acc.washerBonuses + report.washerBonuses,
     customerBonuses: acc.customerBonuses + report.customerBonuses,
+    bankDeposits: acc.bankDeposits + report.bankDeposits,
     totalWages: acc.totalWages + report.totalWages,
     pendingWages: acc.pendingWages + report.pendingWages,
     netProfit: acc.netProfit + report.netProfit,
@@ -127,6 +129,7 @@ const FinancialReportsPage: React.FC = () => {
     washerSalaries: 0,
     washerBonuses: 0,
     customerBonuses: 0,
+    bankDeposits: 0,
     totalWages: 0,
     pendingWages: 0,
     netProfit: 0,
@@ -200,7 +203,7 @@ const FinancialReportsPage: React.FC = () => {
               onClick={() => setIsExpenseModalOpen(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              + Cash Out
+              Total Cash Out
             </button>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
@@ -209,6 +212,7 @@ const FinancialReportsPage: React.FC = () => {
                 onChange={(e) => setSelectedPeriod(e.target.value)}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
+                    <option value="1">Current Month</option>
                 <option value="3">Last 3 Months</option>
                 <option value="6">Last 6 Months</option>
                 <option value="12">Last 12 Months</option>
@@ -520,7 +524,7 @@ const FinancialReportsPage: React.FC = () => {
               <h4 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-4">
                 Expense Breakdown
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">
@@ -543,6 +547,12 @@ const FinancialReportsPage: React.FC = () => {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Customer Bonuses</p>
                   <p className="text-xl font-semibold text-red-600 dark:text-red-400">
                     ₦ {formatCurrency(selectedReport.customerBonuses)}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Bank Deposits</p>
+                  <p className="text-xl font-semibold text-red-600 dark:text-red-400">
+                    ₦ {formatCurrency(selectedReport.bankDeposits)}
                   </p>
                 </div>
               </div>
