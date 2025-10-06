@@ -1,6 +1,7 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 interface DashboardMetrics {
   totalIncome: {
     daily: number;
@@ -70,15 +71,22 @@ interface CheckIn {
 }
 
 const AdminDashboard: React.FC = () => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentCheckIns, setRecentCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   // Fetch dashboard metrics
-  const fetchDashboardMetrics = async () => {
+  const fetchDashboardMetrics = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      const response = await fetch('/api/admin/dashboard-metrics');
+      const response = await fetch('/api/admin/dashboard-metrics', {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -90,11 +98,17 @@ const AdminDashboard: React.FC = () => {
       console.error('Error fetching dashboard metrics:', err);
       setError(err instanceof Error ? err.message : 'Failed to load metrics');
     }
-  };
+  }, [user?.id]);
   // Fetch recent check-ins
-  const fetchRecentCheckIns = async () => {
+  const fetchRecentCheckIns = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      const response = await fetch('/api/admin/check-ins?limit=5&sortBy=check_in_time&sortOrder=desc');
+      const response = await fetch('/api/admin/check-ins?limit=5&sortBy=check_in_time&sortOrder=desc', {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -106,11 +120,16 @@ const AdminDashboard: React.FC = () => {
       console.error('Error fetching recent check-ins:', err);
       setError(err instanceof Error ? err.message : 'Failed to load recent check-ins');
     }
-  };
+  }, [user?.id]);
 
   // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
@@ -127,7 +146,7 @@ const AdminDashboard: React.FC = () => {
     };
 
     loadData();
-  }, []);
+  }, [user?.id, fetchDashboardMetrics, fetchRecentCheckIns]);
 
   // Show loading state
   if (loading) {

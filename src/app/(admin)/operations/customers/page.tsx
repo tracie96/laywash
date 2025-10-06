@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { PlusIcon, PencilIcon, EyeIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
+import { useAuth } from "@/context/AuthContext";
 
 interface Customer {
   id: string;
@@ -73,6 +74,7 @@ interface CheckIn {
 }
 
 const OperationsCustomersPage: React.FC = () => {
+  const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,8 +118,9 @@ const OperationsCustomersPage: React.FC = () => {
     vehicleColor: '',
     isPrimary: true
   }]);
-console.log(customers);
   const fetchCustomers = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -127,7 +130,11 @@ console.log(customers);
       if (filterType !== 'all') params.append('filter', filterType);
       params.append('limit', '10000'); // Request all customers
       
-      const response = await fetch(`/api/admin/customers?${params.toString()}`);
+      const response = await fetch(`/api/admin/customers?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       if (data.success) {
         setCustomers(data.customers);
@@ -140,7 +147,7 @@ console.log(customers);
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterType]);
+  }, [searchTerm, filterType, user?.id]);
 
   useEffect(() => {
     fetchCustomers();

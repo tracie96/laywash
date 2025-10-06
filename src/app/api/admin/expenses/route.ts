@@ -14,6 +14,42 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 // GET - Fetch all expenses
 export async function GET(request: NextRequest) {
   try {
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -41,9 +77,18 @@ export async function GET(request: NextRequest) {
       `)
       .order('expense_date', { ascending: false });
 
+    // Filter by location (through admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      query = query.in('admin_id', locationAdminIds);
+    }
+
     // Apply filters
     if (startDate && endDate) {
-      query = query.gte('expense_date', startDate).lte('expense_date', endDate);
+      // Ensure endDate includes the full day by adding time component
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999); // End of day
+      
+      query = query.gte('expense_date', startDate).lte('expense_date', endDateTime.toISOString());
     }
 
     if (serviceType) {
@@ -102,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate service type
-    const validServiceTypes = ['checkin', 'salary', 'sales', 'free_will', 'deposit_to_bank', 'other'];
+    const validServiceTypes = ['checkin', 'salary', 'expenses', 'free_will', 'deposit_to_bank', 'other'];
     if (!validServiceTypes.includes(serviceType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid service type' },

@@ -22,6 +22,42 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const currentAdminId = request.headers.get('X-Admin-ID');
+
+    // Get admin location for filtering
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
 
     // Build the query with customer and washer information - use same structure as check-ins API
     let query = supabaseAdmin
@@ -54,6 +90,11 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' });
+
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      query = query.in('assigned_admin_id', locationAdminIds);
+    }
 
     // Apply search filter - use same logic as check-ins API
     if (search) {

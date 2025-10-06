@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { useAuth } from '@/context/AuthContext';
 
 interface CheckIn {
   id: string;
@@ -32,6 +33,7 @@ interface CheckIn {
 }
 
 const OperationsCheckInsPage: React.FC = () => {
+  const { user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,11 @@ const OperationsCheckInsPage: React.FC = () => {
       if (filter !== 'all') params.append('status', filter);
       if (paymentFilter !== 'all') params.append('paymentStatus', paymentFilter);
       
-      const response = await fetch(`/api/admin/check-ins?${params.toString()}`);
+      const response = await fetch(`/api/admin/check-ins?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user?.id || '',
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -91,6 +97,7 @@ const OperationsCheckInsPage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           status: newStatus
@@ -115,6 +122,7 @@ const OperationsCheckInsPage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           paymentStatus: 'paid',

@@ -112,10 +112,15 @@ const NewCheckInPage: React.FC = () => {
   // Function to check for duplicate license plates on the same day
   const checkForDuplicateLicensePlate = async (licensePlate: string) => {
     if (!licensePlate.trim()) return { hasDuplicates: false, duplicates: [] };
+    if (!user?.id) return { hasDuplicates: false, duplicates: [] };
     
     try {
       const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/admin/check-ins?licensePlate=${encodeURIComponent(licensePlate)}&date=${today}`);
+      const response = await fetch(`/api/admin/check-ins?licensePlate=${encodeURIComponent(licensePlate)}&date=${today}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const result = await response.json();
       
       if (result.success && result.checkIns && result.checkIns.length > 0) {

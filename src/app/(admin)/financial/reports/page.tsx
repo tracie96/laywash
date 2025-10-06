@@ -203,7 +203,7 @@ const FinancialReportsPage: React.FC = () => {
               onClick={() => setIsExpenseModalOpen(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Total Cash Out
+               Cash Out
             </button>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>

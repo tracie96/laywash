@@ -14,6 +14,44 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 // GET - Fetch payment requests
 export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const washerId = searchParams.get('washerId');
     const adminId = searchParams.get('adminId');
@@ -43,9 +81,14 @@ export async function GET(request: NextRequest) {
       query = query.eq('washer_id', washerId);
     }
 
-    // Filter by admin if specified
+    // Filter by admin - use query param if provided, or location-based filtering
+    // Only filter if not super admin
     if (adminId) {
+      // Specific admin filter from query param
       query = query.eq('admin_id', adminId);
+    } else if (locationAdminIds && locationAdminIds.length > 0) {
+      // Location-based filtering
+      query = query.in('admin_id', locationAdminIds);
     }
 
     // Filter by status
@@ -126,6 +169,32 @@ export async function POST(request: NextRequest) {
     if (requestedAmount <= 0) {
       return NextResponse.json(
         { success: false, error: 'Requested amount must be greater than 0' },
+        { status: 400 }
+      );
+    }
+
+    // Check if washer already has a pending payment request
+    const { data: existingPendingRequest, error: pendingCheckError } = await supabaseAdmin
+      .from('payment_request')
+      .select('id, status, created_at')
+      .eq('washer_id', washerId)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (pendingCheckError) {
+      console.error('Error checking for pending payment requests:', pendingCheckError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to validate payment request status' },
+        { status: 500 }
+      );
+    }
+
+    if (existingPendingRequest) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Cannot create new payment request. Washer already has a pending payment request.' 
+        },
         { status: 400 }
       );
     }

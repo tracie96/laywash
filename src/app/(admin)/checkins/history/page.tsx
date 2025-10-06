@@ -13,6 +13,7 @@ interface CheckIn {
   licensePlate: string;
   vehicleType: string;
   vehicleColor: string;
+  vehicleMake?: string;
   vehicleModel?: string;
   washType?: string;
   services: string[];
@@ -92,6 +93,8 @@ const CheckInHistoryPage: React.FC = () => {
 
   // Fetch earnings data from API
   const fetchEarnings = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setIsLoadingEarnings(true);
       
@@ -100,7 +103,11 @@ const CheckInHistoryPage: React.FC = () => {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       
-      const response = await fetch(`/api/admin/earnings?${params.toString()}`);
+      const response = await fetch(`/api/admin/earnings?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -116,7 +123,7 @@ const CheckInHistoryPage: React.FC = () => {
     } finally {
       setIsLoadingEarnings(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, user?.id]);
 
   // Fetch washers from API
   const fetchWashers = async () => {
@@ -159,7 +166,13 @@ const CheckInHistoryPage: React.FC = () => {
         searchParams.append('endDate', endDate);
       }
       
-      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`);
+      if (!user?.id) return;
+      
+      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -170,6 +183,7 @@ const CheckInHistoryPage: React.FC = () => {
           licensePlate: checkIn.licensePlate,
           vehicleType: checkIn.vehicleType,
           vehicleColor: checkIn.vehicleColor,
+          vehicleMake: checkIn.vehicleMake,
           vehicleModel: checkIn.vehicleModel,
           washType: checkIn.washType,
           services: checkIn.services || [],
@@ -205,7 +219,7 @@ const CheckInHistoryPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching check-ins:', err);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, user?.id]);
 
   // Fetch customer bonuses
   const fetchCustomerBonuses = useCallback(async () => {
@@ -1007,24 +1021,28 @@ const CheckInHistoryPage: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {checkIn.customerName}
                     </h3>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(checkIn.status)}
-                      {checkIn.paymentStatus && (
-                        <Badge
-                          color={checkIn.paymentStatus === 'paid' ? 'success' : 'warning'}
-                          size="sm"
-                        >
-                          {checkIn.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
-                        </Badge>
-                      )}
-                      {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (
-                        <Badge
-                          color="info"
-                          size="sm"
-                        >
-                          🎁 Has Bonus
-                        </Badge>
-                      )}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2">
+                      <div className="flex items-center">
+                        {getStatusBadge(checkIn.status)}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {checkIn.paymentStatus && (
+                          <Badge
+                            color={checkIn.paymentStatus === 'paid' ? 'success' : 'warning'}
+                            size="sm"
+                          >
+                            {checkIn.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
+                          </Badge>
+                        )}
+                        {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (
+                          <Badge
+                            color="info"
+                            size="sm"
+                          >
+                            🎁 Has Bonus
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -1048,6 +1066,12 @@ const CheckInHistoryPage: React.FC = () => {
                       <p className="text-gray-600 dark:text-gray-400">Vehicle Type</p>
                       <p className="font-medium text-gray-900 dark:text-white">
                         {checkIn.vehicleType}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Vehice Make</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {checkIn.vehicleMake}
                       </p>
                     </div>
                     {checkIn.vehicleModel && (

@@ -39,12 +39,68 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function GET(request: NextRequest) {
   try {
-    // For now, skip complex authentication to get the system working
-    // In production, this should be properly authenticated
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const limit = parseInt(searchParams.get('limit') || '10000'); // Increased limit to fetch all customers
+
+    // Get customer IDs from check-ins if filtering by location
+    let customerIds: string[] | null = null;
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      const { data: adminCheckIns } = await supabaseAdmin
+        .from('car_check_ins')
+        .select('customer_id')
+        .in('assigned_admin_id', locationAdminIds)
+        .not('customer_id', 'is', null);
+      
+      if (adminCheckIns && adminCheckIns.length > 0) {
+        // Get unique customer IDs
+        customerIds = [...new Set(adminCheckIns.map(ci => ci.customer_id).filter(Boolean) as string[])];
+      } else {
+        // Location has no check-ins, return empty list
+        return NextResponse.json({
+          success: true,
+          customers: []
+        });
+      }
+    }
 
     // Build the base query
     let query = supabaseAdmin
@@ -66,6 +122,11 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
       .limit(limit);
 
+    // Filter by customer IDs if admin is not super admin
+    if (customerIds) {
+      query = query.in('id', customerIds);
+    }
+
     // Apply search filter
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
@@ -82,7 +143,13 @@ export async function GET(request: NextRequest) {
         .ilike('license_plate', `%${search}%`);
       
       if (!vehicleError && vehicles && vehicles.length > 0) {
-        const vehicleCustomerIds = vehicles.map(v => v.customer_id).filter(Boolean);
+        let vehicleCustomerIds = vehicles.map(v => v.customer_id).filter(Boolean);
+        
+        // If filtering by admin, only include customers that belong to this admin
+        if (customerIds) {
+          vehicleCustomerIds = vehicleCustomerIds.filter(id => customerIds.includes(id as string));
+        }
+        
         if (vehicleCustomerIds.length > 0) {
           const { data: customersByVehicleData, error: customersByVehicleError } = await supabaseAdmin
             .from('customers')
@@ -127,10 +194,17 @@ export async function GET(request: NextRequest) {
 
     // Fetch all check-ins and match them to customers in memory
     // This is more efficient than using .in() with potentially thousands of customer IDs
-    const { data: checkInStats, error: statsError } = await supabaseAdmin
+    let checkInStatsQuery = supabaseAdmin
       .from('car_check_ins')
       .select('customer_id, total_amount, status, actual_completion_time, payment_status')
       .not('customer_id', 'is', null);
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      checkInStatsQuery = checkInStatsQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: checkInStats, error: statsError } = await checkInStatsQuery;
 
     if (statsError) {
       console.error('Error fetching check-in stats:', statsError);

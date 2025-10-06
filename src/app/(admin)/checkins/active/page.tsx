@@ -96,7 +96,7 @@ const ActiveCheckInsPage: React.FC = () => {
   const [sendingSMS, setSendingSMS] = useState<string | null>(null);
 
   // Fetch active check-ins from API
-  const fetchActiveCheckIns = async (search = '') => {
+  const fetchActiveCheckIns = useCallback(async (search = '') => {
     try {
       const searchParams = new URLSearchParams({
         status: 'all',
@@ -109,7 +109,13 @@ const ActiveCheckInsPage: React.FC = () => {
         searchParams.append('search', search.trim());
       }
       
-      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`);
+      if (!user?.id) return;
+      
+      const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -145,7 +151,7 @@ const ActiveCheckInsPage: React.FC = () => {
       console.error('Error fetching check-ins:', err);
       setError(err instanceof Error ? err.message : 'Failed to load check-ins');
     }
-  };
+  }, [user?.id]);
 
   const fetchWashers = async () => {
     try {
@@ -193,7 +199,7 @@ const ActiveCheckInsPage: React.FC = () => {
     };
 
     loadData();
-  }, []);
+  }, [fetchActiveCheckIns]);
 
   // Search functionality with debouncing
   const performSearch = useCallback(async (query: string) => {
@@ -204,7 +210,7 @@ const ActiveCheckInsPage: React.FC = () => {
     } finally {
       setSearchLoading(false);
     }
-  }, []);
+  }, [fetchActiveCheckIns]);
 
 
 

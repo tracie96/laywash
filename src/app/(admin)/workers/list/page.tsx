@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import WorkerDetailModal from '@/components/carwash/WorkerDetailModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface Worker {
   id: string;
@@ -23,6 +24,7 @@ interface Worker {
 }
 
 const WorkerListPage: React.FC = () => {
+  const { user } = useAuth();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,11 +37,17 @@ const WorkerListPage: React.FC = () => {
 
   // Fetch workers from API
   const fetchWorkers = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/admin/washers');
+      const response = await fetch('/api/admin/washers', {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -53,7 +61,7 @@ const WorkerListPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchWorkers();

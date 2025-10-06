@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,8 +11,47 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let adminLocation: string | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        adminLocation = adminProfile?.location || null;
+      }
+    }
+
+    // Get all admins at the same location if filtering by location
+    let locationAdminIds: string[] | null = null;
+    if (adminLocation) {
+      const { data: locationAdmins } = await supabaseAdmin
+        .from('admin_profiles')
+        .select('user_id')
+        .eq('location', adminLocation);
+      
+      locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+    }
+
     // Get current date and calculate period boundaries
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -20,22 +59,36 @@ export async function GET() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
  
-    const { data: incomeData, error: incomeError } = await supabaseAdmin
+    let incomeQuery = supabaseAdmin
       .from('car_check_ins')
       .select('company_income, check_in_time, payment_status')
       .eq('payment_status', 'paid')
       .gte('check_in_time', monthStart.toISOString().split('T')[0]);
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      incomeQuery = incomeQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: incomeData, error: incomeError } = await incomeQuery;
 
     if (incomeError) {
       console.error('Error fetching income data:', incomeError);
       throw new Error('Failed to fetch income data');
     }
 
-    const { data: stockSalesData, error: stockSalesError } = await supabaseAdmin
+    let stockSalesQuery = supabaseAdmin
       .from('sales_transactions')
       .select('total_amount, created_at, status')
       .eq('status', 'completed')
       .gte('created_at', monthStart.toISOString().split('T')[0]);
+    
+    // Filter by location (through admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      stockSalesQuery = stockSalesQuery.in('admin_id', locationAdminIds);
+    }
+
+    const { data: stockSalesData, error: stockSalesError } = await stockSalesQuery;
 
     if (stockSalesError) {
       console.error('Error fetching stock sales data:', stockSalesError);
@@ -102,12 +155,19 @@ export async function GET() {
     ).length || 0;
 
     // 4. Fetch pending check-ins count for today
-    const { data: pendingCheckIns, error: pendingError } = await supabaseAdmin
+    let pendingQuery = supabaseAdmin
       .from('car_check_ins')
       .select('id')
       .in('status', ['pending', 'in_progress'])
       .gte('check_in_time', today.toISOString())
       .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      pendingQuery = pendingQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: pendingCheckIns, error: pendingError } = await pendingQuery;
 
     if (pendingError) {
       console.error('Error fetching pending check-ins:', pendingError);
@@ -117,12 +177,19 @@ export async function GET() {
     const pendingCheckInsCount = pendingCheckIns?.length || 0;
 
     // Calculate pending check-ins total amount for today
-    const { data: pendingCheckInsAmount, error: pendingAmountError } = await supabaseAdmin
+    let pendingAmountQuery = supabaseAdmin
       .from('car_check_ins')
       .select('company_income, total_amount, status')
       .in('status', ['pending', 'in_progress'])
       .gte('check_in_time', today.toISOString())
       .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      pendingAmountQuery = pendingAmountQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: pendingCheckInsAmount, error: pendingAmountError } = await pendingAmountQuery;
 
     if (pendingAmountError) {
       console.error('Error fetching pending check-ins amount:', pendingAmountError);
@@ -149,7 +216,7 @@ export async function GET() {
     // 6. Fetch top performing washers (last 30 days)
     const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
     
-    const { data: performanceData, error: performanceError } = await supabaseAdmin
+    let performanceQuery = supabaseAdmin
       .from('car_check_ins')
       .select(`
         assigned_washer_id,
@@ -168,6 +235,13 @@ export async function GET() {
       .eq('payment_status', 'paid')
       .gte('check_in_time', thirtyDaysAgo.toISOString())
       .not('assigned_washer_id', 'is', null);
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      performanceQuery = performanceQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: performanceData, error: performanceError } = await performanceQuery;
 
     if (performanceError) {
       console.error('Error fetching performance data:', performanceError);
@@ -219,7 +293,7 @@ export async function GET() {
       .slice(0, 5);
 
     // 7. Fetch recent activities
-    const { data: recentCheckIns, error: recentError } = await supabaseAdmin
+    let recentQuery = supabaseAdmin
       .from('car_check_ins')
       .select(`
         id,
@@ -233,6 +307,13 @@ export async function GET() {
       `)
       .order('check_in_time', { ascending: false })
       .limit(10);
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      recentQuery = recentQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: recentCheckIns, error: recentError } = await recentQuery;
 
     if (recentError) {
       console.error('Error fetching recent activities:', recentError);

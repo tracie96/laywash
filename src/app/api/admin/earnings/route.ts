@@ -13,6 +13,44 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -22,6 +60,11 @@ export async function GET(request: NextRequest) {
       .from('car_check_ins')
       .select('company_income,total_amount, payment_status, check_in_time')
       .eq('payment_status', 'paid');
+
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      query = query.in('assigned_admin_id', locationAdminIds);
+    }
 
     // Apply date filters if provided
     if (startDate) {

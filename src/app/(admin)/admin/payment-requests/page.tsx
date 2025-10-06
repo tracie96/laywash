@@ -39,11 +39,17 @@ const AdminPaymentRequestsPage: React.FC = () => {
   const { user } = useAuth();
 
   const fetchPaymentRequests = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/admin/payment-requests?sortBy=created_at&sortOrder=desc');
+      const response = await fetch('/api/admin/payment-requests?sortBy=created_at&sortOrder=desc', {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch payment requests');

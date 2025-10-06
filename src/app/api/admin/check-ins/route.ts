@@ -50,6 +50,7 @@ interface CheckIn {
   wash_type: string;
   vehicle_color?: string;
   vehicle_model?: string;
+  vehicle_make?: string;
   status: string;
   check_in_time: string;
   actual_completion_time?: string;
@@ -90,6 +91,41 @@ function calculateEstimatedDuration(services: CheckInService[]): number {
 
 export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get location admins
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get all admins at same location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        if (adminProfile?.location) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminProfile.location);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || 'all';
@@ -111,7 +147,7 @@ export async function GET(request: NextRequest) {
       console.log(`Searching for: "${search}"`);
       
       // Use a single query with proper filtering that actually works
-      const query = supabaseAdmin
+      let query = supabaseAdmin
         .from('car_check_ins')
         .select(`
           *,
@@ -143,6 +179,11 @@ export async function GET(request: NextRequest) {
         `)
         .order(sortBy, { ascending: sortOrder === 'asc' })
         .limit(limit * 4); // Increase limit since we're filtering after
+      
+      // Filter by location (through assigned_admin_id)
+      if (locationAdminIds && locationAdminIds.length > 0) {
+        query = query.in('assigned_admin_id', locationAdminIds);
+      }
 
       // Execute the query first
       const { data: allResults, error: queryError } = await query;
@@ -267,6 +308,11 @@ export async function GET(request: NextRequest) {
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .limit(limit);
+    
+    // Filter by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      query = query.in('assigned_admin_id', locationAdminIds);
+    }
 
     // Apply license plate filter
     if (licensePlate) {
@@ -324,6 +370,7 @@ export async function GET(request: NextRequest) {
       customerPhone: checkIn.customers?.phone || checkIn.customers?.email || 'N/A',
       licensePlate: checkIn.license_plate,
       vehicleType: checkIn.vehicle_type,
+      vehicleMake: checkIn.vehicle_make || 'N/A',
       washType: checkIn.wash_type,
       vehicleColor: checkIn.vehicle_color || 'N/A',
       vehicleModel: checkIn.vehicle_model || 'N/A',
@@ -407,6 +454,7 @@ export async function POST(request: NextRequest) {
       customerId,
       licensePlate,
       vehicleType,
+      vehicleMake,
       washType,
       vehicleColor,
       vehicleModel,
@@ -485,6 +533,7 @@ export async function POST(request: NextRequest) {
         wash_type: washType,
         vehicle_color: vehicleColor,
         vehicle_model: vehicleModel,
+        vehicle_make: vehicleMake,
         remarks,
         valuable_items: valuableItems,
         assigned_washer_id: service.workerId,
@@ -635,6 +684,7 @@ console.log('Check-in materials:', checkInMaterials);
         customerId: checkIn.customer_id,
         licensePlate: checkIn.license_plate,
         vehicleType: checkIn.vehicle_type,
+        vehicleMake: checkIn.vehicle_make,
         washType: checkIn.wash_type,
         vehicleColor: checkIn.vehicle_color,
         vehicleModel: checkIn.vehicle_model,

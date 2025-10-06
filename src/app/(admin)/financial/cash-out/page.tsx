@@ -6,7 +6,7 @@ import AddExpenseModal from '@/components/admin/AddExpenseModal';
 
 interface Expense {
   id: string;
-  service_type: 'checkin' | 'salary' | 'sales' | 'free_will' | 'deposit_to_bank' | 'other';
+  service_type: 'checkin' | 'salary' | 'expenses' | 'free_will' | 'deposit_to_bank' | 'other';
   amount: number;
   reason: string;
   description?: string;
@@ -77,6 +77,8 @@ const CashOutPage: React.FC = () => {
 
   // Fetch expenses
   const fetchExpenses = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setIsLoading(true);
       setError(null);
@@ -96,7 +98,11 @@ const CashOutPage: React.FC = () => {
         params.append('locationId', selectedLocation);
       }
       
-      const response = await fetch(`/api/admin/expenses?${params.toString()}`);
+      const response = await fetch(`/api/admin/expenses?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -110,7 +116,7 @@ const CashOutPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate, selectedServiceType, selectedLocation]);
+  }, [startDate, endDate, selectedServiceType, selectedLocation, user?.id]);
 
   useEffect(() => {
     fetchLocations();
@@ -148,7 +154,7 @@ const CashOutPage: React.FC = () => {
   const getServiceTypeLabel = (serviceType: string): string => {
     const labels: Record<string, string> = {
       checkin: 'Free Car Wash',
-      sales: 'Free Sales',
+      expenses: 'Expenses',
       deposit_to_bank: 'Bank Deposit',
       other: 'Other'
     };
@@ -275,7 +281,7 @@ const CashOutPage: React.FC = () => {
             >
               <option value="all">All Types</option>
 
-              <option value="sales">Expenses</option>
+              <option value="expenses">Expenses</option>
               <option value="deposit_to_bank">Bank Deposit</option>
               <option value="other">Other</option>
             </select>

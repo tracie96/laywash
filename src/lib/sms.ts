@@ -72,11 +72,11 @@ export class SMSService {;
 
     const formData = new FormData();
     formData.append('token', token);
-    formData.append('senderID', senderId);
+    formData.append('senderID', "Akumka ACC");
     formData.append('recipients', phoneNumber);
     formData.append('message', message);
 
-    const response = await fetch('https://my.kudisms.net/api/corporate', {
+    const response = await fetch('https://my.kudisms.net/api/otp', {
       method: 'POST',
       body: formData
     });

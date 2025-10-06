@@ -21,6 +21,8 @@ const PaymentRequestsPage: React.FC = () => {
   const { isOpen: showActionModal, openModal: openActionModal, closeModal: closeActionModal } = useModal();
 
   const fetchPaymentRequests = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -31,7 +33,11 @@ const PaymentRequestsPage: React.FC = () => {
       params.append('sortBy', 'created_at');
       params.append('sortOrder', 'desc');
       
-      const response = await fetch(`/api/admin/payment-requests?${params.toString()}`);
+      const response = await fetch(`/api/admin/payment-requests?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -45,7 +51,7 @@ const PaymentRequestsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm, filterStatus, user?.id]);
 
   useEffect(() => {
     fetchPaymentRequests();

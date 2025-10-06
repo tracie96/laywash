@@ -103,13 +103,18 @@ const PaymentReportsPage: React.FC = () => {
       params.append('period', selectedPeriod);
       params.append('viewMode', viewMode);
       
-      // Add custom date range if period is custom
       if (selectedPeriod === 'custom') {
         params.append('startDate', customStartDate);
         params.append('endDate', customEndDate);
       }
       
-      const response = await fetch(`/api/admin/payment-reports?${params.toString()}`);
+      if (!user?.id) return;
+      
+      const response = await fetch(`/api/admin/payment-reports?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -124,7 +129,7 @@ const PaymentReportsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedPeriod, viewMode, customStartDate, customEndDate]);
+  }, [selectedPeriod, viewMode, customStartDate, customEndDate, user?.id]);
 
   useEffect(() => {
     fetchReports();

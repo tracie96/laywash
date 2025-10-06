@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,10 +11,50 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let adminLocation: string | null = null;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     // Fetch car washers from the car_washer_profiles table and join with users
-    const { data: washers, error } = await supabaseAdmin
+    // Filter by location using assigned_location field
+    let query = supabaseAdmin
       .from('car_washer_profiles')
       .select(`
         user_id,
@@ -38,6 +78,13 @@ export async function GET() {
       `)
       .eq('users.role', 'car_washer')
       .order('created_at', { ascending: false, referencedTable: 'users' });
+    
+    // Filter by location if not super admin and location is available
+    if (adminLocation) {
+      query = query.eq('assigned_location', adminLocation);
+    }
+
+    const { data: washers, error } = await query;
 
     if (error) {
       console.error('Error fetching washers:', error);
@@ -62,10 +109,17 @@ export async function GET() {
 
     // Fetch check-in statistics for each washer
     const washerIds = washers?.map(w => w.user_id) || [];
-    const { data: checkInStats } = await supabaseAdmin
+    let checkInStatsQuery = supabaseAdmin
       .from('car_check_ins')
       .select('assigned_washer_id, status, updated_at')
       .in('assigned_washer_id', washerIds);
+    
+    // Filter check-in stats by location (through assigned_admin_id)
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      checkInStatsQuery = checkInStatsQuery.in('assigned_admin_id', locationAdminIds);
+    }
+    
+    const { data: checkInStats } = await checkInStatsQuery;
 
     // Calculate stats for each washer
     const washerStats = new Map();

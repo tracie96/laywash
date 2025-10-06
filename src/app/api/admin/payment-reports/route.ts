@@ -13,6 +13,44 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function GET(request: NextRequest) {
   try {
+    // Get current admin user from request header (optional for super admins)
+    const currentAdminId = request.headers.get('X-Admin-ID');
+    
+    let isSuperAdmin = false;
+    let locationAdminIds: string[] | null = null;
+    
+    // If admin ID is provided, check if they're a super admin and get their location
+    if (currentAdminId) {
+      const { data: adminUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', currentAdminId)
+        .single();
+      
+      isSuperAdmin = adminUser?.role === 'super_admin';
+      
+      // Get admin's location if not super admin
+      if (!isSuperAdmin) {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('admin_profiles')
+          .select('location')
+          .eq('user_id', currentAdminId)
+          .single();
+        
+        const adminLocation = adminProfile?.location || null;
+        
+        // Get all admins at the same location
+        if (adminLocation) {
+          const { data: locationAdmins } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('user_id')
+            .eq('location', adminLocation);
+          
+          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get('reportType') || 'daily'; // daily, weekly, monthly
     const period = searchParams.get('period') || 'week'; // today, yesterday, week, month, quarter, custom
@@ -66,7 +104,7 @@ export async function GET(request: NextRequest) {
     }> = [];
     
     if (viewMode !== 'stock-sales-only') {
-      const { data: checkInsData, error: checkInsError } = await supabaseAdmin
+      let checkInsQuery = supabaseAdmin
         .from('car_check_ins')
         .select(`
           id,
@@ -79,6 +117,13 @@ export async function GET(request: NextRequest) {
         .gte('check_in_time', startDate.toISOString())
         .lte('check_in_time', endDate.toISOString())
         .order('check_in_time', { ascending: false });
+      
+      // Filter by location (through assigned_admin_id)
+      if (locationAdminIds && locationAdminIds.length > 0) {
+        checkInsQuery = checkInsQuery.in('assigned_admin_id', locationAdminIds);
+      }
+
+      const { data: checkInsData, error: checkInsError } = await checkInsQuery;
 
       if (checkInsError) {
         console.error('Error fetching check-ins for payment reports:', checkInsError);
@@ -110,7 +155,7 @@ export async function GET(request: NextRequest) {
     
     if (viewMode !== 'car-wash-only') {
       // Fetch actual stock sales from sales_transactions table
-      const { data: salesTransactions, error: salesError } = await supabaseAdmin
+      let salesQuery = supabaseAdmin
         .from('sales_transactions')
         .select(`
           id,
@@ -132,12 +177,17 @@ export async function GET(request: NextRequest) {
         .lte('created_at', endDate.toISOString())
         .eq('status', 'completed') // Only completed sales
         .order('created_at', { ascending: false });
+      
+      // Filter by location (through admin_id)
+      if (locationAdminIds && locationAdminIds.length > 0) {
+        salesQuery = salesQuery.in('admin_id', locationAdminIds);
+      }
+
+      const { data: salesTransactions, error: salesError } = await salesQuery;
 
       if (salesError) {
         console.error('Error fetching sales transactions for stock sales:', salesError);
-        // Continue without stock sales data rather than failing completely
       } else if (salesTransactions) {
-        // Transform the joined data to match our interface
         stockSales = salesTransactions.map(transaction => ({
           id: transaction.id,
           total_amount: transaction.total_amount,

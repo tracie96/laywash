@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { Modal } from '@/components/ui/modal';
+import { useAuth } from '@/context/AuthContext';
 
 interface Payment {
   id: string;
@@ -41,6 +42,7 @@ interface Payment {
 }
 
 const PaymentHistoryPage: React.FC = () => {
+  const { user } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,7 +82,13 @@ const PaymentHistoryPage: React.FC = () => {
       params.append('startDate', startDateStr);
       params.append('endDate', endDateStr);
       
-      const response = await fetch(`/api/admin/payments?${params.toString()}`);
+      if (!user?.id) return;
+      
+      const response = await fetch(`/api/admin/payments?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -94,7 +102,7 @@ const PaymentHistoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter]);
+  }, [searchTerm, filter, user?.id]);
 
   // Fetch payment data from API with debounce for search
   useEffect(() => {
