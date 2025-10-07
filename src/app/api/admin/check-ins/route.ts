@@ -568,6 +568,22 @@ export async function POST(request: NextRequest) {
     }
 
 
+    // Check if customer has a bonus
+    let customerHasBonus = false;
+    if (customerId) {
+      const { data: bonuses, error: bonusError } = await supabaseAdmin
+        .from('bonuses')
+        .select('id, status')
+        .eq('recipient_id', customerId)
+        .eq('type', 'customer')
+        .in('status', ['pending', 'approved']);
+      
+      if (!bonusError && bonuses && bonuses.length > 0) {
+        customerHasBonus = true;
+        console.log(`Customer ${customerId} has ${bonuses.length} active bonus(es)`);
+      }
+    }
+
     // Create service records for each check-in
     for (const { checkIn, service } of createdCheckIns) {
       // Fetch service details including commission percentages from services table
@@ -585,10 +601,15 @@ export async function POST(request: NextRequest) {
       let companyIncome = 0;
       let washerIncome = 0;
       
-      if (serviceDetails?.company_commission_percentage && service.serviceData.price) {
+      // If customer has bonus, company income should be 0
+      if (customerHasBonus) {
+        companyIncome = 0;
+        console.log(`Setting company income to 0 for check-in ${checkIn.id} due to customer bonus`);
+      } else if (serviceDetails?.company_commission_percentage && service.serviceData.price) {
         companyIncome = (service.serviceData.price * serviceDetails.company_commission_percentage) / 100;
       }
       
+      // Washer income is always calculated normally
       if (serviceDetails?.washer_commission_percentage && service.serviceData.price) {
         washerIncome = (service.serviceData.price * serviceDetails.washer_commission_percentage) / 100;
       }
@@ -614,7 +635,8 @@ export async function POST(request: NextRequest) {
 
       // Update the check-in with the calculated incomes
       const updateData: { company_income?: number; washer_income?: number } = {};
-      if (companyIncome > 0) {
+      // Always set company_income, even if it's 0 (for customers with bonus)
+      if (companyIncome >= 0) {
         updateData.company_income = companyIncome;
       }
       if (washerIncome > 0) {

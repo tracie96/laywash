@@ -68,7 +68,7 @@ const AdminPaymentRequestsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPaymentRequests();

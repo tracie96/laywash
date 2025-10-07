@@ -85,7 +85,7 @@ const OperationsCheckInsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchTerm, filter, paymentFilter]);
+  }, [debouncedSearchTerm, filter, paymentFilter,user?.id]);
 
   useEffect(() => {
     fetchCheckIns();

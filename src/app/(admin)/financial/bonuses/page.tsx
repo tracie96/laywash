@@ -29,11 +29,22 @@ interface Bonus {
 interface CreateBonusForm {
   type: 'customer' | 'washer';
   recipientId: string;
+  serviceId: string;
   amount: string;
   reason: string;
   description: string;
   locationId: string;
   milestone: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  companyCommissionPercentage: number;
+  isActive: boolean;
 }
 
 interface Customer {
@@ -57,12 +68,14 @@ const FinancialBonusesPage: React.FC = () => {
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateBonusForm>({
     type: 'customer',
     recipientId: '',
+    serviceId: '',
     amount: '',
     reason: '',
     description: '',
@@ -162,6 +175,7 @@ const FinancialBonusesPage: React.FC = () => {
     fetchBonuses();
     fetchCustomers();
     fetchWashers();
+    fetchServices();
   }, [fetchBonuses]);
 
   // Filter customers and washers when filters change
@@ -192,6 +206,37 @@ const FinancialBonusesPage: React.FC = () => {
       }
     } catch {
       console.error('Error fetching washers');
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/admin/services?status=active');
+      const data = await response.json();
+      if (data.success) {
+        setServices(data.services);
+      }
+    } catch {
+      console.error('Error fetching services');
+    }
+  };
+
+  const handleServiceSelect = (serviceId: string) => {
+    const selectedService = services.find(s => s.id === serviceId);
+    if (selectedService) {
+      // Calculate amount as service price * company commission percentage / 100
+      const calculatedAmount = (selectedService.price * selectedService.companyCommissionPercentage / 100).toFixed(2);
+      setCreateForm({
+        ...createForm,
+        serviceId,
+        amount: calculatedAmount
+      });
+    } else {
+      setCreateForm({
+        ...createForm,
+        serviceId: '',
+        amount: ''
+      });
     }
   };
 
@@ -258,6 +303,7 @@ const FinancialBonusesPage: React.FC = () => {
         setCreateForm({
           type: 'customer',
           recipientId: '',
+          serviceId: '',
           amount: '',
           reason: '',
           description: '',
@@ -721,7 +767,7 @@ const FinancialBonusesPage: React.FC = () => {
             <select
               value={createForm.type}
               onChange={(e) => {
-                setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer', recipientId: ''});
+                setCreateForm({...createForm, type: e.target.value as 'customer' | 'washer', recipientId: '', serviceId: '', amount: ''});
                 setRecipientSearch(''); // Clear search when type changes
               }}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
@@ -751,7 +797,7 @@ const FinancialBonusesPage: React.FC = () => {
             
             <select
               value={createForm.recipientId}
-              onChange={(e) => setCreateForm({...createForm, recipientId: e.target.value})}
+              onChange={(e) => setCreateForm({...createForm, recipientId: e.target.value, serviceId: '', amount: ''})}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Select recipient</option>
@@ -770,6 +816,30 @@ const FinancialBonusesPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Service Selection - Only show for customers when recipient is selected */}
+          {createForm.type === 'customer' && createForm.recipientId && (
+            <div>
+              <Label>Service <span className="text-error-500">*</span></Label>
+              <select
+                value={createForm.serviceId}
+                onChange={(e) => handleServiceSelect(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Select service</option>
+                {services.map(service => (
+                  <option key={service.id} value={service.id}>
+                    {service.name} - ₦{service.price.toFixed(2)} (Commission: {service.companyCommissionPercentage}% = ₦{(service.price * service.companyCommissionPercentage / 100).toFixed(2)})
+                  </option>
+                ))}
+              </select>
+              {createForm.serviceId && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Amount auto-calculated based on company commission percentage
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Amount */}
           <div>
             <Label>Amount (₦) <span className="text-error-500">*</span></Label>
@@ -780,7 +850,13 @@ const FinancialBonusesPage: React.FC = () => {
               placeholder="Enter bonus amount"
               value={createForm.amount}
               onChange={(e) => setCreateForm({...createForm, amount: e.target.value})}
+              disabled={createForm.type === 'customer' && createForm.serviceId !== ''}
             />
+            {createForm.type === 'customer' && createForm.serviceId && (
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Amount is auto-calculated from service selection. Clear service to manually enter amount.
+              </p>
+            )}
           </div>
 
           {/* Reason */}
