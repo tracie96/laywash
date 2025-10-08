@@ -144,9 +144,9 @@ const CashOutPage: React.FC = () => {
 
   // Get display reason for expense
   const getDisplayReason = (expense: Expense): string => {
-    if (expense.service_type === 'deposit_to_bank') {
-      return 'Add cash to the bank';
-    }
+    // if (expense.service_type === 'deposit_to_bank') {
+    //   return 'Add cash to the bank';
+    // }
     return expense.reason;
   };
 
