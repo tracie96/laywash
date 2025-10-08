@@ -14,13 +14,11 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 // GET - Fetch payment requests
 export async function GET(request: NextRequest) {
   try {
-    // Get current admin user from request header (optional for super admins)
     const currentAdminId = request.headers.get('X-Admin-ID');
     
     let isSuperAdmin = false;
-    let locationAdminIds: string[] | null = null;
+    let adminLocation: string | null = null;
     
-    // If admin ID is provided, check if they're a super admin and get their location
     if (currentAdminId) {
       const { data: adminUser } = await supabaseAdmin
         .from('users')
@@ -38,23 +36,12 @@ export async function GET(request: NextRequest) {
           .eq('user_id', currentAdminId)
           .single();
         
-        const adminLocation = adminProfile?.location || null;
-        
-        // Get all admins at the same location
-        if (adminLocation) {
-          const { data: locationAdmins } = await supabaseAdmin
-            .from('admin_profiles')
-            .select('user_id')
-            .eq('location', adminLocation);
-          
-          locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
-        }
+        adminLocation = adminProfile?.location || null;
       }
     }
 
     const { searchParams } = new URL(request.url);
     const washerId = searchParams.get('washerId');
-    const adminId = searchParams.get('adminId');
     const status = searchParams.get('status') || 'all';
     const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'created_at';
@@ -66,6 +53,7 @@ export async function GET(request: NextRequest) {
         *,
         washer:car_washer_profiles!payment_request_washer_id_fkey(
           user_id,
+          assigned_location,
           users!car_washer_profiles_user_id_fkey(
             id,
             name,
@@ -79,16 +67,6 @@ export async function GET(request: NextRequest) {
     // Filter by washer if specified
     if (washerId) {
       query = query.eq('washer_id', washerId);
-    }
-
-    // Filter by admin - use query param if provided, or location-based filtering
-    // Only filter if not super admin
-    if (adminId) {
-      // Specific admin filter from query param
-      query = query.eq('admin_id', adminId);
-    } else if (locationAdminIds && locationAdminIds.length > 0) {
-      // Location-based filtering
-      query = query.in('admin_id', locationAdminIds);
     }
 
     // Filter by status
@@ -106,7 +84,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform the data and apply search filter
+    // Transform the data and apply filters
     let transformedRequests = paymentRequests?.map(request => ({
       id: request.id,
       washer_id: request.washer_id,
@@ -125,9 +103,17 @@ export async function GET(request: NextRequest) {
         id: request.washer?.user_id,
         name: request.washer?.users?.name || 'Unknown',
         email: request.washer?.users?.email || 'Unknown',
-        phone: request.washer?.users?.phone || null
+        phone: request.washer?.users?.phone || null,
+        assigned_location: request.washer?.assigned_location
       }
     })) || [];
+
+    // Filter by washer's assigned location if admin has a location and is not super admin
+    if (!isSuperAdmin && adminLocation) {
+      transformedRequests = transformedRequests.filter(request => 
+        request.washer.assigned_location === adminLocation
+      );
+    }
 
     // Apply search filter if provided
     if (search) {
