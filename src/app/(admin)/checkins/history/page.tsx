@@ -228,10 +228,9 @@ const CheckInHistoryPage: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Create a Set of customer IDs who have active bonuses
         const customerIds = new Set<string>(
           data.bonuses
-            .filter((bonus: { status: string }) => bonus.status !== 'rejected')
+            .filter((bonus: { status: string }) => bonus.status !== 'paid')
             .map((bonus: { recipientId: string }) => bonus.recipientId)
         );
         setCustomerBonuses(customerIds);
