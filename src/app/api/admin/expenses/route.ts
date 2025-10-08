@@ -139,15 +139,15 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!serviceType || !amount || !reason) {
+    if (!serviceType || !amount || !reason || !adminId) {
       return NextResponse.json(
-        { success: false, error: 'Service type, amount, and reason are required' },
+        { success: false, error: 'Service type, amount, reason, and admin ID are required' },
         { status: 400 }
       );
     }
 
     // Validate service type
-    const validServiceTypes = ['checkin', 'salary', 'expenses', 'free_will', 'deposit_to_bank', 'other'];
+    const validServiceTypes = ['checkin', 'salary', 'sales', 'free_will', 'deposit_to_bank', 'other'];
     if (!validServiceTypes.includes(serviceType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid service type' },
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         amount: parseFloat(amount),
         reason,
         description: description || null,
-        admin_id: adminId || null,
+        admin_id: adminId,
         check_in_id: checkInId || null,
         location_id: locationId || null,
         expense_date: expenseDate || new Date().toISOString()

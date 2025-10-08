@@ -5,6 +5,7 @@ import Input from '@/components/form/input/InputField';
 import Label from '@/components/form/Label';
 import Button from '@/components/ui/button/Button';
 import { LocationSelect } from '@/components/ui/LocationSelect';
+import { useAuth } from '@/context/AuthContext';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onClose,
   onExpenseAdded
 }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     serviceType: 'other' as const,
     amount: '',
@@ -43,6 +45,11 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      setError('You must be logged in to add expenses');
+      return;
+    }
+
     if (!formData.amount || !formData.reason) {
       setError('Amount and reason are required');
       return;
@@ -67,6 +74,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           amount: parseFloat(formData.amount),
           reason: formData.reason,
           description: formData.description || null,
+          adminId: user.id,
           locationId: formData.locationId || null,
           expenseDate: new Date().toISOString()
         }),
