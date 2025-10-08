@@ -154,7 +154,7 @@ const CashOutPage: React.FC = () => {
   const getServiceTypeLabel = (serviceType: string): string => {
     const labels: Record<string, string> = {
       checkin: 'Free Car Wash',
-      expenses: 'Expenses',
+      sales: 'Expenses',
       deposit_to_bank: 'Bank Deposit',
       other: 'Other'
     };
@@ -486,6 +486,7 @@ const CashOutPage: React.FC = () => {
                           : expense.service_type === 'salary'
                           ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200'
                           : expense.service_type === 'checkin'
+                        
                           ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200'
                           : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                       }`}>

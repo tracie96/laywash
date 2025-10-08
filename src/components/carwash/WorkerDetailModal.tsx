@@ -59,6 +59,9 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
   const [worker, setWorker] = useState<Worker | null>(null);
   const [carWashHistory, setCarWashHistory] = useState<CarWashRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isEditingRevenue, setIsEditingRevenue] = useState(false);
+  const [editedRevenue, setEditedRevenue] = useState<string>('');
+  const [isSavingRevenue, setIsSavingRevenue] = useState(false);
 
   useEffect(() => {
     const loadWorkerData = async () => {
@@ -146,6 +149,62 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const handleEditRevenue = () => {
+    if (performanceStats) {
+      setEditedRevenue(performanceStats.totalRevenue.toFixed(2));
+      setIsEditingRevenue(true);
+    }
+  };
+
+  const handleCancelEditRevenue = () => {
+    setIsEditingRevenue(false);
+    setEditedRevenue('');
+  };
+
+  const handleSaveRevenue = async () => {
+    try {
+      setIsSavingRevenue(true);
+      const revenueValue = parseFloat(editedRevenue);
+      
+      if (isNaN(revenueValue) || revenueValue < 0) {
+        alert('Please enter a valid revenue amount');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/washers/${workerId}/revenue`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          totalRevenue: revenueValue
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update the worker's total earnings
+        if (worker) {
+          setWorker({
+            ...worker,
+            totalEarnings: revenueValue
+          });
+        }
+        setIsEditingRevenue(false);
+        setEditedRevenue('');
+        alert('Revenue updated successfully');
+      } else {
+        alert(data.error || 'Failed to update revenue');
+      }
+    } catch (error) {
+      console.error('Error updating revenue:', error);
+      alert('Failed to update revenue');
+    } finally {
+      setIsSavingRevenue(false);
+    }
   };
 
   if (isLoading) {
@@ -499,13 +558,56 @@ const WorkerDetailModal: React.FC<WorkerDetailModalProps> = ({
 
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Total Revenue
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ₦ {performanceStats.totalRevenue.toFixed(2)}
-                    </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Total Revenue
+                      </p>
+                      {!isEditingRevenue && (
+                        <button
+                          onClick={handleEditRevenue}
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          title="Edit revenue"
+                        >
+                          <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {isEditingRevenue ? (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedRevenue}
+                          onChange={(e) => setEditedRevenue(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-lg font-bold"
+                          placeholder="Enter revenue"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveRevenue}
+                            disabled={isSavingRevenue}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isSavingRevenue ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={handleCancelEditRevenue}
+                            disabled={isSavingRevenue}
+                            className="px-3 py-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-800 dark:text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        ₦ {performanceStats.totalRevenue.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
