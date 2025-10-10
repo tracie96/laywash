@@ -31,7 +31,9 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const serviceTypes = [
     { value: 'sales', label: 'Expenses' },
-    { value: 'deposit_to_bank', label: 'Bank Deposit' },
+    { value: 'deposit_to_bank_sales', label: 'Bank Deposit for Sales' },
+    { value: 'deposit_to_bank_carwash', label: 'Bank Deposit for Carwash' },
+
     { value: 'other', label: 'Other' }
   ];
 

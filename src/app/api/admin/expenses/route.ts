@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate service type
-    const validServiceTypes = ['checkin', 'salary', 'sales', 'free_will', 'deposit_to_bank', 'other'];
+    const validServiceTypes = ['checkin', 'salary', 'sales', 'free_will', 'deposit_to_bank_sales', 'deposit_to_bank_carwash', 'other'];
     if (!validServiceTypes.includes(serviceType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid service type' },

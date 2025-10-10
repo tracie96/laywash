@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Button from '@/components/ui/button/Button';
 import { useAuth } from '@/context/AuthContext';
 import AddExpenseModal from '@/components/admin/AddExpenseModal';
+import { Modal } from '@/components/ui/modal';
 
 interface Expense {
   id: string;
@@ -45,6 +46,12 @@ const CashOutPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  
+  // Delete modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   console.log(user);
   
   // Filters
@@ -130,6 +137,52 @@ const CashOutPage: React.FC = () => {
 
   const handleExpenseAdded = () => {
     fetchExpenses();
+  };
+
+  // Handle delete expense
+  const handleDeleteClick = (expense: Expense) => {
+    setExpenseToDelete(expense);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!expenseToDelete || !user?.id) return;
+
+    try {
+      setIsDeleting(true);
+
+      const response = await fetch(`/api/admin/expenses/${expenseToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-ID': user.id,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Remove the deleted expense from the list
+        setExpenses(prev => prev.filter(exp => exp.id !== expenseToDelete.id));
+        setIsDeleteModalOpen(false);
+        setExpenseToDelete(null);
+        
+        // Show success message
+        alert('Expense deleted successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to delete expense');
+      }
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      alert(`Failed to delete expense: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setIsDeleteModalOpen(false);
+    setExpenseToDelete(null);
   };
 
   // Calculate totals
@@ -346,7 +399,7 @@ const CashOutPage: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -354,7 +407,7 @@ const CashOutPage: React.FC = () => {
                 Total Expenses
               </p>
               <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                ₦ {totals.total.toFixed(2)}
+                ₦ {totals.total.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
@@ -372,7 +425,7 @@ const CashOutPage: React.FC = () => {
                 Bank Deposits
               </p>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                ₦ {(totals.byType.deposit_to_bank || 0).toFixed(2)}
+                ₦ {(totals.byType.deposit_to_bank || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -383,36 +436,20 @@ const CashOutPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Salaries
-              </p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                ₦ {(totals.byType.salary || 0).toFixed(2)}
-              </p>
-            </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
+      
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Records
+                Other Expenses
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {expenses.length}
+              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                ₦ {(totals.total - (totals.byType.salary || 0) - (totals.byType.deposit_to_bank || 0)).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
@@ -447,12 +484,15 @@ const CashOutPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Location
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -494,7 +534,7 @@ const CashOutPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-400">
-                      ₦ {expense.amount.toFixed(2)}
+                      ₦ {expense.amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                       {getDisplayReason(expense)}
@@ -502,6 +542,17 @@ const CashOutPage: React.FC = () => {
                   
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                       {expense.location?.address || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handleDeleteClick(expense)}
+                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                        title="Delete expense"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -517,6 +568,72 @@ const CashOutPage: React.FC = () => {
         onClose={() => setIsExpenseModalOpen(false)}
         onExpenseAdded={handleExpenseAdded}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={handleDeleteCancel}
+        className="max-w-md mx-4"
+      >
+        <div className="p-6">
+          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-center">
+            Delete Expense
+          </h3>
+          
+          <p className="text-gray-600 dark:text-gray-400 mb-4 text-center">
+            Are you sure you want to delete this expense? This action cannot be undone.
+          </p>
+          
+          {expenseToDelete && (
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Amount:</span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    ₦ {expenseToDelete.amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Type:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {getServiceTypeLabel(expenseToDelete.service_type)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Date:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {new Date(expenseToDelete.expense_date).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={handleDeleteCancel}
+              className="flex-1"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
