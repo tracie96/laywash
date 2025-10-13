@@ -335,7 +335,8 @@ const CashOutPage: React.FC = () => {
               <option value="all">All Types</option>
 
               <option value="expenses">Expenses</option>
-              <option value="deposit_to_bank">Bank Deposit</option>
+              <option value="deposit_to_bank_sales">Bank Deposit for Sales</option>
+              <option value="deposit_to_bank_carwash">Bank Deposit for Carwash</option>
               <option value="other">Other</option>
             </select>
           </div>

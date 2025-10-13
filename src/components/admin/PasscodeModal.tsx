@@ -24,7 +24,6 @@ const PasscodeModal: React.FC<PasscodeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setPasscode('');
-      // Focus input when modal opens
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);

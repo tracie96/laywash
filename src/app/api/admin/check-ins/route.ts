@@ -540,7 +540,7 @@ export async function POST(request: NextRequest) {
         assigned_admin_id: currentAdminId,
         estimated_completion_time: new Date(Date.now() + (serviceDuration * 60 * 1000)).toISOString(),
         total_amount: serviceAmount,
-        user_code: userCode,
+        user_code: userCode || null,
         passcode: securityCode,
         reason,
         status: 'pending',

@@ -459,7 +459,7 @@ const NewCheckInPage: React.FC = () => {
     }
 
     if (formData.washType === 'delayed') {
-      if (!formData.securityCode.trim() || !formData.userCode.trim()) {
+      if (!formData.securityCode.trim() ) {
         setError('Security code and user code are required for delayed wash customers');
         setIsSubmitting(false);
         return;
@@ -1182,7 +1182,7 @@ const NewCheckInPage: React.FC = () => {
           {/* Security Codes - Only for Delayed Wash */}
           {formData.washType === 'delayed' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                 <FormField label="Security Code" required>
                   <InputField
                     type="text"
@@ -1191,14 +1191,14 @@ const NewCheckInPage: React.FC = () => {
                     placeholder="Enter security code"
                   />
                 </FormField>
-                <FormField label="Key Code" required>
+                {/* <FormField label="Key Code" required>
                   <InputField
                     type="text"
                     value={formData.userCode}
                     onChange={(e) => handleInputChange('userCode', e.target.value)}
                     placeholder="Enter user code"
                   />
-                </FormField>
+                </FormField> */}
               </div>
               
               <FormField label="Check-in Process Details" required>
