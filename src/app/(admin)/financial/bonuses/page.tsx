@@ -94,6 +94,7 @@ const FinancialBonusesPage: React.FC = () => {
   const [filteredWashers, setFilteredWashers] = useState<Washer[]>([]);
   
   const { user } = useAuth();
+  const { hasRole } = useAuth();
 
   const fetchBonuses = useCallback(async () => {
     try {
@@ -500,6 +501,7 @@ const FinancialBonusesPage: React.FC = () => {
               <option value="rejected">Rejected</option>
             </select>
           </div>
+          {hasRole('super_admin') &&  (
 
           <button
             onClick={() => setShowCreateModal(true)}
@@ -507,7 +509,7 @@ const FinancialBonusesPage: React.FC = () => {
           >
             <PlusIcon className="w-4 h-4 mr-2" />
             Create Bonus
-          </button>
+          </button>)}
         </div>
       </div>
 
