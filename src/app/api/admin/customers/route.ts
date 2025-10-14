@@ -37,6 +37,16 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
+/**
+ * GET /api/admin/customers
+ * 
+ * Location-Based Access Control:
+ * - Super admins: Can see ALL customers
+ * - Location admins: Can only see customers assigned to admins at their location
+ *   1. Get the current admin's location
+ *   2. Find all admins at the same location
+ *   3. Filter customers where assigned_admin_id is in that location's admin list
+ */
 export async function GET(request: NextRequest) {
   try {
     // Get current admin user from request header (optional for super admins)
@@ -79,28 +89,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const limit = parseInt(searchParams.get('limit') || '10000'); // Increased limit to fetch all customers
-
-    // Get customer IDs from check-ins if filtering by location
-    let customerIds: string[] | null = null;
-    if (locationAdminIds && locationAdminIds.length > 0) {
-      const { data: adminCheckIns } = await supabaseAdmin
-        .from('car_check_ins')
-        .select('customer_id')
-        .in('assigned_admin_id', locationAdminIds)
-        .not('customer_id', 'is', null);
-      
-      if (adminCheckIns && adminCheckIns.length > 0) {
-        // Get unique customer IDs
-        customerIds = [...new Set(adminCheckIns.map(ci => ci.customer_id).filter(Boolean) as string[])];
-      } else {
-        // Location has no check-ins, return empty list
-        return NextResponse.json({
-          success: true,
-          customers: []
-        });
-      }
-    }
+    const limit = parseInt(searchParams.get('limit') || '10000');
 
     // Build the base query
     let query = supabaseAdmin
@@ -122,19 +111,16 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
       .limit(limit);
 
-    // Filter by customer IDs if admin is not super admin
-    if (customerIds) {
-      query = query.in('id', customerIds);
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      query = query.in('assigned_admin_id', locationAdminIds);
     }
 
-    // Apply search filter
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
     }
 
     const { data: customers, error } = await query;
 
-    // If we have a search term, also search for customers by vehicle license plates
     let customersByVehicle: CustomerWithVehicles[] = [];
     if (search) {
       const { data: vehicles, error: vehicleError } = await supabaseAdmin
@@ -143,15 +129,10 @@ export async function GET(request: NextRequest) {
         .ilike('license_plate', `%${search}%`);
       
       if (!vehicleError && vehicles && vehicles.length > 0) {
-        let vehicleCustomerIds = vehicles.map(v => v.customer_id).filter(Boolean);
-        
-        // If filtering by admin, only include customers that belong to this admin
-        if (customerIds) {
-          vehicleCustomerIds = vehicleCustomerIds.filter(id => customerIds.includes(id as string));
-        }
+        const vehicleCustomerIds = vehicles.map(v => v.customer_id).filter(Boolean);
         
         if (vehicleCustomerIds.length > 0) {
-          const { data: customersByVehicleData, error: customersByVehicleError } = await supabaseAdmin
+          let vehicleQuery = supabaseAdmin
             .from('customers')
             .select(`
               *,
@@ -170,6 +151,13 @@ export async function GET(request: NextRequest) {
             .in('id', vehicleCustomerIds)
             .order('name', { ascending: true })
             .limit(limit);
+          
+          // Also filter by location for vehicle search results
+          if (locationAdminIds && locationAdminIds.length > 0) {
+            vehicleQuery = vehicleQuery.in('assigned_admin_id', locationAdminIds);
+          }
+          
+          const { data: customersByVehicleData, error: customersByVehicleError } = await vehicleQuery;
           
           if (!customersByVehicleError) {
             customersByVehicle = customersByVehicleData || [];
@@ -193,7 +181,6 @@ export async function GET(request: NextRequest) {
     );
 
     // Fetch all check-ins and match them to customers in memory
-    // This is more efficient than using .in() with potentially thousands of customer IDs
     let checkInStatsQuery = supabaseAdmin
       .from('car_check_ins')
       .select('customer_id, total_amount, status, actual_completion_time, payment_status')

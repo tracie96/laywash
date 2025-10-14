@@ -128,7 +128,7 @@ const OperationsCustomersPage: React.FC = () => {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
       if (filterType !== 'all') params.append('filter', filterType);
-      params.append('limit', '10000'); // Request all customers
+      params.append('limit', '10000'); 
       
       const response = await fetch(`/api/admin/customers?${params.toString()}`, {
         headers: {
@@ -483,7 +483,7 @@ const OperationsCustomersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageBreadCrumb pageTitle="Customer Database" />
+      <PageBreadCrumb pageTitle="Customer Databsase" />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
