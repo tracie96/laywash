@@ -97,8 +97,10 @@ export async function GET(request: NextRequest) {
 
       return {
         id: checkIn.id,
-        customerName: checkIn.customers?.[0]?.name || 'Walk-in Customer',
-        customerPhone: checkIn.customers?.[0]?.phone || 'N/A',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        customerName: (checkIn.customers as any)?.name || 'Walk-in Customer',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        customerPhone: (checkIn.customers as any)?.phone || 'N/A',
         licensePlate: checkIn.license_plate,
         vehicleType: checkIn.vehicle_type,
         vehicleColor: checkIn.vehicle_color,
@@ -112,7 +114,8 @@ export async function GET(request: NextRequest) {
         specialInstructions: checkIn.remarks,
         paymentStatus: checkIn.payment_status,
         paymentMethod: checkIn.payment_method,
-        customerId: checkIn.customers?.[0]?.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        customerId: (checkIn.customers as any)?.id,
         createdAt: checkIn.created_at,
         updatedAt: checkIn.updated_at,
         washType: checkIn.wash_type || 'instant'

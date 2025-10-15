@@ -362,7 +362,6 @@ export async function GET(request: NextRequest) {
 
       checkIns = queryResults || [];
     }
-
     // Transform the data to match the frontend interface
     const transformedCheckIns = checkIns?.map(checkIn => ({
       id: checkIn.id,

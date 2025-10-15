@@ -149,7 +149,7 @@ const CheckInHistoryPage: React.FC = () => {
     try {
       const searchParams = new URLSearchParams({
         status: 'all',
-        limit: '100',
+        limit: '1000000',
         sortBy: 'check_in_time',
         sortOrder: 'desc'
       });

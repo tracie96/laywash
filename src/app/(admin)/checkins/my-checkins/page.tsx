@@ -35,6 +35,7 @@ const MyCheckInsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // Separate state for input value
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
   const [assignMaterialsModalOpen, setAssignMaterialsModalOpen] = useState(false);
   const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
@@ -151,6 +152,16 @@ const MyCheckInsPage: React.FC = () => {
       console.error('Error fetching check-in materials:', err);
     }
   }, [user?.id]);
+
+  const handleSearch = () => {
+    setSearchQuery(searchInput);
+  };
+
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   useEffect(() => {
     fetchMyCheckIns();
@@ -329,14 +340,21 @@ const MyCheckInsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
-          <div className="flex-1">
+          <div className="flex-1 flex gap-2">
             <input
               type="text"
               placeholder="Search by customer name, license plate, or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
+            <Button
+              onClick={handleSearch}
+              className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
+            >
+              Search
+            </Button>
           </div>
           
           {/* Status Filter */}

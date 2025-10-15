@@ -135,7 +135,8 @@ export async function GET(
       specialInstructions: checkIn.remarks,
       valuableItems: checkIn.valuable_items,
       washType: checkIn.wash_type || 'instant',
-      assignedWasher: checkIn.assigned_washer?.[0]?.name || 'Unassigned',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+assignedWasher: (checkIn.assigned_washer as any)?.name || 'Unassigned',
       services: checkIn.check_in_services?.map(cis => ({
         id: cis.id,
         name: cis.service_name,

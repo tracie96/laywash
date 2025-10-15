@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
       
       isSuperAdmin = adminUser?.role === 'super_admin';
       
-      // Get admin's location if not super admin
       if (!isSuperAdmin) {
         const { data: adminProfile } = await supabaseAdmin
           .from('admin_profiles')
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest) {
         
         const adminLocation = adminProfile?.location || null;
         
-        // Get all admins at the same location
         if (adminLocation) {
           const { data: locationAdmins } = await supabaseAdmin
             .from('admin_profiles')
@@ -91,7 +89,6 @@ export async function GET(request: NextRequest) {
       `)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
-    // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
       query = query.in('assigned_admin_id', locationAdminIds);
     }
@@ -101,10 +98,19 @@ export async function GET(request: NextRequest) {
       query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%,license_plate.ilike.%${search}%`);
     }
 
-    // Apply status filter - map to payment_status like check-ins API
+    // Apply status filter
     if (status !== 'all') {
-      const paymentStatus = status === 'completed' ? 'paid' : status;
-      query = query.eq('payment_status', paymentStatus);
+      if (status === 'cancelled') {
+        // Filter by status column for cancelled
+        query = query.eq('status', 'cancelled');
+      } else if (status === 'pending') {
+        // For pending, only show where payment_status is pending (excludes cancelled)
+        query = query.eq('payment_status', 'pending').neq('status', 'cancelled');
+      } else {
+        // Filter by payment_status for completed
+        const paymentStatus = status === 'completed' ? 'paid' : status;
+        query = query.eq('payment_status', paymentStatus);
+      }
     }
 
     // Apply payment method filter
@@ -143,7 +149,7 @@ export async function GET(request: NextRequest) {
         amount: checkIn.total_amount || 0, // Use total_amount like check-in history
         totalPrice: checkIn.total_amount || 0, // Add totalPrice field for consistency
         date: checkIn.check_in_time,
-        status: checkIn.status === 'cancelled' ? 'cancelled' : (checkIn.payment_status === 'paid' ? 'completed' : 'pending'),
+        status: checkIn.status === 'cancelled' ? 'cancelled' : checkIn.payment_status === 'paid' ? 'completed' : 'pending',
         paymentMethod: checkIn.payment_method || 'Not specified',
         paymentStatus: checkIn.payment_status, // Add paymentStatus field
         serviceType: serviceType,
