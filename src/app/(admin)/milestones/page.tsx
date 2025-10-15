@@ -4,6 +4,7 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
+import { Modal } from "@/components/ui/modal";
 
 interface Milestone {
   id: string;
@@ -31,7 +32,8 @@ const MilestonesPage: React.FC = () => {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'visits' | 'spending' | 'custom'>('all');
   const [isCheckingMilestones, setIsCheckingMilestones] = useState(false);
@@ -84,6 +86,42 @@ const MilestonesPage: React.FC = () => {
 
       if (data.success) {
         await fetchMilestones();
+      } else {
+        alert(`Failed to update milestone: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error updating milestone:', err);
+      alert('Failed to update milestone. Please try again.');
+    }
+  };
+
+  const handleEditMilestone = (milestone: Milestone) => {
+    setEditingMilestone(milestone);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMilestone) return;
+
+    try {
+      const response = await fetch(`/api/admin/milestones/${editingMilestone.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editingMilestone.name,
+          description: editingMilestone.description,
+          isActive: editingMilestone.isActive,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        await fetchMilestones();
+        setShowEditModal(false);
+        setEditingMilestone(null);
       } else {
         alert(`Failed to update milestone: ${data.error || 'Unknown error'}`);
       }
@@ -461,6 +499,12 @@ const MilestonesPage: React.FC = () => {
                         >
                           Delete
                         </button>
+                        <button 
+                          onClick={() => handleEditMilestone(milestone)}
+                          className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
+                        >
+                          Edit
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -470,6 +514,92 @@ const MilestonesPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingMilestone(null);
+        }}
+        className="max-w-2xl"
+      >
+        {editingMilestone && (
+          <>
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Edit Milestone
+              </h2>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={editingMilestone.name}
+                  onChange={(e) => setEditingMilestone({ ...editingMilestone, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-light-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={editingMilestone.description}
+                  onChange={(e) => setEditingMilestone({ ...editingMilestone, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-light-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={editingMilestone.isActive}
+                  onChange={(e) => setEditingMilestone({ ...editingMilestone, isActive: e.target.checked })}
+                  className="h-4 w-4 text-green-light-600 focus:ring-green-light-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                  Active
+                </label>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <strong>Type:</strong> {editingMilestone.type}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  <strong>Condition:</strong> {formatCondition(editingMilestone)}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  <strong>Reward:</strong> {formatReward(editingMilestone.reward)}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingMilestone(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

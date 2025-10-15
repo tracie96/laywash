@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import SuperAdminDashboard from '../../../components/carwash/dashboards/SuperAdminDashboard';
+// import SuperAdminDashboard from '../../../components/carwash/dashboards/SuperAdminDashboard';
 import AdminDashboard from '../../../components/carwash/dashboards/AdminDashboard';
 import CarWasherDashboard from '../../../components/carwash/dashboards/CarWasherDashboard';
 
@@ -20,12 +20,12 @@ const DashboardPage: React.FC = () => {
   }
 
   if (!isAuthenticated || !user) {
-    return null; // Will be handled by layout redirect
+    return null; 
   }
 
   return (
     <div className="p-6">
-      {user.role === 'super_admin' && <SuperAdminDashboard />}
+      {user.role === 'super_admin' && <AdminDashboard />}
       {user.role === 'admin' && <AdminDashboard />}
       {user.role === 'car_washer' && <CarWasherDashboard />}
     </div>
