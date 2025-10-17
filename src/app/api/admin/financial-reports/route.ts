@@ -36,13 +36,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '6'; // Default to last 6 months
     const location = searchParams.get('location'); // Optional location filter
-console.log('period', period);
     const now = new Date();
     const startDate = new Date();
     
-    // Fix period calculation - "1" should mean current month, not previous month
     if (period === '1') {
-      // Current month - start from first day of current month
       startDate.setFullYear(now.getFullYear(), now.getMonth(), 1);
       startDate.setHours(0, 0, 0, 0);
     } else {
@@ -501,8 +498,17 @@ console.log('period', period);
         case 'sales':
           // Free sales - revenue loss
           break;
+        case 'expenses':
+          // General expenses
+          break;
         case 'free_will':
           // Voluntary expenses
+          break;
+        case 'deposit_to_bank_carwash':
+          monthData.bankDeposits += amount;
+          break;
+        case 'deposit_to_bank_sales':
+          monthData.bankDeposits += amount;
           break;
         case 'deposit_to_bank':
           monthData.bankDeposits += amount;

@@ -93,11 +93,6 @@ export async function GET(request: NextRequest) {
       query = query.in('assigned_admin_id', locationAdminIds);
     }
 
-    // Apply search filter - use same logic as check-ins API
-    if (search) {
-      query = query.or(`customers.name.ilike.%${search}%,customers.phone.ilike.%${search}%,license_plate.ilike.%${search}%`);
-    }
-
     // Apply status filter
     if (status !== 'all') {
       if (status === 'cancelled') {
@@ -126,7 +121,7 @@ export async function GET(request: NextRequest) {
       query = query.lte('check_in_time', endDate);
     }
 
-    const { data: checkIns, error } = await query;
+    const { data: allCheckIns, error } = await query;
 
     if (error) {
       console.error('Fetch payments error:', error);
@@ -134,6 +129,21 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Failed to fetch payments' },
         { status: 500 }
       );
+    }
+
+    // Filter the results in JavaScript based on search criteria
+    let checkIns = allCheckIns || [];
+    if (search) {
+      const searchLower = search.toLowerCase();
+      checkIns = checkIns.filter(checkIn => {
+        const customerName = checkIn.customers?.name || '';
+        const customerPhone = checkIn.customers?.phone || '';
+        const licensePlate = checkIn.license_plate || '';
+        
+        return customerName.toLowerCase().includes(searchLower) ||
+               customerPhone.toLowerCase().includes(searchLower) ||
+               licensePlate.toLowerCase().includes(searchLower);
+      });
     }
 
     // Transform the data to match the frontend interface
