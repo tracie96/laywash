@@ -72,6 +72,27 @@ export async function PATCH(
       );
     }
 
+    // Calculate actual visits from check-ins
+    const { data: checkIns } = await supabaseAdmin
+      .from('car_check_ins')
+      .select('check_in_time, total_amount, status, payment_status')
+      .eq('customer_id', achievement.customer_id);
+
+    // Count unique days for total visits (same logic as customers route)
+    const uniqueDays = new Set<string>();
+    checkIns?.forEach(ci => {
+      // Only count paid check-ins for total visits (same as customers route)
+      if (ci.check_in_time && ci.payment_status === 'paid') {
+        // Extract date without timezone conversion (same as customers route)
+        const checkInDate = ci.check_in_time.split('T')[0];
+        uniqueDays.add(checkInDate);
+      }
+    });
+    const actualVisits = uniqueDays.size;
+    
+    // Calculate total spent from completed check-ins (same logic as customers route)
+    const actualSpent = checkIns?.filter(ci => ci.status === 'completed' && ci.total_amount).reduce((sum, ci) => sum + (ci.total_amount || 0), 0) || 0;
+
     // Transform the data
     const transformedAchievement = {
       id: achievement.id,
@@ -82,8 +103,8 @@ export async function PATCH(
         email: achievement.customer?.email,
         phone: achievement.customer?.phone,
         licensePlate: achievement.customer?.license_plate,
-        totalVisits: achievement.customer?.total_visits,
-        totalSpent: parseFloat(achievement.customer?.total_spent || '0')
+        totalVisits: actualVisits,
+        totalSpent: actualSpent
       },
       milestoneId: achievement.milestone_id,
       milestone: {
@@ -164,6 +185,27 @@ export async function GET(
       );
     }
 
+    // Calculate actual visits from check-ins
+    const { data: checkIns } = await supabaseAdmin
+      .from('car_check_ins')
+      .select('check_in_time, total_amount, status, payment_status')
+      .eq('customer_id', achievement.customer_id);
+
+    // Count unique days for total visits (same logic as customers route)
+    const uniqueDays = new Set<string>();
+    checkIns?.forEach(ci => {
+      // Only count paid check-ins for total visits (same as customers route)
+      if (ci.check_in_time && ci.payment_status === 'paid') {
+        // Extract date without timezone conversion (same as customers route)
+        const checkInDate = ci.check_in_time.split('T')[0];
+        uniqueDays.add(checkInDate);
+      }
+    });
+    const actualVisits = uniqueDays.size;
+    
+    // Calculate total spent from completed check-ins (same logic as customers route)
+    const actualSpent = checkIns?.filter(ci => ci.status === 'completed' && ci.total_amount).reduce((sum, ci) => sum + (ci.total_amount || 0), 0) || 0;
+
     // Transform the data
     const transformedAchievement = {
       id: achievement.id,
@@ -174,8 +216,8 @@ export async function GET(
         email: achievement.customer?.email,
         phone: achievement.customer?.phone,
         licensePlate: achievement.customer?.license_plate,
-        totalVisits: achievement.customer?.total_visits,
-        totalSpent: parseFloat(achievement.customer?.total_spent || '0')
+        totalVisits: actualVisits,
+        totalSpent: actualSpent
       },
       milestoneId: achievement.milestone_id,
       milestone: {

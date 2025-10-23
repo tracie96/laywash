@@ -128,7 +128,7 @@ const ToolsManagementPage: React.FC = () => {
     }
   };
 
-  const handleToolAction = async (toolId: string, action: 'toggle' | 'delete' | 'update') => {
+  const handleToolAction = async (toolId: string, action: 'toggle' | 'delete' | 'update' | 'updateCost') => {
     try {
       if (action === 'delete') {
         const response = await fetch(`/api/admin/tools/${toolId}`, {
@@ -197,6 +197,36 @@ const ToolsManagementPage: React.FC = () => {
             }
           } else {
             setError('Please enter a valid amount (0 or greater)');
+          }
+        }
+      } else if (action === 'updateCost') {
+        const currentTool = tools.find(t => t.id === toolId);
+        if (!currentTool) return;
+
+        const promptMessage = `Tool: ${currentTool.name}\nCurrent Replacement Cost: ₦${currentTool.replacementCost.toFixed(2)}\n\nEnter new replacement cost:`;
+        const newCost = prompt(promptMessage, currentTool.replacementCost.toString());
+        if (newCost !== null) {
+          const cost = parseFloat(newCost);
+          if (!isNaN(cost) && cost >= 0) {
+            const response = await fetch(`/api/admin/tools/${toolId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                replacementCost: cost
+              }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              fetchTools(); // Refresh the list
+            } else {
+              setError(data.error || 'Failed to update replacement cost');
+            }
+          } else {
+            setError('Please enter a valid replacement cost (0 or greater)');
           }
         }
       }
@@ -547,7 +577,14 @@ const ToolsManagementPage: React.FC = () => {
                           variant="outline"
                           onClick={() => handleToolAction(tool.id, 'update')}
                         >
-                          Update
+                          Update Amount
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToolAction(tool.id, 'updateCost')}
+                        >
+                          Update Cost
                         </Button>
                         <Button
                           size="sm"
@@ -656,7 +693,7 @@ const ToolsManagementPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Amount
+                    Quantity
                   </label>
                   <input
                     type="number"
@@ -699,6 +736,7 @@ const ToolsManagementPage: React.FC = () => {
                   {submitting ? 'Creating...' : 'Create Tool'}
                 </button>
               </div>
+            
             </form>
        
       </Modal>

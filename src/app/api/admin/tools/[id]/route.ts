@@ -132,13 +132,63 @@ export async function DELETE(
   try {
     const { id } = await params;
     console.log('Deleting tool with ID:', id);
-    // For now, return success with mock data
-    // In a real implementation, you would delete from the tools table
-    // and check for dependencies before deletion
+
+    // First, check if the tool exists
+    const { data: existingTool, error: fetchError } = await supabaseAdmin
+      .from('worker_tools')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingTool) {
+      return NextResponse.json(
+        { success: false, error: 'Tool not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check for dependencies - tools assigned to washers
+    const { data: assignedTools, error: dependencyError } = await supabaseAdmin
+      .from('washer_tools')
+      .select('id, tool_name')
+      .eq('tool_name', existingTool.name);
+
+    if (dependencyError) {
+      console.error('Error checking tool dependencies:', dependencyError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to check tool dependencies' },
+        { status: 500 }
+      );
+    }
+
+    // If tool is assigned to washers, prevent deletion
+    if (assignedTools && assignedTools.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Cannot delete tool "${existingTool.name}" because it is currently assigned to ${assignedTools.length} washer(s). Please return all assigned tools before deleting.` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete the tool from worker_tools table
+    const { error: deleteError } = await supabaseAdmin
+      .from('worker_tools')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Error deleting tool:', deleteError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete tool' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Tool deleted successfully'
+      message: `Tool "${existingTool.name}" deleted successfully`
     });
 
   } catch (error) {

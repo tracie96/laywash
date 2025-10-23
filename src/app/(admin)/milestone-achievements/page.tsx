@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
 import { Modal } from "@/components/ui/modal";
+import { useAuth } from "@/context/AuthContext";
 
 interface CustomerMilestoneAchievement {
   id: string;
@@ -55,6 +56,7 @@ interface QualifyingCustomer {
 }
 
 const MilestoneAchievementsPage: React.FC = () => {
+  const { user } = useAuth();
   const [achievements, setAchievements] = useState<CustomerMilestoneAchievement[]>([]);
   const [qualifyingCustomers, setQualifyingCustomers] = useState<QualifyingCustomer[]>([]);
   const [currentMilestone, setCurrentMilestone] = useState<{
@@ -100,6 +102,8 @@ const MilestoneAchievementsPage: React.FC = () => {
   const milestoneId = searchParams.get('milestoneId');
 
   const fetchAchievements = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -112,7 +116,11 @@ const MilestoneAchievementsPage: React.FC = () => {
         params.append('milestoneId', milestoneId);
       }
 
-      const response = await fetch(`/api/admin/milestone-achievements?${params.toString()}`);
+      const response = await fetch(`/api/admin/milestone-achievements?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -126,10 +134,10 @@ const MilestoneAchievementsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedFilter, milestoneId]);
+  }, [selectedFilter, milestoneId, user?.id]);
 
   const fetchQualifyingCustomers = useCallback(async () => {
-    if (!milestoneId) return;
+    if (!milestoneId || !user?.id) return;
     
     try {
       setLoading(true);
@@ -143,6 +151,7 @@ const MilestoneAchievementsPage: React.FC = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user.id,
         },
         body: JSON.stringify({ milestoneId }),
         signal: controller.signal
@@ -169,7 +178,7 @@ const MilestoneAchievementsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [milestoneId]);
+  }, [milestoneId, user?.id]);
 
   // Fetch bonuses to check which customers already have bonuses
   const fetchBonuses = useCallback(async () => {
