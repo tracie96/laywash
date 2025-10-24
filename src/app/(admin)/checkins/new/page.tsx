@@ -968,9 +968,7 @@ const NewCheckInPage: React.FC = () => {
                               Materials can be assigned here or handled by workers during the service
                             </p>
                             {/* Debug info */}
-                            <div className="text-xs text-gray-500 mb-2">
-                              Debug: Worker ID: {selectedService.workerId}, Materials Count: {serviceMaterials[service.id]?.length || 0}
-                            </div>
+                           
                             {!serviceMaterials[service.id] ? (
                               <div className="text-center py-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Loading materials...</p>

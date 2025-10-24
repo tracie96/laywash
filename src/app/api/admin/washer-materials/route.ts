@@ -51,23 +51,52 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    console.log({tools});
-    const transformedTools = tools?.map(tool => ({
-      id: tool.id,
-      washerId: tool.washer_id,
-      washer: tool.washer,
-      toolName: tool.tool_name,
-      toolType: tool.tool_type,
-      quantity: tool.quantity,
-      returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
-      price: tool.amount, // Changed from amount to price
-      assignedDate: tool.assigned_date,
-      returnedDate: tool.returned_date,
-      isReturned: tool.is_returned,
-      notes: tool.notes,
-      createdAt: tool.created_at,
-      updatedAt: tool.updated_at
-    })) || [];
+
+    // Get used quantities from check_in_materials for all tools
+    const toolNames = tools?.map(tool => tool.tool_name) || [];
+    const usedQuantities: Record<string, number> = {};
+
+    if (toolNames.length > 0) {
+      const { data: usedMaterials, error: usedError } = await supabaseAdmin
+        .from('check_in_materials')
+        .select('material_name, quantity_used, washer_id')
+        .in('material_name', toolNames);
+
+      if (!usedError && usedMaterials) {
+        // Calculate total used quantity for each tool by washer
+        usedMaterials.forEach(used => {
+          const key = `${used.material_name}_${used.washer_id}`;
+          usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
+        });
+      }
+    }
+
+    console.log({tools, usedQuantities});
+    const transformedTools = tools?.map(tool => {
+      // Calculate available quantity: assigned quantity - used quantity
+      const usedKey = `${tool.tool_name}_${tool.washer_id}`;
+      const usedQuantity = usedQuantities[usedKey] || 0;
+      const availableQuantity = Math.max(0, tool.quantity - usedQuantity);
+
+      return {
+        id: tool.id,
+        washerId: tool.washer_id,
+        washer: tool.washer,
+        toolName: tool.tool_name,
+        toolType: tool.tool_type,
+        quantity: availableQuantity, // Show available quantity instead of assigned quantity
+        assignedQuantity: tool.quantity, // Keep original assigned quantity
+        usedQuantity: usedQuantity, // Show how much has been used
+        returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
+        price: tool.amount, // Changed from amount to price
+        assignedDate: tool.assigned_date,
+        returnedDate: tool.returned_date,
+        isReturned: tool.is_returned,
+        notes: tool.notes,
+        createdAt: tool.created_at,
+        updatedAt: tool.updated_at
+      };
+    }) || [];
 
     return NextResponse.json({
       success: true,
