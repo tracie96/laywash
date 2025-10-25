@@ -51,14 +51,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get current date in Nigeria time (UTC+1) - simple approach
+    // Get current date in Nigeria time - more explicit approach
     const now = new Date();
-    const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
-    const today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
+    
+    // Method 1: UTC+1 calculation
+    const utcPlus1 = new Date(now.getTime() + (1 * 60 * 60 * 1000));
+    const todayUTC = new Date(utcPlus1.getFullYear(), utcPlus1.getMonth(), utcPlus1.getDate());
+    
+    // Method 2: Server time with explicit offset
+    const serverOffset = now.getTimezoneOffset(); // minutes
+    const nigeriaOffset = -60; // Nigeria is UTC+1 (60 minutes ahead)
+    const offsetDiff = nigeriaOffset - serverOffset;
+    const nigeriaTime = new Date(now.getTime() + (offsetDiff * 60 * 1000));
+    const todayServer = new Date(nigeriaTime.getFullYear(), nigeriaTime.getMonth(), nigeriaTime.getDate());
+    
+    // Use the more reliable method
+    const today = todayUTC;
     
     // Calculate date ranges
     const startOfDay = new Date(today);
     const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
+    
+    // Enhanced debug logging
+    console.log('Date calculation comparison:', {
+      serverTime: now.toISOString(),
+      serverTimezone: now.getTimezoneOffset(),
+      utcPlus1: utcPlus1.toISOString(),
+      nigeriaTime: nigeriaTime.toISOString(),
+      todayUTC: todayUTC.toISOString(),
+      todayServer: todayServer.toISOString(),
+      finalToday: today.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString()
+    });
     
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
@@ -97,12 +122,96 @@ export async function GET(request: NextRequest) {
       checkInsQuery = checkInsQuery.in('assigned_admin_id', locationAdminIds);
     }
 
-    const { data: checkInsData, error: checkInsError } = await checkInsQuery;
+    const result = await checkInsQuery;
+    let checkInsData = result.data;
+    const checkInsError = result.error;
 
     if (checkInsError) {
       console.error('Error fetching check-ins for income calculation:', checkInsError);
-    } else if (checkInsData) {
+    } else {
+      console.log('Daily check-ins query result:', {
+        count: checkInsData?.length || 0,
+        data: checkInsData?.map(ci => ({
+          id: ci.id,
+          check_in_time: ci.check_in_time,
+          company_income: ci.company_income,
+          payment_status: ci.payment_status
+        })) || []
+      });
+    }
 
+    // If no daily data found, try alternative date calculation
+    if (!checkInsData || checkInsData.length === 0) {
+      console.log('No daily check-ins found with UTC+1, trying alternative calculation...');
+      
+      // Try with server-based calculation
+      const altStartOfDay = new Date(todayServer);
+      const altEndOfDay = new Date(todayServer.getTime() + (24 * 60 * 60 * 1000) - 1);
+      
+      console.log('Trying alternative date range:', {
+        altStartOfDay: altStartOfDay.toISOString(),
+        altEndOfDay: altEndOfDay.toISOString()
+      });
+      
+      // Try query with alternative dates
+      let altQuery = supabaseAdmin
+        .from('car_check_ins')
+        .select(`
+          id,
+          company_income,
+          payment_status,
+          check_in_time,
+          status,
+          assigned_admin_id
+        `)
+        .gte('check_in_time', altStartOfDay.toISOString())
+        .lte('check_in_time', altEndOfDay.toISOString());
+      
+      if (locationAdminIds && locationAdminIds.length > 0) {
+        altQuery = altQuery.in('assigned_admin_id', locationAdminIds);
+      }
+      
+      const { data: altData } = await altQuery;
+      console.log('Alternative query result:', {
+        count: altData?.length || 0,
+        data: altData?.map(ci => ({
+          id: ci.id,
+          check_in_time: ci.check_in_time,
+          company_income: ci.company_income,
+          payment_status: ci.payment_status
+        })) || []
+      });
+      
+      // If alternative method found data, use it
+      if (altData && altData.length > 0) {
+        console.log('Using alternative date calculation');
+        // Update the variables to use alternative data
+        checkInsData = altData;
+      } else {
+        // Check recent data as fallback
+        console.log('Still no data, checking recent check-ins...');
+        const recentQuery = supabaseAdmin
+          .from('car_check_ins')
+          .select('id, check_in_time, company_income, payment_status')
+          .order('check_in_time', { ascending: false })
+          .limit(5);
+        
+        if (locationAdminIds && locationAdminIds.length > 0) {
+          recentQuery.in('assigned_admin_id', locationAdminIds);
+        }
+        
+        const { data: recentData } = await recentQuery;
+        console.log('Recent check-ins (last 5):', recentData?.map(ci => ({
+          id: ci.id,
+          check_in_time: ci.check_in_time,
+          company_income: ci.company_income,
+          payment_status: ci.payment_status,
+          dateOnly: ci.check_in_time?.split('T')[0]
+        })) || []);
+      }
+    }
+
+    if (checkInsData) {
       // Calculate daily income from ALL check-ins (including pending)
       const dailyCheckIns = checkInsData.filter(checkIn => {
         const checkInDate = new Date(checkIn.check_in_time);
