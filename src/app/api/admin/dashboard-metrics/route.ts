@@ -94,6 +94,22 @@ export async function GET(request: NextRequest) {
     const startOfDay = new Date(today);
     const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
     
+    // Production fallback: Use a broader date range to catch any timezone issues
+    const productionFallback = process.env.NODE_ENV === 'production';
+    if (productionFallback) {
+      console.log('Production environment detected - using broader date range for debugging');
+      // Use a 48-hour window to catch any timezone edge cases
+      const broaderStartOfDay = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+      const broaderEndOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+      
+      console.log('Production fallback dates:', {
+        originalStart: startOfDay.toISOString(),
+        originalEnd: endOfDay.toISOString(),
+        broaderStart: broaderStartOfDay.toISOString(),
+        broaderEnd: broaderEndOfDay.toISOString()
+      });
+    }
+    
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
     const endOfWeek = new Date(startOfWeek.getTime() + (7 * 24 * 60 * 60 * 1000) - 1);
@@ -109,7 +125,9 @@ export async function GET(request: NextRequest) {
       startOfDay: startOfDay.toISOString(),
       endOfDay: endOfDay.toISOString(),
       environment: process.env.NODE_ENV,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      timezoneOffset: now.getTimezoneOffset(),
+      utcTime: now.toUTCString()
     });
 
     // 1. Calculate income metrics for car wash services
@@ -131,10 +149,23 @@ export async function GET(request: NextRequest) {
         company_income,
         payment_status,
         check_in_time,
-        status
-      `)
-      .gte('check_in_time', startOfDay.toISOString())
-      .lte('check_in_time', endOfDay.toISOString());
+        status,
+        assigned_admin_id
+      `);
+    
+    // Use broader date range in production for debugging
+    if (productionFallback) {
+      const broaderStart = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+      const broaderEnd = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+      checkInsQuery = checkInsQuery
+        .gte('check_in_time', broaderStart.toISOString())
+        .lte('check_in_time', broaderEnd.toISOString());
+      console.log('Using broader date range for production debugging');
+    } else {
+      checkInsQuery = checkInsQuery
+        .gte('check_in_time', startOfDay.toISOString())
+        .lte('check_in_time', endOfDay.toISOString());
+    }
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -145,19 +176,25 @@ export async function GET(request: NextRequest) {
 
     if (checkInsError) {
       console.error('Error fetching check-ins for income calculation:', checkInsError);
-    } else if (checkInsData) {
+    } else {
       // Debug logging for earnings calculation
       console.log('Earnings debug - Today check-ins:', {
         startOfDay: startOfDay.toISOString(),
         endOfDay: endOfDay.toISOString(),
-        checkInsCount: checkInsData.length,
-        checkInsData: checkInsData.map(ci => ({
+        checkInsCount: checkInsData?.length || 0,
+        queryParams: {
+          startOfDay: startOfDay.toISOString(),
+          endOfDay: endOfDay.toISOString(),
+          locationAdminIds: locationAdminIds
+        },
+        checkInsData: checkInsData?.map(ci => ({
           id: ci.id,
           company_income: ci.company_income,
           payment_status: ci.payment_status,
           status: ci.status,
-          check_in_time: ci.check_in_time
-        }))
+          check_in_time: ci.check_in_time,
+          assigned_admin_id: ci.assigned_admin_id
+        })) || []
       });
 
       // Calculate daily income from ALL check-ins (including pending)
