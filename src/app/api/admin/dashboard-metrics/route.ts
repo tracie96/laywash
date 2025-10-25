@@ -51,10 +51,44 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get current date in Nigeria time (UTC+1)
+    // Get current date in Nigeria time (UTC+1) - more robust approach
     const now = new Date();
-    const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
-    const today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
+    let today: Date;
+    
+    try {
+      // Try to use Intl.DateTimeFormat for better timezone handling
+      const nigeriaTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Africa/Lagos',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).formatToParts(now);
+      
+      // Extract date components
+      const year = parseInt(nigeriaTime.find(part => part.type === 'year')?.value || '0');
+      const month = parseInt(nigeriaTime.find(part => part.type === 'month')?.value || '0') - 1; // 0-indexed
+      const day = parseInt(nigeriaTime.find(part => part.type === 'day')?.value || '0');
+      
+      // Create today's date in Nigeria timezone
+      today = new Date(year, month, day);
+    } catch (error) {
+      console.warn('Timezone API not available, falling back to manual calculation:', error);
+      // Fallback to manual UTC+1 calculation
+      const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
+      today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
+    }
+    
+    // Additional fallback: Use environment variable or default to UTC+1
+    if (!today || isNaN(today.getTime())) {
+      console.warn('Date calculation failed, using server time with UTC+1 offset');
+      const serverTime = new Date();
+      const nigeriaTime = new Date(serverTime.getTime() + (1 * 60 * 60 * 1000));
+      today = new Date(nigeriaTime.getFullYear(), nigeriaTime.getMonth(), nigeriaTime.getDate());
+    }
     
     // Calculate date ranges
     const startOfDay = new Date(today);
@@ -66,6 +100,17 @@ export async function GET(request: NextRequest) {
     
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    // Debug logging for timezone issues
+    console.log('Timezone debug:', {
+      serverTime: now.toISOString(),
+      serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      today: today.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      environment: process.env.NODE_ENV,
+      timestamp: Date.now()
+    });
 
     // 1. Calculate income metrics for car wash services
     let dailyIncome = 0;
@@ -358,7 +403,7 @@ export async function GET(request: NextRequest) {
     const lowStockItems = inventoryData?.length || 0;
 
     // 6. Fetch top performing washers (last 30 days)
-    const thirtyDaysAgo = new Date(nigeriaNow.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
     
     let performanceQuery = supabaseAdmin
       .from('car_check_ins')
