@@ -972,7 +972,7 @@ const NewCheckInPage: React.FC = () => {
                             {!serviceMaterials[service.id] ? (
                               <div className="text-center py-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Loading materials...</p>
-                              </div>
+                              </div> 
                             ) : serviceMaterials[service.id].length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400">No materials available for this worker</p>
                             ) : (

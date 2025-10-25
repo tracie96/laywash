@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const currentAdminId = request.headers.get('X-Admin-ID');
     
     let isSuperAdmin = false;
-    let adminLocation: string | null = null;
+    let locationAdminIds: string[] | null = null;
     
     // If admin ID is provided, check if they're a super admin and get their location
     if (currentAdminId) {
@@ -37,12 +37,9 @@ export async function GET(request: NextRequest) {
           .eq('user_id', currentAdminId)
           .single();
         
-        adminLocation = adminProfile?.location || null;
-      }
-    }
+        const adminLocation = adminProfile?.location || null;
 
-    // Get all admins at the same location if filtering by location
-    let locationAdminIds: string[] | null = null;
+        // Get all admins at the same location
     if (adminLocation) {
       const { data: locationAdmins } = await supabaseAdmin
         .from('admin_profiles')
@@ -51,84 +48,228 @@ export async function GET(request: NextRequest) {
       
       locationAdminIds = locationAdmins?.map(a => a.user_id) || [];
     }
+      }
+    }
 
-    // Get current date and calculate period boundaries
+    // Get current date in Nigeria time (UTC+1)
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
+    const today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
+    
+    // Calculate date ranges
+    const startOfDay = new Date(today);
+    const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
+    
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
+    const endOfWeek = new Date(startOfWeek.getTime() + (7 * 24 * 60 * 60 * 1000) - 1);
+    
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
 
- 
-    let incomeQuery = supabaseAdmin
+    // 1. Calculate income metrics for car wash services
+    let dailyIncome = 0;
+    let weeklyIncome = 0;
+    let monthlyIncome = 0;
+    let dailyCarWashIncome = 0;
+    let weeklyCarWashIncome = 0;
+    let monthlyCarWashIncome = 0;
+    let dailyCarCount = 0;
+    let weeklyCarCount = 0;
+    let monthlyCarCount = 0;
+
+    // Fetch car check-ins for income calculations (include all statuses for earnings)
+    let checkInsQuery = supabaseAdmin
       .from('car_check_ins')
-      .select('company_income, check_in_time, payment_status')
-      .eq('payment_status', 'paid')
-      .gte('check_in_time', monthStart.toISOString().split('T')[0]);
+      .select(`
+        id,
+        company_income,
+        payment_status,
+        check_in_time,
+        status
+      `)
+      .gte('check_in_time', startOfDay.toISOString())
+      .lte('check_in_time', endOfDay.toISOString());
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
-      incomeQuery = incomeQuery.in('assigned_admin_id', locationAdminIds);
+      checkInsQuery = checkInsQuery.in('assigned_admin_id', locationAdminIds);
     }
 
-    const { data: incomeData, error: incomeError } = await incomeQuery;
+    const { data: checkInsData, error: checkInsError } = await checkInsQuery;
 
-    if (incomeError) {
-      console.error('Error fetching income data:', incomeError);
-      throw new Error('Failed to fetch income data');
+    if (checkInsError) {
+      console.error('Error fetching check-ins for income calculation:', checkInsError);
+    } else if (checkInsData) {
+      // Debug logging for earnings calculation
+      console.log('Earnings debug - Today check-ins:', {
+        startOfDay: startOfDay.toISOString(),
+        endOfDay: endOfDay.toISOString(),
+        checkInsCount: checkInsData.length,
+        checkInsData: checkInsData.map(ci => ({
+          id: ci.id,
+          company_income: ci.company_income,
+          payment_status: ci.payment_status,
+          status: ci.status,
+          check_in_time: ci.check_in_time
+        }))
+      });
+
+      // Calculate daily income from ALL check-ins (including pending)
+      const dailyCheckIns = checkInsData.filter(checkIn => {
+        const checkInDate = new Date(checkIn.check_in_time);
+        return checkInDate >= startOfDay && checkInDate <= endOfDay;
+      });
+      
+      // Calculate total earnings (including pending payments)
+      dailyIncome = dailyCheckIns.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      // Calculate only paid earnings for car wash income
+      const paidCheckIns = dailyCheckIns.filter(ci => ci.payment_status === 'paid' && ci.status === 'completed');
+      dailyCarWashIncome = paidCheckIns.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      dailyCarCount = dailyCheckIns.length;
+
+      // Note: Weekly and monthly calculations will be done with separate queries below
     }
 
-    let stockSalesQuery = supabaseAdmin
+    // 2. Calculate stock sales income - Daily
+    let dailyStockSalesIncome = 0;
+    let weeklyStockSalesIncome = 0;
+    let monthlyStockSalesIncome = 0;
+
+    // Fetch daily stock sales data
+    let dailySalesQuery = supabaseAdmin
       .from('sales_transactions')
-      .select('total_amount, created_at, status')
+      .select(`
+        id,
+        total_amount,
+        created_at
+      `)
       .eq('status', 'completed')
-      .gte('created_at', monthStart.toISOString().split('T')[0]);
+      .gte('created_at', startOfDay.toISOString())
+      .lte('created_at', endOfDay.toISOString());
     
-    // Filter by location (through admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
-      stockSalesQuery = stockSalesQuery.in('admin_id', locationAdminIds);
+      dailySalesQuery = dailySalesQuery.in('admin_id', locationAdminIds);
     }
 
-    const { data: stockSalesData, error: stockSalesError } = await stockSalesQuery;
-
-    if (stockSalesError) {
-      console.error('Error fetching stock sales data:', stockSalesError);
+    const { data: dailySalesData, error: dailySalesError } = await dailySalesQuery;
+    if (!dailySalesError && dailySalesData) {
+      dailyStockSalesIncome = dailySalesData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
     }
 
-    const calculateIncome = (data: Array<{ total_amount: number; [key: string]: string | number }>, dateField: string, startDate: Date) => {
-      return data
-        ?.filter(item => new Date(item[dateField]) >= startDate)
-        .reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
-    };
+    // Fetch weekly stock sales data
+    let weeklySalesQuery = supabaseAdmin
+      .from('sales_transactions')
+      .select(`
+        id,
+        total_amount,
+        created_at
+      `)
+      .eq('status', 'completed')
+      .gte('created_at', startOfWeek.toISOString())
+      .lte('created_at', endOfWeek.toISOString());
+    
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      weeklySalesQuery = weeklySalesQuery.in('admin_id', locationAdminIds);
+    }
 
-    const calculateCarWashIncome = (data: Array<{ company_income: number | null; [key: string]: string | number | null }>, dateField: string, startDate: Date) => {
-      return data
-        ?.filter(item => item[dateField] && new Date(item[dateField] as string) >= startDate)
-        .reduce((sum, item) => sum + (item.company_income || 0), 0) || 0;
-    };
+    const { data: weeklySalesData, error: weeklySalesError } = await weeklySalesQuery;
+    if (!weeklySalesError && weeklySalesData) {
+      weeklyStockSalesIncome = weeklySalesData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+    }
 
+    // Fetch monthly stock sales data
+    let monthlySalesQuery = supabaseAdmin
+      .from('sales_transactions')
+      .select(`
+        id,
+        total_amount,
+        created_at
+      `)
+      .eq('status', 'completed')
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+    
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      monthlySalesQuery = monthlySalesQuery.in('admin_id', locationAdminIds);
+    }
 
-    const dailyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', today);
-    const weeklyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', weekStart);
-    const monthlyCarWashIncome = calculateCarWashIncome(incomeData, 'check_in_time', monthStart);
+    const { data: monthlySalesData, error: monthlySalesError } = await monthlySalesQuery;
+    if (!monthlySalesError && monthlySalesData) {
+      monthlyStockSalesIncome = monthlySalesData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+    }
 
-    // Stock sales income
-    const dailyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', today);
-    const weeklyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', weekStart);
-    const monthlyStockSalesIncome = calculateIncome(stockSalesData || [], 'created_at', monthStart);
+    // Add stock sales to total income
+    dailyIncome += dailyStockSalesIncome;
+    weeklyIncome += weeklyStockSalesIncome;
+    monthlyIncome += monthlyStockSalesIncome;
 
-    // Combined total income
-    const dailyIncome = dailyCarWashIncome + dailyStockSalesIncome;
-    const weeklyIncome = weeklyCarWashIncome + weeklyStockSalesIncome;
-    const monthlyIncome = monthlyCarWashIncome + monthlyStockSalesIncome;
+    // Fetch weekly check-ins data
+    let weeklyCheckInsQuery = supabaseAdmin
+      .from('car_check_ins')
+      .select(`
+        id,
+        company_income,
+        payment_status,
+        check_in_time,
+        status
+      `)
+      .gte('check_in_time', startOfWeek.toISOString())
+      .lte('check_in_time', endOfWeek.toISOString());
+    
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      weeklyCheckInsQuery = weeklyCheckInsQuery.in('assigned_admin_id', locationAdminIds);
+    }
 
-    // 2. Calculate car count metrics
-    const dailyCarCount = incomeData
-      ?.filter(item => new Date(item.check_in_time) >= today).length || 0;
+    const { data: weeklyCheckInsData, error: weeklyCheckInsError } = await weeklyCheckInsQuery;
 
-    const weeklyCarCount = incomeData
-      ?.filter(item => new Date(item.check_in_time) >= weekStart).length || 0;
+    if (weeklyCheckInsError) {
+      console.error('Error fetching weekly check-ins:', weeklyCheckInsError);
+    } else if (weeklyCheckInsData) {
+      // Calculate weekly income from ALL check-ins (including pending)
+      weeklyIncome = weeklyCheckInsData.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      // Calculate only paid earnings for weekly car wash income
+      const paidWeeklyCheckIns = weeklyCheckInsData.filter(ci => ci.payment_status === 'paid' && ci.status === 'completed');
+      weeklyCarWashIncome = paidWeeklyCheckIns.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      weeklyCarCount = weeklyCheckInsData.length;
+    }
 
-    const monthlyCarCount = incomeData?.length || 0;
+    // Fetch monthly check-ins data
+    let monthlyCheckInsQuery = supabaseAdmin
+      .from('car_check_ins')
+      .select(`
+        id,
+        company_income,
+        payment_status,
+        check_in_time,
+        status
+      `)
+      .gte('check_in_time', startOfMonth.toISOString())
+      .lte('check_in_time', endOfMonth.toISOString());
+    
+    if (locationAdminIds && locationAdminIds.length > 0) {
+      monthlyCheckInsQuery = monthlyCheckInsQuery.in('assigned_admin_id', locationAdminIds);
+    }
+
+    const { data: monthlyCheckInsData, error: monthlyCheckInsError } = await monthlyCheckInsQuery;
+
+    if (monthlyCheckInsError) {
+      console.error('Error fetching monthly check-ins:', monthlyCheckInsError);
+    } else if (monthlyCheckInsData) {
+      // Calculate monthly income from ALL check-ins (including pending)
+      monthlyIncome = monthlyCheckInsData.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      // Calculate only paid earnings for monthly car wash income
+      const paidMonthlyCheckIns = monthlyCheckInsData.filter(ci => ci.payment_status === 'paid' && ci.status === 'completed');
+      monthlyCarWashIncome = paidMonthlyCheckIns.reduce((sum, checkIn) => sum + (checkIn.company_income || 0), 0);
+      
+      monthlyCarCount = monthlyCheckInsData.length;
+    }
+  
 
     // 3. Fetch active washers count
     const { data: washersData, error: washersError } = await supabaseAdmin
@@ -157,10 +298,8 @@ export async function GET(request: NextRequest) {
     // 4. Fetch pending check-ins count for today
     let pendingQuery = supabaseAdmin
       .from('car_check_ins')
-      .select('id')
-      .in('status', ['pending', 'in_progress'])
-      .gte('check_in_time', today.toISOString())
-      .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
+      .select('id, created_at')
+      .in('status', ['pending', 'in_progress']);
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -174,15 +313,17 @@ export async function GET(request: NextRequest) {
       throw new Error('Failed to fetch pending check-ins');
     }
 
-    const pendingCheckInsCount = pendingCheckIns?.length || 0;
+    // Filter pending check-ins for today using the same date logic
+    const pendingCheckInsCount = pendingCheckIns?.filter(checkIn => {
+      const checkInDate = new Date(checkIn.created_at);
+      return checkInDate.toDateString() === today.toDateString();
+    }).length || 0;
 
     // Calculate pending check-ins total amount for today
     let pendingAmountQuery = supabaseAdmin
       .from('car_check_ins')
-      .select('company_income, total_amount, status')
-      .in('status', ['pending', 'in_progress'])
-      .gte('check_in_time', today.toISOString())
-      .lt('check_in_time', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
+      .select('company_income, total_amount, status, created_at')
+      .in('status', ['pending', 'in_progress']);
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -195,12 +336,15 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching pending check-ins amount:', pendingAmountError);
     }
 
-
-    const pendingPaymentAmount = pendingCheckInsAmount?.reduce((sum, checkIn) => {
+    const pendingPaymentAmount = pendingCheckInsAmount?.filter(checkIn => {
+      const checkInDate = new Date(checkIn.created_at);
+      return checkInDate.toDateString() === today.toDateString();
+    }).reduce((sum, checkIn) => {
       const amount = checkIn.company_income || checkIn.total_amount || 0;
       return sum + amount;
     }, 0) || 0;
 
+    // 5. Fetch low stock items
     const { data: inventoryData, error: inventoryError } = await supabaseAdmin
       .from('stock_items')
       .select('id, current_stock, minimum_stock')
@@ -214,7 +358,7 @@ export async function GET(request: NextRequest) {
     const lowStockItems = inventoryData?.length || 0;
 
     // 6. Fetch top performing washers (last 30 days)
-    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const thirtyDaysAgo = new Date(nigeriaNow.getTime() - (30 * 24 * 60 * 60 * 1000));
     
     let performanceQuery = supabaseAdmin
       .from('car_check_ins')
@@ -364,6 +508,16 @@ export async function GET(request: NextRequest) {
 
     // Limit to 5 most recent activities
     const limitedRecentActivities = recentActivities.slice(0, 5);
+
+    // Debug logging for final metrics
+    console.log('Final dashboard metrics:', {
+      dailyIncome,
+      dailyCarWashIncome,
+      dailyStockSalesIncome,
+      dailyCarCount,
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString()
+    });
 
     // Prepare dashboard metrics response
     const dashboardMetrics = {

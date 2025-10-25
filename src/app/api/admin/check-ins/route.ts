@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const limit = parseInt(searchParams.get('limit') || '50');
-
+console.log('date:', date);
     let checkIns: CheckIn[] = [];
 
     if (search) {

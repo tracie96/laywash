@@ -90,6 +90,18 @@ const AdminDashboard: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
+        console.log('Dashboard metrics received:', result.data);
+        console.log('Daily income breakdown:', {
+          totalIncome: result.data.totalIncome?.daily,
+          carWashIncome: result.data.carWashIncome?.daily,
+          stockSalesIncome: result.data.stockSalesIncome?.daily
+        });
+        console.log('Weekly income breakdown:', {
+          totalIncome: result.data.totalIncome?.weekly,
+          carWashIncome: result.data.carWashIncome?.weekly,
+          stockSalesIncome: result.data.stockSalesIncome?.weekly
+        });
+        console.log('Full carWashIncome object:', result.data.carWashIncome);
         setMetrics(result.data);
       } else {
         throw new Error(result.error || 'Failed to fetch dashboard metrics');
@@ -215,6 +227,23 @@ const AdminDashboard: React.FC = () => {
           <p className="text-sm font-medium text-gray-900 dark:text-white">
             {new Date().toLocaleDateString()}
           </p>
+          <button 
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/admin/debug-data', {
+                  headers: { 'X-Admin-ID': user?.id || '' }
+                });
+                const data = await response.json();
+                console.log('Debug data:', data);
+                alert(`Debug data logged to console. Check-ins: ${data.data?.allCheckIns?.count || 0}, Paid: ${data.data?.paidCheckIns?.count || 0}`);
+              } catch (error) {
+                console.error('Debug error:', error);
+              }
+            }}
+            className="mt-2 px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+          >
+            Debug Data
+          </button>
         </div>
       </div>
 
@@ -328,9 +357,7 @@ const AdminDashboard: React.FC = () => {
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            ₦ {(metrics?.totalIncome?.weekly || 0).toLocaleString()}
-          </p>
+       
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Car Wash:</span>
@@ -380,15 +407,31 @@ const AdminDashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Car Wash %</span>
               <span className="text-sm font-medium text-blue-600">
-                {metrics?.totalIncome?.daily ? 
-                  Math.round((metrics.carWashIncome.daily / metrics.totalIncome.daily) * 100) : 0}%
+                {(() => {
+                  const totalDaily = metrics?.totalIncome?.daily || 0;
+                  const carWashDaily = metrics?.carWashIncome?.daily || 0;
+                  console.log('Car Wash Percentage calculation:', { 
+                    totalDaily, 
+                    carWashDaily, 
+                    percentage: totalDaily > 0 ? Math.round((carWashDaily / totalDaily) * 100) : 0 
+                  });
+                  return totalDaily > 0 ? Math.round((carWashDaily / totalDaily) * 100) : 0;
+                })()}%
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Stock Sales %</span>
               <span className="text-sm font-medium text-purple-600">
-                {metrics?.totalIncome?.daily ? 
-                  Math.round((metrics.stockSalesIncome.daily / metrics.totalIncome.daily) * 100) : 0}%
+                {(() => {
+                  const totalDaily = metrics?.totalIncome?.daily || 0;
+                  const stockSalesDaily = metrics?.stockSalesIncome?.daily || 0;
+                  console.log('Stock Sales Percentage calculation:', { 
+                    totalDaily, 
+                    stockSalesDaily, 
+                    percentage: totalDaily > 0 ? Math.round((stockSalesDaily / totalDaily) * 100) : 0 
+                  });
+                  return totalDaily > 0 ? Math.round((stockSalesDaily / totalDaily) * 100) : 0;
+                })()}%
               </span>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
