@@ -51,38 +51,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get current date in Nigeria time - more explicit approach
+    // Get current date in Nigeria time - Vercel-specific approach
     const now = new Date();
     
-    // Method 1: UTC+1 calculation
-    const utcPlus1 = new Date(now.getTime() + (1 * 60 * 60 * 1000));
-    const todayUTC = new Date(utcPlus1.getFullYear(), utcPlus1.getMonth(), utcPlus1.getDate());
+    // Vercel servers run in UTC, so we need to be explicit about Nigeria time
+    // Nigeria is UTC+1, so we add 1 hour to UTC time
+    const nigeriaTime = new Date(now.getTime() + (1 * 60 * 60 * 1000));
+    const today = new Date(nigeriaTime.getFullYear(), nigeriaTime.getMonth(), nigeriaTime.getDate());
     
-    // Method 2: Server time with explicit offset
-    const serverOffset = now.getTimezoneOffset(); // minutes
-    const nigeriaOffset = -60; // Nigeria is UTC+1 (60 minutes ahead)
-    const offsetDiff = nigeriaOffset - serverOffset;
-    const nigeriaTime = new Date(now.getTime() + (offsetDiff * 60 * 1000));
-    const todayServer = new Date(nigeriaTime.getFullYear(), nigeriaTime.getMonth(), nigeriaTime.getDate());
-    
-    // Use the more reliable method
-    const today = todayUTC;
+    // For Vercel, let's also try a broader approach - include yesterday and today
+    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+    const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
     
     // Calculate date ranges
     const startOfDay = new Date(today);
     const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
     
-    // Enhanced debug logging
-    console.log('Date calculation comparison:', {
+    // Vercel-specific debug logging
+    console.log('Vercel date calculation:', {
       serverTime: now.toISOString(),
       serverTimezone: now.getTimezoneOffset(),
-      utcPlus1: utcPlus1.toISOString(),
       nigeriaTime: nigeriaTime.toISOString(),
-      todayUTC: todayUTC.toISOString(),
-      todayServer: todayServer.toISOString(),
-      finalToday: today.toISOString(),
+      today: today.toISOString(),
+      yesterday: yesterday.toISOString(),
+      tomorrow: tomorrow.toISOString(),
       startOfDay: startOfDay.toISOString(),
-      endOfDay: endOfDay.toISOString()
+      endOfDay: endOfDay.toISOString(),
+      queryRange: `${yesterday.toISOString()} to ${tomorrow.toISOString()}`
     });
     
     const startOfWeek = new Date(today);
@@ -104,6 +99,7 @@ export async function GET(request: NextRequest) {
     let monthlyCarCount = 0;
 
     // Fetch car check-ins for income calculations (include all statuses for earnings)
+    // Use broader date range for Vercel to catch timezone edge cases
     let checkInsQuery = supabaseAdmin
       .from('car_check_ins')
       .select(`
@@ -114,8 +110,8 @@ export async function GET(request: NextRequest) {
         status,
         assigned_admin_id
       `)
-      .gte('check_in_time', startOfDay.toISOString())
-      .lte('check_in_time', endOfDay.toISOString());
+      .gte('check_in_time', yesterday.toISOString())
+      .lte('check_in_time', tomorrow.toISOString());
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -145,8 +141,8 @@ export async function GET(request: NextRequest) {
       console.log('No daily check-ins found with UTC+1, trying alternative calculation...');
       
       // Try with server-based calculation
-      const altStartOfDay = new Date(todayServer);
-      const altEndOfDay = new Date(todayServer.getTime() + (24 * 60 * 60 * 1000) - 1);
+      const altStartOfDay = new Date(today);
+      const altEndOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
       
       console.log('Trying alternative date range:', {
         altStartOfDay: altStartOfDay.toISOString(),
@@ -213,9 +209,12 @@ export async function GET(request: NextRequest) {
 
     if (checkInsData) {
       // Calculate daily income from ALL check-ins (including pending)
+      // Filter for today's data from the broader range
       const dailyCheckIns = checkInsData.filter(checkIn => {
         const checkInDate = new Date(checkIn.check_in_time);
-        return checkInDate >= startOfDay && checkInDate <= endOfDay;
+        const checkInDateOnly = new Date(checkInDate.getFullYear(), checkInDate.getMonth(), checkInDate.getDate());
+        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        return checkInDateOnly.getTime() === todayDateOnly.getTime();
       });
       
       // Calculate total earnings (including pending payments)
