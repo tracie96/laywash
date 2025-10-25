@@ -127,7 +127,18 @@ export async function GET(request: NextRequest) {
       environment: process.env.NODE_ENV,
       timestamp: Date.now(),
       timezoneOffset: now.getTimezoneOffset(),
-      utcTime: now.toUTCString()
+      utcTime: now.toUTCString(),
+      todayDateString: today.toDateString(),
+      todayISOString: today.toISOString()
+    });
+    
+    // Additional debugging - check what dates we're actually looking for
+    console.log('Date range analysis:', {
+      lookingForToday: today.toDateString(),
+      startOfDayFormatted: startOfDay.toISOString(),
+      endOfDayFormatted: endOfDay.toISOString(),
+      currentServerDate: new Date().toDateString(),
+      currentServerTime: new Date().toISOString()
     });
 
     // 1. Calculate income metrics for car wash services
@@ -155,12 +166,20 @@ export async function GET(request: NextRequest) {
     
     // Use broader date range in production for debugging
     if (productionFallback) {
-      const broaderStart = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+      // Include yesterday's data to catch timezone issues
+      const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+      const broaderStart = new Date(yesterday.getTime());
       const broaderEnd = new Date(today.getTime() + (24 * 60 * 60 * 1000));
       checkInsQuery = checkInsQuery
         .gte('check_in_time', broaderStart.toISOString())
         .lte('check_in_time', broaderEnd.toISOString());
-      console.log('Using broader date range for production debugging');
+      console.log('Using broader date range for production debugging (including yesterday)');
+      console.log('Date range:', {
+        yesterday: yesterday.toISOString(),
+        today: today.toISOString(),
+        broaderStart: broaderStart.toISOString(),
+        broaderEnd: broaderEnd.toISOString()
+      });
     } else {
       checkInsQuery = checkInsQuery
         .gte('check_in_time', startOfDay.toISOString())
@@ -196,6 +215,30 @@ export async function GET(request: NextRequest) {
           assigned_admin_id: ci.assigned_admin_id
         })) || []
       });
+      
+      // Additional debugging - get some recent check-ins to see actual dates
+      if (productionFallback && (!checkInsData || checkInsData.length === 0)) {
+        console.log('No check-ins found for daily range, checking recent data...');
+        const recentQuery = supabaseAdmin
+          .from('car_check_ins')
+          .select('id, check_in_time, company_income, payment_status, status')
+          .order('check_in_time', { ascending: false })
+          .limit(10);
+        
+        if (locationAdminIds && locationAdminIds.length > 0) {
+          recentQuery.in('assigned_admin_id', locationAdminIds);
+        }
+        
+        const { data: recentData } = await recentQuery;
+        console.log('Recent check-ins (last 10):', recentData?.map(ci => ({
+          id: ci.id,
+          check_in_time: ci.check_in_time,
+          company_income: ci.company_income,
+          payment_status: ci.payment_status,
+          status: ci.status,
+          dateOnly: ci.check_in_time?.split('T')[0]
+        })) || []);
+      }
 
       // Calculate daily income from ALL check-ins (including pending)
       const dailyCheckIns = checkInsData.filter(checkIn => {
