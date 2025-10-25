@@ -90,7 +90,6 @@ const superAdminItems: NavItem[] = [
     subItems: [
       { name: "Tool Management", path: "/tools/management", pro: false },
       { name: "Tool Assignments", path: "/tools/assignments", pro: false },
-      { name: "Lost Tool Charges", path: "/tools/charges", pro: false }
     ],
     roles: ["super_admin"]
   },
@@ -168,7 +167,6 @@ const adminItems: NavItem[] = [
     subItems: [
       { name: "Tool Management", path: "/tools/management", pro: false },
       { name: "Tool Assignments", path: "/tools/assignments", pro: false },
-      { name: "Lost Tool Charges", path: "/tools/charges", pro: false }
     ],
     roles: ["admin"]
   },

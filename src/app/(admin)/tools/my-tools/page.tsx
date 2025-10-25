@@ -153,7 +153,7 @@ const MyToolsPage: React.FC = () => {
   });
 
   const assignedToolsCount = tools.filter(t => !t.isReturned).length;
-  const returnedToolsCount = tools.filter(t => t.isReturned).length;
+  // const returnedToolsCount = tools.filter(t => t.isReturned).length;
     const totalToolsValue = tools.reduce((sum, tool) => sum + (tool.price || 0), 0);
 
   if (loading) {
@@ -222,7 +222,7 @@ const MyToolsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalToolsValue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalToolsValue.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,12 +253,7 @@ const MyToolsPage: React.FC = () => {
             >
               Assigned ({assignedToolsCount})
             </Button>
-            <Button
-              onClick={() => setFilterStatus('returned')}
-              size="sm"
-            >
-              Returned ({returnedToolsCount})
-            </Button>
+            
           </div>
         </div>
       </div>
@@ -322,7 +317,7 @@ const MyToolsPage: React.FC = () => {
                       {new Date(tool.assignedDate).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      ${tool.price}
+                      {tool.price}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">

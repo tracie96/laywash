@@ -1,5 +1,5 @@
 "use client";
-  import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import Button from '@/components/ui/button/Button';
 
@@ -59,21 +59,30 @@ const ToolsChargesPage: React.FC = () => {
       params.append('sortBy', sortBy);
       params.append('sortOrder', sortOrder);
       
+      console.log('Fetching charges with params:', params.toString());
+      
       const response = await fetch(`/api/admin/tool-charges?${params.toString()}`);
       const data = await response.json();
       
+      console.log('API response:', data);
+      
       if (data.success) {
-        setCharges(data.charges);
+        setCharges(data.charges || []);
       } else {
         setError(data.error || 'Failed to fetch charges');
       }
-    } catch {
-      console.error('Error fetching charges');
+    } catch (error) {
+      console.error('Error fetching charges:', error);
       setError('Failed to fetch charges from server');
     } finally {
       setLoading(false);
     }
   }, [searchTerm, filterStatus, sortBy, sortOrder]);
+
+  // Fetch charges on component mount and when dependencies change
+  useEffect(() => {
+    fetchCharges();
+  }, [fetchCharges]);
 
   const handleCreateCharge = async (e: React.FormEvent) => {
     e.preventDefault();
