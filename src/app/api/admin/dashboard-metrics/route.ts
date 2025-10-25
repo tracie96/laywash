@@ -51,64 +51,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get current date in Nigeria time (UTC+1) - more robust approach
+    // Get current date in Nigeria time (UTC+1) - simple approach
     const now = new Date();
-    let today: Date;
-    
-    try {
-      // Try to use Intl.DateTimeFormat for better timezone handling
-      const nigeriaTime = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Africa/Lagos',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).formatToParts(now);
-      
-      // Extract date components
-      const year = parseInt(nigeriaTime.find(part => part.type === 'year')?.value || '0');
-      const month = parseInt(nigeriaTime.find(part => part.type === 'month')?.value || '0') - 1; // 0-indexed
-      const day = parseInt(nigeriaTime.find(part => part.type === 'day')?.value || '0');
-      
-      // Create today's date in Nigeria timezone
-      today = new Date(year, month, day);
-    } catch (error) {
-      console.warn('Timezone API not available, falling back to manual calculation:', error);
-      // Fallback to manual UTC+1 calculation
-      const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
-      today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
-    }
-    
-    // Additional fallback: Use environment variable or default to UTC+1
-    if (!today || isNaN(today.getTime())) {
-      console.warn('Date calculation failed, using server time with UTC+1 offset');
-      const serverTime = new Date();
-      const nigeriaTime = new Date(serverTime.getTime() + (1 * 60 * 60 * 1000));
-      today = new Date(nigeriaTime.getFullYear(), nigeriaTime.getMonth(), nigeriaTime.getDate());
-    }
+    const nigeriaNow = new Date(now.getTime() + (1 * 60 * 60 * 1000)); // UTC+1
+    const today = new Date(nigeriaNow.getFullYear(), nigeriaNow.getMonth(), nigeriaNow.getDate());
     
     // Calculate date ranges
     const startOfDay = new Date(today);
     const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
-    
-    // Production fallback: Use a broader date range to catch any timezone issues
-    const productionFallback = process.env.NODE_ENV === 'production';
-    if (productionFallback) {
-      console.log('Production environment detected - using broader date range for debugging');
-      // Use a 48-hour window to catch any timezone edge cases
-      const broaderStartOfDay = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-      const broaderEndOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000));
-      
-      console.log('Production fallback dates:', {
-        originalStart: startOfDay.toISOString(),
-        originalEnd: endOfDay.toISOString(),
-        broaderStart: broaderStartOfDay.toISOString(),
-        broaderEnd: broaderEndOfDay.toISOString()
-      });
-    }
     
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
@@ -116,30 +66,6 @@ export async function GET(request: NextRequest) {
     
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
-    
-    // Debug logging for timezone issues
-    console.log('Timezone debug:', {
-      serverTime: now.toISOString(),
-      serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      today: today.toISOString(),
-      startOfDay: startOfDay.toISOString(),
-      endOfDay: endOfDay.toISOString(),
-      environment: process.env.NODE_ENV,
-      timestamp: Date.now(),
-      timezoneOffset: now.getTimezoneOffset(),
-      utcTime: now.toUTCString(),
-      todayDateString: today.toDateString(),
-      todayISOString: today.toISOString()
-    });
-    
-    // Additional debugging - check what dates we're actually looking for
-    console.log('Date range analysis:', {
-      lookingForToday: today.toDateString(),
-      startOfDayFormatted: startOfDay.toISOString(),
-      endOfDayFormatted: endOfDay.toISOString(),
-      currentServerDate: new Date().toDateString(),
-      currentServerTime: new Date().toISOString()
-    });
 
     // 1. Calculate income metrics for car wash services
     let dailyIncome = 0;
@@ -162,29 +88,9 @@ export async function GET(request: NextRequest) {
         check_in_time,
         status,
         assigned_admin_id
-      `);
-    
-    // Use broader date range in production for debugging
-    if (productionFallback) {
-      // Include yesterday's data to catch timezone issues
-      const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-      const broaderStart = new Date(yesterday.getTime());
-      const broaderEnd = new Date(today.getTime() + (24 * 60 * 60 * 1000));
-      checkInsQuery = checkInsQuery
-        .gte('check_in_time', broaderStart.toISOString())
-        .lte('check_in_time', broaderEnd.toISOString());
-      console.log('Using broader date range for production debugging (including yesterday)');
-      console.log('Date range:', {
-        yesterday: yesterday.toISOString(),
-        today: today.toISOString(),
-        broaderStart: broaderStart.toISOString(),
-        broaderEnd: broaderEnd.toISOString()
-      });
-    } else {
-      checkInsQuery = checkInsQuery
-        .gte('check_in_time', startOfDay.toISOString())
-        .lte('check_in_time', endOfDay.toISOString());
-    }
+      `)
+      .gte('check_in_time', startOfDay.toISOString())
+      .lte('check_in_time', endOfDay.toISOString());
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -195,50 +101,7 @@ export async function GET(request: NextRequest) {
 
     if (checkInsError) {
       console.error('Error fetching check-ins for income calculation:', checkInsError);
-    } else {
-      // Debug logging for earnings calculation
-      console.log('Earnings debug - Today check-ins:', {
-        startOfDay: startOfDay.toISOString(),
-        endOfDay: endOfDay.toISOString(),
-        checkInsCount: checkInsData?.length || 0,
-        queryParams: {
-          startOfDay: startOfDay.toISOString(),
-          endOfDay: endOfDay.toISOString(),
-          locationAdminIds: locationAdminIds
-        },
-        checkInsData: checkInsData?.map(ci => ({
-          id: ci.id,
-          company_income: ci.company_income,
-          payment_status: ci.payment_status,
-          status: ci.status,
-          check_in_time: ci.check_in_time,
-          assigned_admin_id: ci.assigned_admin_id
-        })) || []
-      });
-      
-      // Additional debugging - get some recent check-ins to see actual dates
-      if (productionFallback && (!checkInsData || checkInsData.length === 0)) {
-        console.log('No check-ins found for daily range, checking recent data...');
-        const recentQuery = supabaseAdmin
-          .from('car_check_ins')
-          .select('id, check_in_time, company_income, payment_status, status')
-          .order('check_in_time', { ascending: false })
-          .limit(10);
-        
-        if (locationAdminIds && locationAdminIds.length > 0) {
-          recentQuery.in('assigned_admin_id', locationAdminIds);
-        }
-        
-        const { data: recentData } = await recentQuery;
-        console.log('Recent check-ins (last 10):', recentData?.map(ci => ({
-          id: ci.id,
-          check_in_time: ci.check_in_time,
-          company_income: ci.company_income,
-          payment_status: ci.payment_status,
-          status: ci.status,
-          dateOnly: ci.check_in_time?.split('T')[0]
-        })) || []);
-      }
+    } else if (checkInsData) {
 
       // Calculate daily income from ALL check-ins (including pending)
       const dailyCheckIns = checkInsData.filter(checkIn => {
@@ -634,15 +497,6 @@ export async function GET(request: NextRequest) {
     // Limit to 5 most recent activities
     const limitedRecentActivities = recentActivities.slice(0, 5);
 
-    // Debug logging for final metrics
-    console.log('Final dashboard metrics:', {
-      dailyIncome,
-      dailyCarWashIncome,
-      dailyStockSalesIncome,
-      dailyCarCount,
-      startOfDay: startOfDay.toISOString(),
-      endOfDay: endOfDay.toISOString()
-    });
 
     // Prepare dashboard metrics response
     const dashboardMetrics = {
