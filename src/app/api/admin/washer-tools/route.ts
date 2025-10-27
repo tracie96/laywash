@@ -53,22 +53,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get used quantities from check_in_materials for all tools using material_id
+    const toolIds = tools?.map(tool => tool.id) || [];
+    const usedQuantities: Record<string, number> = {};
+
+    if (toolIds.length > 0) {
+      const { data: usedMaterials, error: usedError } = await supabaseAdmin
+        .from('check_in_materials')
+        .select('material_id, quantity_used, washer_id')
+        .in('material_id', toolIds);
+
+      if (!usedError && usedMaterials) {
+        // Calculate total used quantity for each tool by washer
+        usedMaterials.forEach(used => {
+          const key = `${used.material_id}_${used.washer_id}`;
+          usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
+        });
+      }
+    }
+
     // Transform the data to match the frontend interface
-    const transformedTools = tools?.map(tool => ({
-      id: tool.id,
-      washerId: tool.washer_id,
-      washer: tool.washer,
-      toolName: tool.tool_name,
-      toolType: tool.tool_type,
-      quantity: tool.quantity,
-      returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
-      assignedDate: tool.assigned_date,
-      returnedDate: tool.returned_date,
-      isReturned: tool.is_returned,
-      notes: tool.notes,
-      createdAt: tool.created_at,
-      updatedAt: tool.updated_at
-    })) || [];
+    const transformedTools = tools?.map(tool => {
+      const usedKey = `${tool.id}_${tool.washer_id}`;
+      const usedQuantity = usedQuantities[usedKey] || 0;
+      const returnedQuantity = tool.returned_quantity || 0;
+      
+      return {
+        id: tool.id,
+        washerId: tool.washer_id,
+        washer: tool.washer,
+        toolName: tool.tool_name,
+        toolType: tool.tool_type,
+        quantity: tool.quantity,
+        returnedQuantity: returnedQuantity,
+        usedQuantity: usedQuantity, // Quantity used from check_in_materials
+        assignedDate: tool.assigned_date,
+        returnedDate: tool.returned_date,
+        isReturned: tool.is_returned,
+        notes: tool.notes,
+        createdAt: tool.created_at,
+        updatedAt: tool.updated_at
+      };
+    }) || [];
 
     return NextResponse.json({
       success: true,
@@ -87,11 +113,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { 
-      washerId, 
+      washerId,
+      toolId,
       toolName, 
       toolType, 
       quantity, 
-      notes 
+      notes,
+      price
     } = await request.json();
 
     // Validate required input
@@ -130,35 +158,53 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-console.log('toolName', toolName);
-    // Get replacement cost from services table where tool_name matches service name
-    const { data: service, error: serviceError } = await supabaseAdmin
-      .from('worker_tools')
-      .select('replacement_cost')
-      .eq('name', toolName)
-      .single();
+    // Log received data
+    console.log('Received data:', { washerId, toolId, toolName, toolType, quantity, price });
 
-    if (serviceError) {
-      console.error('Error fetching service replacement cost:', serviceError);
-      return NextResponse.json(
-        { success: false, error: 'Service not found for tool' },
-        { status: 404 }
-      );
+    // Determine the cost to use: provided price > worker_tools replacement cost
+    let finalCost = 0;
+    
+    if (price && price > 0) {
+      // Use the provided price
+      finalCost = price;
+    } else {
+      // Get replacement cost from worker_tools table
+      const { data: service, error: serviceError } = await supabaseAdmin
+        .from('worker_tools')
+        .select('replacement_cost')
+        .eq('name', toolName)
+        .single();
+
+      if (serviceError) {
+        console.error('Error fetching service replacement cost:', serviceError);
+        // Don't fail, just use 0 as default
+        finalCost = 0;
+      } else {
+        finalCost = service?.replacement_cost || 0;
+      }
     }
 
-    const replacementCost = service?.replacement_cost || 0;
+    // Prepare insert data
+    const insertData: Record<string, unknown> = {
+      washer_id: washerId,
+      tool_name: toolName,
+      tool_type: toolType,
+      quantity: quantity,
+      amount: finalCost,
+      notes: notes || null
+    };
+
+    // Only add tool_id if it's provided and not null
+    if (toolId) {
+      insertData.tool_id = toolId;
+    }
+
+    console.log('Inserting washer tool with data:', insertData);
 
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin
       .from('washer_tools')
-      .insert({
-        washer_id: washerId,
-        tool_name: toolName,
-        tool_type: toolType,
-        quantity: quantity,
-        amount: replacementCost,
-        notes: notes || null
-      })
+      .insert(insertData)
       .select(`
         *,
         washer:users!washer_tools_washer_id_fkey (

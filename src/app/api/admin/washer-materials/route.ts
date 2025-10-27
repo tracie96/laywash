@@ -52,20 +52,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get used quantities from check_in_materials for all tools
-    const toolNames = tools?.map(tool => tool.tool_name) || [];
+    // Get used quantities from check_in_materials for all tools using material_id
+    const toolIds = tools?.map(tool => tool.id) || [];
     const usedQuantities: Record<string, number> = {};
 
-    if (toolNames.length > 0) {
+    if (toolIds.length > 0) {
       const { data: usedMaterials, error: usedError } = await supabaseAdmin
         .from('check_in_materials')
-        .select('material_name, quantity_used, washer_id')
-        .in('material_name', toolNames);
+        .select('material_id, quantity_used, washer_id')
+        .in('material_id', toolIds);
 
       if (!usedError && usedMaterials) {
         // Calculate total used quantity for each tool by washer
         usedMaterials.forEach(used => {
-          const key = `${used.material_name}_${used.washer_id}`;
+          const key = `${used.material_id}_${used.washer_id}`;
           usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
         });
       }
@@ -73,10 +73,15 @@ export async function GET(request: NextRequest) {
 
     console.log({tools, usedQuantities});
     const transformedTools = tools?.map(tool => {
-      // Calculate available quantity: assigned quantity - used quantity
-      const usedKey = `${tool.tool_name}_${tool.washer_id}`;
+      // Calculate used quantity from check_in_materials
+      const usedKey = `${tool.id}_${tool.washer_id}`;
       const usedQuantity = usedQuantities[usedKey] || 0;
-      const availableQuantity = Math.max(0, tool.quantity - usedQuantity);
+      const returnedQuantity = tool.returned_quantity || 0;
+      
+      // Calculate available quantity: assigned - used - returned
+      // This follows the same logic as assignments: quantity - returnedQuantity
+      // When some quantity is returned, it's no longer available for use
+      const remainingQuantity = Math.max(0, tool.quantity - usedQuantity - returnedQuantity);
 
       return {
         id: tool.id,
@@ -84,10 +89,10 @@ export async function GET(request: NextRequest) {
         washer: tool.washer,
         toolName: tool.tool_name,
         toolType: tool.tool_type,
-        quantity: availableQuantity, // Show available quantity instead of assigned quantity
-        assignedQuantity: tool.quantity, // Keep original assigned quantity
-        usedQuantity: usedQuantity, // Show how much has been used
-        returnedQuantity: tool.returned_quantity || 0, // Default to 0 if not set
+        quantity: remainingQuantity, // Remaining quantity (assigned - used - returned)
+        assignedQuantity: tool.quantity, // Original assigned quantity
+        usedQuantity: usedQuantity, // Quantity used from check_in_materials
+        returnedQuantity: returnedQuantity, // Returned quantity
         price: tool.amount, // Changed from amount to price
         assignedDate: tool.assigned_date,
         returnedDate: tool.returned_date,
@@ -115,11 +120,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { 
-      washerId, 
+      washerId,
+      toolId,
       toolName, 
       toolType, 
       quantity, 
-      notes 
+      notes,
+      price
     } = await request.json();
 
     // Validate required input
@@ -138,36 +145,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get replacement cost from services table where tool_name matches service name
-    const { data: service, error: serviceError } = await supabaseAdmin
-      .from('services')
-      .select('replacement_cost')
-      .eq('name', toolName)
-      .single();
+    // Log toolId if provided (for tracking the source tool)
+    console.log('Received data:', { washerId, toolId, toolName, toolType, quantity, price });
+    
+    // Determine the cost to use: provided price > service replacement cost
+    let finalCost = 0;
+    
+    if (price && price > 0) {
+      // Use the provided price
+      finalCost = price;
+    } else {
+      // Get replacement cost from services table where tool_name matches service name
+      const { data: service, error: serviceError } = await supabaseAdmin
+        .from('services')
+        .select('replacement_cost')
+        .eq('name', toolName)
+        .single();
 
-    if (serviceError) {
-      console.error('Error fetching service replacement cost:', serviceError);
-      return NextResponse.json(
-        { success: false, error: 'Service not found for tool' },
-        { status: 404 }
-      );
+      if (serviceError) {
+        console.error('Error fetching service replacement cost:', serviceError);
+        // Don't fail, just use 0 as default
+        finalCost = 0;
+      } else {
+        finalCost = service?.replacement_cost || 0;
+      }
     }
 
-    const replacementCost = service?.replacement_cost || 0;
+    // Prepare insert data
+    const insertData: Record<string, unknown> = {
+      washer_id: washerId,
+      tool_name: toolName,
+      tool_type: toolType,
+      quantity: quantity,
+      amount: finalCost,
+      notes: notes || null
+    };
+
+    // Only add tool_id if it's provided and not null
+    if (toolId) {
+      insertData.tool_id = toolId;
+    }
+
+    console.log('Inserting washer tool with data:', insertData);
 
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin
       .from('washer_tools')
-      .insert({
-        washer_id: washerId,
-        tool_name: toolName,
-        tool_type: toolType,
-        quantity: quantity,
-        amount: replacementCost, // Use replacement cost from services table
-        notes: notes || null
-      })
+      .insert(insertData)
       .select(`
-        *,
+        *,  
         washer:users!washer_tools_washer_id_fkey (
           id,
           name,

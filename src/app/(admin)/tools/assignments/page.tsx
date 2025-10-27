@@ -10,6 +10,7 @@ interface ToolAssignment {
   workerName: string;
   quantity: number;
   returnedQuantity?: number;
+  usedQuantity?: number;
   assignedDate: string;
   returnDate?: string;
   status: "assigned" | "returned" | "overdue" | "partially_returned";
@@ -54,6 +55,7 @@ interface WasherToolWithWorker {
   toolType: string;
   quantity: number;
   returnedQuantity?: number;
+  usedQuantity?: number;
   assignedDate: string;
   returnedDate?: string;
   isReturned: boolean;
@@ -123,17 +125,35 @@ const ToolsAssignmentsPage: React.FC = () => {
 
       // Transform API data to match our interface
       const transformedAssignments: ToolAssignment[] = assignmentsData.success 
-        ? assignmentsData.tools.map((tool: WasherToolWithWorker) => ({
+          ? assignmentsData.tools.map((tool: WasherToolWithWorker) => ({
             id: tool.id,
             toolName: tool.toolName,
             workerName: tool.washer?.name || 'Unknown Worker',
             quantity: tool.quantity,
             returnedQuantity: tool.returnedQuantity,
+            usedQuantity: tool.usedQuantity,
             assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
             returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
-            status: tool.isReturned ? "returned" : 
-                   (tool.returnedQuantity && tool.returnedQuantity > 0) ? "partially_returned" :
-                   new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000) ? "overdue" : "assigned",
+            status: (() => {
+              // If explicitly marked as returned in DB, it's returned
+              if (tool.isReturned) return "returned";
+              
+              // Calculate if all items are accounted for (used + returned = total)
+              const used = tool.usedQuantity || 0;
+              const returned = tool.returnedQuantity || 0;
+              const total = tool.quantity;
+              
+              // If used + returned equals total, it's fully returned
+              if (used + returned >= total) return "returned";
+              
+              // If partially returned, show partially_returned
+              if (returned > 0 && returned < total) return "partially_returned";
+              
+              // If overdue (assigned more than 24 hours ago), show overdue
+              if (new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000)) return "overdue";
+              
+              return "assigned";
+            })(),
             notes: tool.notes || 'No notes'
           }))
         : [];
@@ -294,6 +314,7 @@ const ToolsAssignmentsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          toolId: selectedTool.id,
           washerId: assignmentForm.workerId,
           toolName: selectedTool.name,
           toolType: 'equipment',
@@ -518,16 +539,26 @@ const ToolsAssignmentsPage: React.FC = () => {
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
                               <div>
                                 <div>Total: {assignment.quantity}</div>
+                                {assignment.usedQuantity && assignment.usedQuantity > 0 && (
+                                  <div className="text-blue-600 dark:text-blue-400">
+                                    Used: {assignment.usedQuantity}
+                                  </div>
+                                )}
                                 {assignment.returnedQuantity && assignment.returnedQuantity > 0 && (
                                   <div className="text-green-600 dark:text-green-400">
                                     Returned: {assignment.returnedQuantity}
                                   </div>
                                 )}
-                                {assignment.returnedQuantity && assignment.returnedQuantity < assignment.quantity && (
-                                  <div className="text-orange-600 dark:text-orange-400">
-                                    Remaining: {assignment.quantity - assignment.returnedQuantity}
-                                  </div>
-                                )}
+                                {(() => {
+                                  const used = assignment.usedQuantity || 0;
+                                  const returned = assignment.returnedQuantity || 0;
+                                  const remaining = assignment.quantity - used - returned;
+                                  return remaining > 0 && (
+                                    <div className="text-orange-600 dark:text-orange-400">
+                                      Remaining: {remaining}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
