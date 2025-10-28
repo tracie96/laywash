@@ -72,6 +72,29 @@ export async function GET(request: NextRequest) {
     }
 
     console.log({tools, usedQuantities});
+    // Auto-update is_returned status for tools where used + returned = assigned
+    for (const tool of tools || []) {
+      const usedKey = `${tool.id}_${tool.washer_id}`;
+      const usedQuantity = usedQuantities[usedKey] || 0;
+      const returnedQuantity = tool.returned_quantity || 0;
+      
+      // If used + returned equals assigned quantity, mark as returned
+      if ((usedQuantity + returnedQuantity >= tool.quantity) && !tool.is_returned) {
+        // Fire and forget the update
+        void supabaseAdmin
+          .from('washer_tools')
+          .update({ 
+            is_returned: true,
+            returned_date: new Date().toISOString()
+          })
+          .eq('id', tool.id);
+        
+        // Update the tool in memory immediately
+        tool.is_returned = true;
+        tool.returned_date = new Date().toISOString();
+      }
+    }
+
     const transformedTools = tools?.map(tool => {
       // Calculate used quantity from check_in_materials
       const usedKey = `${tool.id}_${tool.washer_id}`;

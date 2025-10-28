@@ -20,6 +20,9 @@ interface WorkerTool {
   price: number;
   createdAt: string;
   updatedAt: string;
+  returnedQuantity?: number;
+  assignedQuantity?: number;
+  usedQuantity?: number;
 }
 
 const MyToolsPage: React.FC = () => {
@@ -282,7 +285,9 @@ const MyToolsPage: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tool</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Used</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Returned</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
@@ -306,7 +311,13 @@ const MyToolsPage: React.FC = () => {
                       {tool.toolType}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {tool.quantity} {tool.unit || 'piece'}
+                      {tool.assignedQuantity || tool.quantity} {tool.unit || 'piece'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {tool.usedQuantity || 0} {tool.unit || 'piece'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {tool.returnedQuantity || 0} {tool.unit || 'piece'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge color={getStatusColor(tool.isReturned)}>

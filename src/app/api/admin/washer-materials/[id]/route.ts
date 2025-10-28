@@ -19,7 +19,6 @@ export async function PATCH(
     const { id } = await params;
     const { quantity } = await request.json();
 
-    // Validate input
     if (quantity === undefined || quantity < 0) {
       return NextResponse.json(
         { success: false, error: 'Quantity must be a non-negative number' },
@@ -62,6 +61,7 @@ export async function PATCH(
       toolName: updatedTool.tool_name,
       toolType: updatedTool.tool_type,
       quantity: updatedTool.quantity,
+      returnedQuantity: updatedTool.returned_quantity || 0,
       amount: updatedTool.amount,
       assignedDate: updatedTool.assigned_date,
       returnedDate: updatedTool.returned_date,

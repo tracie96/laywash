@@ -38,6 +38,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get used quantities from check_in_materials for all tools
+    const toolIds = allTools?.map(tool => tool.id) || [];
+    const usedQuantities: Record<string, number> = {};
+
+    if (toolIds.length > 0) {
+      const { data: usedMaterials, error: usedError } = await supabaseAdmin
+        .from('check_in_materials')
+        .select('material_id, quantity_used, washer_id')
+        .in('material_id', toolIds);
+
+      if (!usedError && usedMaterials) {
+        // Calculate total used quantity for each tool by washer
+        usedMaterials.forEach(used => {
+          const key = `${used.material_id}_${used.washer_id}`;
+          usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
+        });
+      }
+    }
+
     // Calculate deductions based on unreturned tools
     let materialDeductions = 0;
     let toolDeductions = 0;
@@ -54,9 +73,13 @@ export async function GET(request: NextRequest) {
 
     if (allTools && allTools.length > 0) {
       for (const tool of allTools) {
-        // Calculate unreturned quantity: quantity - returned_quantity (default to 0 if not set)
+        // Get used quantity from check_in_materials
+        const usedKey = `${tool.id}_${tool.washer_id}`;
+        const usedQuantity = usedQuantities[usedKey] || 0;
+        
+        // Calculate unreturned quantity: assigned - used - returned
         const returnedQuantity = tool.returned_quantity || 0;
-        const unreturnedQuantity = tool.quantity - returnedQuantity;
+        const unreturnedQuantity = tool.quantity - usedQuantity - returnedQuantity;
         
         // Only include tools that have unreturned items
         if (unreturnedQuantity > 0) {
