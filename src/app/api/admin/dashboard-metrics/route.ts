@@ -67,18 +67,6 @@ export async function GET(request: NextRequest) {
     const startOfDay = new Date(today);
     const endOfDay = new Date(today.getTime() + (24 * 60 * 60 * 1000) - 1);
     
-    // Vercel-specific debug logging
-    console.log('Vercel date calculation:', {
-      serverTime: now.toISOString(),
-      serverTimezone: now.getTimezoneOffset(),
-      nigeriaTime: nigeriaTime.toISOString(),
-      today: today.toISOString(),
-      yesterday: yesterday.toISOString(),
-      tomorrow: tomorrow.toISOString(),
-      startOfDay: startOfDay.toISOString(),
-      endOfDay: endOfDay.toISOString(),
-      queryRange: `${yesterday.toISOString()} to ${tomorrow.toISOString()}`
-    });
     
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
@@ -100,6 +88,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch car check-ins for income calculations (include all statuses for earnings)
     // Use broader date range for Vercel to catch timezone edge cases
+    // Filter by actual_completion_time to track today's earnings based on completion date
     let checkInsQuery = supabaseAdmin
       .from('car_check_ins')
       .select(`
@@ -108,10 +97,12 @@ export async function GET(request: NextRequest) {
         payment_status,
         check_in_time,
         status,
+        actual_completion_time,
         assigned_admin_id
       `)
-      .gte('check_in_time', yesterday.toISOString())
-      .lte('check_in_time', tomorrow.toISOString());
+      .gte('actual_completion_time', yesterday.toISOString())
+      .lte('actual_completion_time', tomorrow.toISOString())
+      .not('actual_completion_time', 'is', null);
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
@@ -130,6 +121,7 @@ export async function GET(request: NextRequest) {
         data: checkInsData?.map(ci => ({
           id: ci.id,
           check_in_time: ci.check_in_time,
+          actual_completion_time: ci.actual_completion_time,
           company_income: ci.company_income,
           payment_status: ci.payment_status
         })) || []
@@ -149,19 +141,21 @@ export async function GET(request: NextRequest) {
         altEndOfDay: altEndOfDay.toISOString()
       });
       
-      // Try query with alternative dates
+      // Try query with alternative dates using actual_completion_time
       let altQuery = supabaseAdmin
         .from('car_check_ins')
         .select(`
           id,
           company_income,
           payment_status,
+          actual_completion_time,
           check_in_time,
           status,
           assigned_admin_id
         `)
-        .gte('check_in_time', altStartOfDay.toISOString())
-        .lte('check_in_time', altEndOfDay.toISOString());
+        .gte('actual_completion_time', altStartOfDay.toISOString())
+        .lte('actual_completion_time', altEndOfDay.toISOString())
+        .not('actual_completion_time', 'is', null);
       
       if (locationAdminIds && locationAdminIds.length > 0) {
         altQuery = altQuery.in('assigned_admin_id', locationAdminIds);
@@ -208,13 +202,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (checkInsData) {
-      // Calculate daily income from ALL check-ins (including pending)
-      // Filter for today's data from the broader range
+      // Calculate daily income from check-ins completed today
+      // Filter for today's data from the broader range using actual_completion_time
       const dailyCheckIns = checkInsData.filter(checkIn => {
-        const checkInDate = new Date(checkIn.check_in_time);
-        const checkInDateOnly = new Date(checkInDate.getFullYear(), checkInDate.getMonth(), checkInDate.getDate());
+        if (!checkIn.actual_completion_time) return false;
+        const completionDate = new Date(checkIn.actual_completion_time);
+        const completionDateOnly = new Date(completionDate.getFullYear(), completionDate.getMonth(), completionDate.getDate());
         const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        return checkInDateOnly.getTime() === todayDateOnly.getTime();
+        return completionDateOnly.getTime() === todayDateOnly.getTime();
       });
       
       // Calculate total earnings (including pending payments)

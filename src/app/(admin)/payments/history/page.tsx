@@ -436,7 +436,9 @@ const PaymentHistoryPage: React.FC = () => {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Date</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {new Date(payment.date).toLocaleString()}
+                        {payment.completionTime 
+                          ? new Date(payment.completionTime).toLocaleString()
+                          : new Date(payment.date).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -676,7 +678,9 @@ const PaymentHistoryPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Payment Date</p>
                   <p className="font-medium text-gray-900 dark:text-white">
-                    {new Date(selectedPayment.date).toLocaleString()}
+                    {selectedPayment.completionTime 
+                      ? new Date(selectedPayment.completionTime).toLocaleString()
+                      : new Date(selectedPayment.date).toLocaleString()}
                   </p>
                 </div>
                 {selectedPayment.checkInTime && (

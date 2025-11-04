@@ -977,7 +977,9 @@ const NewCheckInPage: React.FC = () => {
                               <p className="text-xs text-gray-500 dark:text-gray-400">No materials available for this worker</p>
                             ) : (
                               <div className="grid grid-cols-1 gap-3">
-                                {serviceMaterials[service.id].map((material) => {
+                                {serviceMaterials[service.id]
+                                  .filter((material) => material.quantity > 0)
+                                  .map((material) => {
                                   const assignedMaterial = selectedService.materials.find(m => m.materialId === material.id);
                                   
                                   return (

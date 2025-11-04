@@ -227,23 +227,7 @@ const AdminDashboard: React.FC = () => {
           <p className="text-sm font-medium text-gray-900 dark:text-white">
             {new Date().toLocaleDateString()}
           </p>
-          <button 
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/admin/debug-data', {
-                  headers: { 'X-Admin-ID': user?.id || '' }
-                });
-                const data = await response.json();
-                console.log('Debug data:', data);
-                alert(`Debug data logged to console. Check-ins: ${data.data?.allCheckIns?.count || 0}, Paid: ${data.data?.paidCheckIns?.count || 0}`);
-              } catch (error) {
-                console.error('Debug error:', error);
-              }
-            }}
-            className="mt-2 px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-          >
-            Debug Data
-          </button>
+       
         </div>
       </div>
 

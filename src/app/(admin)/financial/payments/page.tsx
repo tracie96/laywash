@@ -775,9 +775,9 @@ const FinancialPaymentsPage: React.FC = () => {
                       <div className="text-sm text-gray-900 dark:text-white">
                         {new Date(payment.date).toLocaleDateString()}
                       </div>
-                      {payment.type === 'car_wash' && payment.checkInTime && (
+                      {payment.type === 'car_wash' && payment.completionTime && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(payment.checkInTime).toLocaleTimeString()}
+                          {new Date(payment.completionTime).toLocaleTimeString()}
                         </div>
                       )}
                     </td>

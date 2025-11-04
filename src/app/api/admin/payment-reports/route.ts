@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
       payment_status: string;
       payment_method: string;
       check_in_time: string;
+      actual_completion_time: string | null;
       customer_id: string;
     }> = [];
     
@@ -112,11 +113,23 @@ export async function GET(request: NextRequest) {
           payment_status,
           payment_method,
           check_in_time,
+          actual_completion_time,
           customer_id
-        `)
-        .gte('check_in_time', startDate.toISOString())
-        .lte('check_in_time', endDate.toISOString())
-        .order('check_in_time', { ascending: false });
+        `);
+      
+      // For car wash only, filter by actual_completion_time; otherwise use check_in_time
+      if (viewMode === 'car-wash-only') {
+        checkInsQuery = checkInsQuery
+          .gte('actual_completion_time', startDate.toISOString())
+          .lte('actual_completion_time', endDate.toISOString())
+          .not('actual_completion_time', 'is', null)
+          .order('actual_completion_time', { ascending: false });
+      } else {
+        checkInsQuery = checkInsQuery
+          .gte('check_in_time', startDate.toISOString())
+          .lte('check_in_time', endDate.toISOString())
+          .order('check_in_time', { ascending: false });
+      }
       
       // Filter by location (through assigned_admin_id)
       if (locationAdminIds && locationAdminIds.length > 0) {
@@ -220,7 +233,11 @@ export async function GET(request: NextRequest) {
     // Process car check-ins (only if not stock-sales-only)
     if (viewMode !== 'stock-sales-only') {
       checkIns?.forEach(checkIn => {
-      const date = new Date(checkIn.check_in_time);
+      // For car wash only, use actual_completion_time; otherwise use check_in_time
+      const dateTime = viewMode === 'car-wash-only' && checkIn.actual_completion_time 
+        ? checkIn.actual_completion_time 
+        : checkIn.check_in_time;
+      const date = new Date(dateTime);
       let groupKey: string;
 
       switch (reportType) {
