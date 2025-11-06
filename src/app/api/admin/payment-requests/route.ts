@@ -204,21 +204,21 @@ export async function POST(request: NextRequest) {
 
     // For advance payments, check if washer has 0 or negative earnings and amount doesn't exceed 2000
     if (isAdvance) {
-      if (currentEarnings > 2000) {
+      if (currentEarnings > 3000) {
         return NextResponse.json(
           { 
             success: false, 
-            error: 'Advance payments can only be requested when total earnings is 2000 or negative' 
+            error: 'Advance payments can only be requested when total earnings is 3000 or negative' 
           },
           { status: 400 }
         );
       }
       
-      if (requestedAmount > 2000) {
+      if (requestedAmount > 3000) {
         return NextResponse.json(
           { 
             success: false, 
-            error: 'Advance payment cannot exceed ₦2,000' 
+            error: 'Advance payment cannot exceed ₦3,000' 
           },
           { status: 400 }
         );

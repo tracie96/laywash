@@ -243,8 +243,8 @@ const PaymentRequestsPage: React.FC = () => {
       return;
     }
 
-    if (requestedAmount > 2000) {
-      alert('Advance payment cannot exceed ₦2,000');
+    if (requestedAmount > 3000) {
+      alert('Advance payment cannot exceed ₦3,000');
       return;
     }
 
@@ -406,14 +406,12 @@ const PaymentRequestsPage: React.FC = () => {
             Create Payment Request
           </Button>
           
-          {currentEarnings <= 2000 && (
             <Button
               onClick={openAdvanceForm}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               Request Advance
             </Button>
-          )}
         </div>
       </div>
 
@@ -705,11 +703,11 @@ const PaymentRequestsPage: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Enter amount (max ₦2,000)"
               min="1"
-              max="2000"
+              max="3000"
               required
             />
             <div className="text-xs text-gray-500 mt-1">
-              Maximum: ₦2,000
+              Maximum: ₦3,000
             </div>
           </div>
           
