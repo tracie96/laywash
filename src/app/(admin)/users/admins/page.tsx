@@ -15,6 +15,7 @@ interface Admin {
   lastLogin: string;
   permissions: string[];
   location?: string | null;
+  locationName?: string | null;
   cvUrl?: string | null;
   pictureUrl?: string | null;
   address?: string | null;
@@ -125,11 +126,11 @@ const UsersAdminsPage: React.FC = () => {
   // Filter admins by location
   const filteredAdmins = admins.filter(admin => {
     if (locationFilter === 'all') return true;
-    return admin.location === locationFilter;
+    return (admin.locationName || admin.location) === locationFilter;
   });
 
   // Get unique locations for filter dropdown
-  const uniqueLocations = Array.from(new Set(admins.map(admin => admin.location).filter(Boolean)));
+  const uniqueLocations = Array.from(new Set(admins.map(admin => admin.locationName || admin.location).filter(Boolean)));
 
   const totalAdmins = admins.length;
   const activeAdmins = admins.filter(a => a.status === "active").length;
@@ -324,7 +325,7 @@ const UsersAdminsPage: React.FC = () => {
                       {admin.phone}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {admin.location}
+                      {admin.locationName || admin.location}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {new Date(admin.joinDate).toLocaleDateString()}

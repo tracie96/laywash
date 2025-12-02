@@ -483,7 +483,7 @@ const OperationsCustomersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageBreadCrumb pageTitle="Customer Databsase" />
+      <PageBreadCrumb pageTitle="Customer Database" />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -761,8 +761,9 @@ const OperationsCustomersPage: React.FC = () => {
                           className="text-blue-light-600 hover:text-blue-light-500 dark:text-blue-light-400 dark:hover:text-blue-light-300 transition-colors"
                           title="View Details"
                         >
-                          <EyeIcon className="w-4 h-4" />
+                          <EyeIcon className="w-6 h-4" />
                         </button>
+                        {user?.role === 'super_admin' && (
                         <button 
                           onClick={() => handleEditCustomer(customer)}
                           className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 transition-colors"
@@ -770,6 +771,7 @@ const OperationsCustomersPage: React.FC = () => {
                         >
                           <PencilIcon className="w-4 h-4" />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

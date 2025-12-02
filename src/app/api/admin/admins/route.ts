@@ -27,6 +27,10 @@ export async function GET() {
         updated_at,
         admin_profiles (
           location,
+          locations (
+            lga,
+            address
+          ),
           address,
           cv_url,
           picture_url,
@@ -47,6 +51,8 @@ export async function GET() {
     // Transform the data to match the frontend interface
     const transformedAdmins = admins.map(admin => {
       const profile = admin.admin_profiles?.[0];
+      // @ts-ignore
+      const locationName = profile?.locations?.lga || profile?.locations?.address;
       return {
         id: admin.id,
         name: admin.name,
@@ -57,6 +63,7 @@ export async function GET() {
         lastLogin: 'N/A', // This would need to be tracked separately
         permissions: getPermissionsForRole(admin.role),
         location: profile?.location || null,
+        locationName: locationName || null,
         address: profile?.address || null,
         cvUrl: profile?.cv_url || null,
         pictureUrl: profile?.picture_url || null,
