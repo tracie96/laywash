@@ -51,8 +51,8 @@ export async function GET() {
     // Transform the data to match the frontend interface
     const transformedAdmins = admins.map(admin => {
       const profile = admin.admin_profiles?.[0];
-      // @ts-ignore
-      const locationName = profile?.locations?.lga || profile?.locations?.address;
+    // @ts-expect-error: Supabase join may not have proper TypeScript types
+    const locationName = profile?.locations?.lga || profile?.locations?.address;
       return {
         id: admin.id,
         name: admin.name,

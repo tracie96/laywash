@@ -201,7 +201,7 @@ export async function GET(
 
     // Transform the data to match the frontend interface
     const profile = admin.admin_profiles?.[0];
-    // @ts-ignore
+    // @ts-expect-error: Supabase join may not have proper TypeScript types
     const locationName = profile?.locations?.lga || profile?.locations?.address;
     
     const transformedAdmin = {
