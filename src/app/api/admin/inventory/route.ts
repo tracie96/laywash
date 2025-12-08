@@ -87,10 +87,14 @@ export async function GET(request: NextRequest) {
     // Apply status filter after transformation
     let filteredItems = transformedItems;
     if (status !== 'all') {
-      filteredItems = filteredItems.filter(item => {
-        const stockStatus = getStockStatus(item);
-        return stockStatus === status;
-      });
+      if (status === 'active' || status === 'inactive') {
+        filteredItems = filteredItems.filter(item => item.isActive === (status === 'active'));
+      } else {
+        filteredItems = filteredItems.filter(item => {
+          const stockStatus = getStockStatus(item);
+          return stockStatus === status;
+        });
+      }
     }
 
     return NextResponse.json({

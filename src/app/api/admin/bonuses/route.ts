@@ -113,7 +113,10 @@ export async function GET(request: NextRequest) {
           approvedBy: bonus.approved_by,
           approvedAt: bonus.approved_at,
           paidAt: bonus.paid_at,
-          createdAt: bonus.created_at
+          createdAt: bonus.created_at,
+          bonusType: bonus.bonus_type,
+          serviceId: bonus.service_id,
+          itemId: bonus.item_id
         };
       })
     );
@@ -139,7 +142,10 @@ export async function POST(request: NextRequest) {
       recipientId, 
       amount, 
       reason, 
-      milestone 
+      milestone,
+      bonusType, // 'cash', 'service', 'item'
+      serviceId,
+      itemId
     } = await request.json();
 
     // Validate required input
@@ -148,6 +154,48 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Missing required fields: type, recipientId, amount, and reason are required' },
         { status: 400 }
       );
+    }
+
+    // Handle Inventory Item Logic
+    if (bonusType === 'item' && itemId) {
+      // Check and deduct stock
+      const { data: item, error: itemError } = await supabaseAdmin
+        .from('inventory')
+        .select('name, current_stock')
+        .eq('id', itemId)
+        .single();
+
+      if (itemError || !item) {
+        return NextResponse.json(
+          { success: false, error: 'Selected item not found' },
+          { status: 400 }
+        );
+      }
+
+      if (item.current_stock <= 0) {
+        return NextResponse.json(
+          { success: false, error: `Item "${item.name}" is out of stock` },
+          { status: 400 }
+        );
+      }
+
+      // Deduct stock
+      const { error: updateError } = await supabaseAdmin
+        .from('inventory')
+        .update({ current_stock: item.current_stock - 1 })
+        .eq('id', itemId);
+
+      if (updateError) {
+        console.error('Failed to deduct stock:', updateError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to update inventory stock' },
+          { status: 500 }
+        );
+      }
+      
+      // Log stock movement if table exists (optional, but good for tracking)
+      // We'll skip for now to avoid errors if table doesn't match exactly, 
+      // but in a real app, you'd want to record this.
     }
 
     // Validate type
@@ -212,6 +260,9 @@ export async function POST(request: NextRequest) {
         amount,
         reason,
         milestone: milestone || null,
+        bonus_type: bonusType || 'cash',
+        service_id: serviceId || null,
+        item_id: itemId || null,
         status: 'pending',
         created_at: new Date().toISOString()
       })

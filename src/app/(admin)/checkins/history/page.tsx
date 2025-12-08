@@ -48,6 +48,29 @@ interface Washer {
   hourlyRate: number;
 }
 
+interface Bonus {
+  id: string;
+  recipientId: string;
+  amount: number;
+  reason: string;
+  milestone?: string;
+  status: string;
+  createdAt: string;
+  bonusType?: string;
+  serviceId?: string;
+  itemId?: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+}
+
+interface InventoryItem {
+  id: string;
+  name: string;
+}
+
 const CheckInHistoryPage: React.FC = () => {
   const { hasRole, user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
@@ -83,7 +106,9 @@ const CheckInHistoryPage: React.FC = () => {
   const [sendingSMS, setSendingSMS] = useState<string | null>(null);
 
   // Track customer bonuses
-  const [customerBonuses, setCustomerBonuses] = useState<Set<string>>(new Set());
+  const [customerBonuses, setCustomerBonuses] = useState<Map<string, Bonus[]>>(new Map());
+  const [showBonusModal, setShowBonusModal] = useState(false);
+  const [selectedCustomerBonuses, setSelectedCustomerBonuses] = useState<Bonus[]>([]);
 
   // Helper function to get current date in YYYY-MM-DD format
   const getCurrentDate = () => {
@@ -228,17 +253,57 @@ const CheckInHistoryPage: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        const customerIds = new Set<string>(
-          data.bonuses
-            .filter((bonus: { status: string }) => bonus.status !== 'paid')
-            .map((bonus: { recipientId: string }) => bonus.recipientId)
-        );
-        setCustomerBonuses(customerIds);
+        const bonusesMap = new Map<string, Bonus[]>();
+        data.bonuses
+          .filter((bonus: Bonus) => bonus.status !== 'paid')
+          .forEach((bonus: Bonus) => {
+            const customerId = bonus.recipientId;
+            if (!bonusesMap.has(customerId)) {
+              bonusesMap.set(customerId, []);
+            }
+            bonusesMap.get(customerId)!.push(bonus);
+          });
+        setCustomerBonuses(bonusesMap);
       }
     } catch (error) {
       console.error('Error fetching customer bonuses:', error);
     }
   }, []);
+
+  // Fetch service/item names when bonus modal opens
+  useEffect(() => {
+    if (showBonusModal && selectedCustomerBonuses.length > 0) {
+      const fetchNames = async () => {
+        // Fetch all services and items
+        const [servicesRes, itemsRes] = await Promise.all([
+          fetch('/api/admin/services'),
+          fetch('/api/admin/inventory')
+        ]);
+        
+        const servicesData = await servicesRes.json();
+        const itemsData = await itemsRes.json();
+        
+        const services: Service[] = servicesData.success ? servicesData.services : [];
+        const items: InventoryItem[] = itemsData.success ? itemsData.inventory : [];
+        
+        // Update DOM with names
+        selectedCustomerBonuses.forEach((bonus) => {
+          if (bonus.serviceId) {
+            const service = services.find((s: Service) => s.id === bonus.serviceId);
+            const element = document.getElementById(`service-name-${bonus.id}`);
+            if (element && service) element.textContent = service.name;
+          }
+          if (bonus.itemId) {
+            const item = items.find((i: InventoryItem) => i.id === bonus.itemId);
+            const element = document.getElementById(`item-name-${bonus.id}`);
+            if (element && item) element.textContent = item.name;
+          }
+        });
+      };
+      
+      fetchNames();
+    }
+  }, [showBonusModal, selectedCustomerBonuses]);
 
   // Load data on component mount
   useEffect(() => {
@@ -1028,12 +1093,20 @@ const CheckInHistoryPage: React.FC = () => {
                           </Badge>
                         )}
                         {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (
-                          <Badge
-                            color="info"
-                            size="sm"
+                          <button
+                            onClick={() => {
+                              setSelectedCustomerBonuses(customerBonuses.get(checkIn.customerId!) || []);
+                              setShowBonusModal(true);
+                            }}
+                            className="cursor-pointer"
                           >
-                            🎁 Has Bonus
-                          </Badge>
+                            <Badge
+                              color="info"
+                              size="sm"
+                            >
+                              🎁 Has Bonus
+                            </Badge>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1598,6 +1671,92 @@ const CheckInHistoryPage: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Bonus Details Modal */}
+      <Modal
+        isOpen={showBonusModal}
+        onClose={() => setShowBonusModal(false)}
+        className="max-w-2xl"
+      >
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Customer Bonuses
+          </h2>
+          
+          {selectedCustomerBonuses.length === 0 ? (
+            <p className="text-gray-600 dark:text-gray-400">No bonuses found.</p>
+          ) : (
+            <div className="space-y-4">
+              {selectedCustomerBonuses.map((bonus) => (
+                <div key={bonus.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {bonus.reason}
+                      </p>
+                      {bonus.milestone && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Milestone: {bonus.milestone}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      bonus.status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
+                      bonus.status === 'paid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200' :
+                      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                    }`}>
+                      {bonus.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Amount</p>
+                      <p className="font-medium text-gray-900 dark:text-white">₦{bonus.amount?.toFixed(2) || '0.00'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Type</p>
+                      <p className="font-medium text-gray-900 dark:text-white capitalize">
+                        {bonus.bonusType || 'cash'}
+                      </p>
+                    </div>
+                    {bonus.serviceId && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Service</p>
+                        <p className="font-medium text-gray-900 dark:text-white" id={`service-name-${bonus.id}`}>
+                          Loading...
+                        </p>
+                      </div>
+                    )}
+                    {bonus.itemId && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Item</p>
+                        <p className="font-medium text-gray-900 dark:text-white" id={`item-name-${bonus.id}`}>
+                          Loading...
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400">Date</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {new Date(bonus.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+            <Button
+              onClick={() => setShowBonusModal(false)}
+              variant="outline"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -24,6 +24,9 @@ interface Bonus {
   approvedAt?: string;
   paidAt?: string;
   createdAt: string;
+  bonusType?: 'cash' | 'service' | 'item';
+  serviceId?: string;
+  itemId?: string;
 }
 
 interface CreateBonusForm {
@@ -64,11 +67,17 @@ interface Washer {
   phone: string;
 }
 
+interface InventoryItem {
+  id: string;
+  name: string;
+}
+
 const FinancialBonusesPage: React.FC = () => {
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -177,6 +186,7 @@ const FinancialBonusesPage: React.FC = () => {
     fetchCustomers();
     fetchWashers();
     fetchServices();
+    fetchInventory();
   }, [fetchBonuses]);
 
   // Filter customers and washers when filters change
@@ -219,6 +229,18 @@ const FinancialBonusesPage: React.FC = () => {
       }
     } catch {
       console.error('Error fetching services');
+    }
+  };
+
+  const fetchInventory = async () => {
+    try {
+      const response = await fetch('/api/admin/inventory?status=active');
+      const data = await response.json();
+      if (data.success) {
+        setInventory(data.inventory || []);
+      }
+    } catch {
+      console.error('Error fetching inventory');
     }
   };
 
@@ -686,6 +708,19 @@ const FinancialBonusesPage: React.FC = () => {
                       {bonus.milestone && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           Milestone: {bonus.milestone}
+                        </div>
+                      )}
+                      {bonus.bonusType && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Type: <span className="capitalize">{bonus.bonusType}</span>
+                          {bonus.serviceId && (() => {
+                            const service = services.find(s => s.id === bonus.serviceId);
+                            return service ? ` - ${service.name}` : '';
+                          })()}
+                          {bonus.itemId && (() => {
+                            const item = inventory.find(i => i.id === bonus.itemId);
+                            return item ? ` - ${item.name}` : '';
+                          })()}
                         </div>
                       )}
                     </td>

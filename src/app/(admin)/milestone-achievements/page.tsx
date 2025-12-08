@@ -64,6 +64,19 @@ interface Milestone {
   };
 }
 
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  price: number;
+  currentStock: number;
+}
+
 const MilestoneAchievementsPage: React.FC = () => {
   const { user } = useAuth();
   const [achievements, setAchievements] = useState<CustomerMilestoneAchievement[]>([]);
@@ -87,11 +100,18 @@ const MilestoneAchievementsPage: React.FC = () => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [viewMode, setViewMode] = useState<'achievements' | 'qualifying'>('achievements');
   
+  // Data for bonus selection
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
+  const [availableInventory, setAvailableInventory] = useState<InventoryItem[]>([]);
+  
   // Bonus modal states
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [bonusForm, setBonusForm] = useState({
     customerId: '',
     customerName: '',
+    bonusType: 'cash', // 'cash' (default), 'service', 'item'
+    serviceId: '',
+    itemId: '',
     amount: '',
     reason: '',
     milestone: ''
@@ -255,14 +275,40 @@ const MilestoneAchievementsPage: React.FC = () => {
     }
   }, []);
 
+  const fetchServices = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/services?status=active');
+      const data = await response.json();
+      if (data.success) {
+        setAvailableServices(data.services || []);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    }
+  }, []);
+
+  const fetchInventory = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/inventory?status=active');
+      const data = await response.json();
+      if (data.success) {
+        setAvailableInventory(data.inventory || []);
+      }
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBonuses();
+    fetchServices();
+    fetchInventory();
     if (milestoneId) {
       fetchQualifyingCustomers();
     } else {
     fetchAchievements();
     }
-  }, [milestoneId, selectedFilter, selectedType, searchTerm, fetchAchievements, fetchQualifyingCustomers, fetchBonuses]);
+  }, [milestoneId, selectedFilter, selectedType, searchTerm, fetchAchievements, fetchQualifyingCustomers, fetchBonuses, fetchServices, fetchInventory]);
 
   // Get bonus status for customer and milestone
   const getBonusStatus = (customerId: string, milestoneName: string): string | null => {
@@ -343,6 +389,9 @@ const MilestoneAchievementsPage: React.FC = () => {
     setBonusForm({
       customerId,
       customerName,
+      bonusType: 'cash',
+      serviceId: '',
+      itemId: '',
       amount: '',
       reason: `Milestone Achievement: ${milestone}`,
       milestone
@@ -358,10 +407,20 @@ const MilestoneAchievementsPage: React.FC = () => {
       setBonusError('Please fill in all required fields');
       return;
     }
+    
+    if (bonusForm.bonusType === 'service' && !bonusForm.serviceId) {
+      setBonusError('Please select a service');
+      return;
+    }
+    
+    if (bonusForm.bonusType === 'item' && !bonusForm.itemId) {
+      setBonusError('Please select an item');
+      return;
+    }
 
     const amount = parseFloat(bonusForm.amount);
     if (isNaN(amount) || amount <= 0) {
-      setBonusError('Bonus amount must be greater than 0');
+      setBonusError('Bonus value must be greater than 0');
       return;
     }
 
@@ -381,23 +440,26 @@ const MilestoneAchievementsPage: React.FC = () => {
           amount: amount,
           reason: bonusForm.reason,
           milestone: bonusForm.milestone || null,
+          bonusType: bonusForm.bonusType,
+          serviceId: bonusForm.serviceId || null,
+          itemId: bonusForm.itemId || null
         }),
       });
 
       const bonusData = await bonusResponse.json();
 
       if (bonusData.success) {
-        // Create expense entry for customer bonuses (free wash)
+        // Create expense entry for customer bonuses (free wash/item)
         const expenseResponse = await fetch('/api/admin/expenses', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            serviceType: 'checkin',
+            serviceType: bonusForm.bonusType === 'item' ? 'inventory' : 'checkin',
             amount: amount,
-            reason: `Free Car Wash Bonus: ${bonusForm.reason}`,
-            description: `Free wash bonus awarded to ${bonusForm.customerName} - ${bonusForm.milestone}`,
+            reason: `Bonus (${bonusForm.bonusType}): ${bonusForm.reason}`,
+            description: `Bonus awarded to ${bonusForm.customerName} - ${bonusForm.milestone}`,
             expenseDate: new Date().toISOString()
           }),
         });
@@ -411,6 +473,9 @@ const MilestoneAchievementsPage: React.FC = () => {
         setBonusForm({
           customerId: '',
           customerName: '',
+          bonusType: 'cash',
+          serviceId: '',
+          itemId: '',
           amount: '',
           reason: '',
           milestone: ''
@@ -418,9 +483,14 @@ const MilestoneAchievementsPage: React.FC = () => {
         // Refresh bonuses list to update button state
         fetchBonuses();
         
+        // Refresh inventory if item was given
+        if (bonusForm.bonusType === 'item') {
+          fetchInventory();
+        }
+        
         setNotification({ 
           type: 'success', 
-          message: `Free wash bonus of ₦${amount} created successfully for ${bonusForm.customerName}!` 
+          message: `Bonus of ₦${amount} created successfully for ${bonusForm.customerName}!` 
         });
         setTimeout(() => setNotification(null), 5000);
       } else {
@@ -983,20 +1053,108 @@ const MilestoneAchievementsPage: React.FC = () => {
           )}
 
           <form onSubmit={handleCreateBonus} className="space-y-4">
+            {/* Bonus Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Bonus Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={bonusForm.bonusType}
+                onChange={(e) => {
+                  const type = e.target.value;
+                  setBonusForm({
+                    ...bonusForm, 
+                    bonusType: type,
+                    serviceId: '',
+                    itemId: '',
+                    amount: type === 'cash' ? '' : bonusForm.amount // Clear amount only if switching away from cash, effectively
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="cash">Cash/Discount</option>
+                <option value="service">Free Service</option>
+                <option value="item">Free Item</option>
+              </select>
+            </div>
+
+            {bonusForm.bonusType === 'service' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Service <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={bonusForm.serviceId}
+                  onChange={(e) => {
+                    const serviceId = e.target.value;
+                    const service = availableServices.find(s => s.id === serviceId);
+                    setBonusForm({
+                      ...bonusForm,
+                      serviceId,
+                      amount: service?.price ? String(service.price) : '',
+                      reason: service ? `Free ${service.name} Service` : bonusForm.reason
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Select a service</option>
+                  {availableServices.map(service => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} (₦{service.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Item Selection */}
+            {bonusForm.bonusType === 'item' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Item <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={bonusForm.itemId}
+                  onChange={(e) => {
+                    const itemId = e.target.value;
+                    const item = availableInventory.find(i => i.id === itemId);
+                    setBonusForm({
+                      ...bonusForm,
+                      itemId,
+                      amount: item?.price ? String(item.price) : '',
+                      reason: item ? `Free ${item.name} Item` : bonusForm.reason
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Select an item</option>
+                  {availableInventory.map(item => (
+                    <option key={item.id} value={item.id} disabled={item.currentStock <= 0}>
+                      {item.name} (Stock: {item.currentStock}) - ₦{item.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Amount */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Free Wash Value (₦) <span className="text-red-500">*</span>
+                Bonus Value (₦) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="Enter free wash value"
+                placeholder="Enter value"
                 value={bonusForm.amount}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBonusForm({...bonusForm, amount: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                readOnly={bonusForm.bonusType !== 'cash'} // Read-only for service/item to prevent tampering (optional, user might want to adjust value)
               />
+              {bonusForm.bonusType !== 'cash' && (
+                <p className="text-xs text-gray-500 mt-1">Value automatically set based on selection.</p>
+              )}
             </div>
 
             {/* Reason */}
@@ -1006,7 +1164,7 @@ const MilestoneAchievementsPage: React.FC = () => {
               </label>
               <input
                 type="text"
-                placeholder="Brief reason for free wash"
+                placeholder="Brief reason for bonus"
                 value={bonusForm.reason}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBonusForm({...bonusForm, reason: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
