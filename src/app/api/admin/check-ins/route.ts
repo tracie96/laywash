@@ -203,17 +203,18 @@ console.log('date:', date);
           const customerPhone = checkIn.customers?.phone || '';
           const licensePlate = checkIn.license_plate || '';
           const userCode = checkIn.user_code || '';
+          const passcode = checkIn.passcode || '';
           
           const searchLower = search.toLowerCase();
           
           return customerName.toLowerCase().includes(searchLower) ||
                  customerPhone.toLowerCase().includes(searchLower) ||
                  licensePlate.toLowerCase().includes(searchLower) ||
-                 userCode.toLowerCase().includes(searchLower);
+                 userCode.toLowerCase().includes(searchLower) ||
+                 passcode.toLowerCase().includes(searchLower);
         });
       }
 
-      console.log(`Total results after filtering: ${checkIns.length}`);
 
       // Apply license plate and date filters
       if (licensePlate) {

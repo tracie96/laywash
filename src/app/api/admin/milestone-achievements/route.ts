@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
 // Function to get customers who qualify for a specific milestone
 export async function PUT(request: NextRequest) {
   try {
-    const { milestoneId } = await request.json();
+    const { milestoneId, exclusionCondition } = await request.json();
 
     if (!milestoneId) {
       return NextResponse.json(
@@ -344,17 +344,26 @@ export async function PUT(request: NextRequest) {
 
         let qualified = false;
         let achievedValue = 0;
+        let excluded = false;
 
         // Check milestone condition
         if (milestone.type === 'visits') {
           achievedValue = actualVisits;
           qualified = checkCondition(achievedValue, milestone.condition);
+          // Check exclusion condition if present (e.g., to exclude those who qualify for next tier)
+          if (qualified && exclusionCondition) {
+            excluded = checkCondition(achievedValue, exclusionCondition);
+          }
         } else if (milestone.type === 'spending') {
           achievedValue = actualSpent;
           qualified = checkCondition(achievedValue, milestone.condition);
+          // Check exclusion condition if present
+          if (qualified && exclusionCondition) {
+            excluded = checkCondition(achievedValue, exclusionCondition);
+          }
         }
 
-        if (qualified) {
+        if (qualified && !excluded) {
           qualifyingCustomers.push({
             id: customer.id,
             name: customer.name,

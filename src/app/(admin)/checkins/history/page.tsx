@@ -49,7 +49,7 @@ interface Washer {
 }
 
 const CheckInHistoryPage: React.FC = () => {
-  const { user } = useAuth();
+  const { hasRole, user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +59,7 @@ const CheckInHistoryPage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'pos'>('cash');
-  
+
   // Date search state
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -94,15 +94,15 @@ const CheckInHistoryPage: React.FC = () => {
   // Fetch earnings data from API
   const fetchEarnings = useCallback(async () => {
     if (!user?.id) return;
-    
+
     try {
       setIsLoadingEarnings(true);
-      
+
       // Build query parameters for date filtering
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
-      
+
       const response = await fetch(`/api/admin/earnings?${params.toString()}`, {
         headers: {
           'X-Admin-ID': user.id,
@@ -130,11 +130,11 @@ const CheckInHistoryPage: React.FC = () => {
     try {
       const response = await fetch('/api/admin/washers');
       const result = await response.json();
-      
+
       if (result.success) {
         const allWashers = result.washers || [];
         // Filter to only show active and available washers for assignment
-        const availableWashers = allWashers.filter((washer: { isActive: boolean; isAvailable: boolean }) => 
+        const availableWashers = allWashers.filter((washer: { isActive: boolean; isAvailable: boolean }) =>
           washer.isActive && washer.isAvailable
         );
         setWashers(availableWashers);
@@ -153,11 +153,11 @@ const CheckInHistoryPage: React.FC = () => {
         sortBy: 'check_in_time',
         sortOrder: 'desc'
       });
-      
+
       if (search.trim()) {
         searchParams.append('search', search.trim());
       }
-      
+
       // Add date range parameters if they exist
       if (startDate) {
         searchParams.append('startDate', startDate);
@@ -165,16 +165,16 @@ const CheckInHistoryPage: React.FC = () => {
       if (endDate) {
         searchParams.append('endDate', endDate);
       }
-      
+
       if (!user?.id) return;
-      
+
       const response = await fetch(`/api/admin/check-ins?${searchParams.toString()}`, {
         headers: {
           'X-Admin-ID': user.id,
         },
       });
       const result = await response.json();
-      
+
       if (result.success) {
         const transformedCheckIns: CheckIn[] = result.checkIns.map((checkIn: CheckIn) => ({
           id: checkIn.id,
@@ -211,7 +211,7 @@ const CheckInHistoryPage: React.FC = () => {
           // Filter out check-ins with invalid dates and cancelled check-ins
           return !isNaN(checkIn.checkInTime.getTime());
         });
-        
+
         setCheckIns(transformedCheckIns);
       } else {
         throw new Error(result.error || 'Failed to fetch check-ins');
@@ -226,7 +226,7 @@ const CheckInHistoryPage: React.FC = () => {
     try {
       const response = await fetch('/api/admin/bonuses?type=customer');
       const data = await response.json();
-      
+
       if (data.success) {
         const customerIds = new Set<string>(
           data.bonuses
@@ -244,7 +244,7 @@ const CheckInHistoryPage: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      
+
       try {
         await Promise.all([
           fetchCheckIns(),
@@ -282,10 +282,10 @@ const CheckInHistoryPage: React.FC = () => {
     } else {
       statusMatch = checkIn.status === filter;
     }
-    
+
     if (!statusMatch) return false;
-    
-    
+
+
     // Then filter by search query if provided
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -295,17 +295,17 @@ const CheckInHistoryPage: React.FC = () => {
       const matchesWasher = checkIn.assignedWasher?.toLowerCase().includes(query) || false;
       if (!matchesName && !matchesPhone && !matchesPlate && !matchesWasher) return false;
     }
-    
+
     // Then filter by date range if dates are selected
     if (startDate || endDate) {
       const checkInDate = new Date(checkIn.checkInTime);
       const start = startDate ? new Date(startDate + 'T00:00:00') : null;
       const end = endDate ? new Date(endDate + 'T23:59:59') : null;
-      
+
       if (start && checkInDate < start) return false;
       if (end && checkInDate > end) return false;
     }
-    
+
     return true;
   });
 
@@ -317,9 +317,9 @@ const CheckInHistoryPage: React.FC = () => {
   const handleMarkInProgress = async (checkInId: string) => {
     try {
       setUpdatingStatus(checkInId);
-      
+
       console.log('Updating check-in status to in_progress:', checkInId);
-      
+
       const response = await fetch(`/api/admin/check-ins/${checkInId}`, {
         method: 'PATCH',
         headers: {
@@ -335,15 +335,15 @@ const CheckInHistoryPage: React.FC = () => {
       console.log('Update response:', result);
 
       if (response.ok && result.success) {
-        setCheckIns(prev => prev.map(checkIn => 
-          checkIn.id === checkInId 
+        setCheckIns(prev => prev.map(checkIn =>
+          checkIn.id === checkInId
             ? { ...checkIn, status: 'in_progress' as const }
             : checkIn
         ));
-        
+
         // Show success message
         alert('Status updated successfully! Work started.');
-        
+
         // Refresh the list to get any additional updates
         await fetchCheckIns();
       } else {
@@ -361,7 +361,7 @@ const CheckInHistoryPage: React.FC = () => {
   const handlePaymentConfirm = async () => {
     try {
       setIsUpdatingPayment(selectedCheckInId);
-      
+
       const response = await fetch(`/api/admin/check-ins/${selectedCheckInId}`, {
         method: 'PATCH',
         headers: {
@@ -377,21 +377,21 @@ const CheckInHistoryPage: React.FC = () => {
 
       if (result.success) {
         // Update the local state to reflect the payment status change
-        setCheckIns(prev => prev.map(checkIn => 
-          checkIn.id === selectedCheckInId 
+        setCheckIns(prev => prev.map(checkIn =>
+          checkIn.id === selectedCheckInId
             ? { ...checkIn, paymentStatus: 'paid', paymentMethod: selectedPaymentMethod }
             : checkIn
         ));
-        
+
         // Refetch earnings to update the total
         fetchEarnings();
-        
+
         // Notify other pages that washer earnings have been updated
         localStorage.setItem('washer_earnings_updated', Date.now().toString());
-        
+
         // Show success message
         alert('Payment status updated successfully!');
-        
+
         // Close modal and reset
         setShowPaymentModal(false);
         setSelectedCheckInId('');
@@ -446,7 +446,7 @@ const CheckInHistoryPage: React.FC = () => {
   const handleStatusChange = async (checkInId: string, newStatus: string, passcode?: string, reason?: string) => {
     try {
       const requestBody: { status: string; passcode?: string; reason?: string } = { status: newStatus };
-      
+
       if (newStatus === 'completed' && passcode) {
         requestBody.passcode = passcode;
       }
@@ -464,22 +464,22 @@ const CheckInHistoryPage: React.FC = () => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // Update local state with the response data
-        setCheckIns(prev => prev.map(checkIn => 
-          checkIn.id === checkInId 
+        setCheckIns(prev => prev.map(checkIn =>
+          checkIn.id === checkInId
             ? { ...checkIn, ...result.checkIn }
             : checkIn
         ));
-        
+
         // Close modal and clear error on success
         if (newStatus === 'completed') {
           setShowPasscodeModal(false);
           setPasscodeError('');
           setSelectedCheckInId('');
         }
-        
+
         if (newStatus === 'cancelled') {
           setShowCancelModal(false);
           setCancelReason('');
@@ -500,17 +500,17 @@ const CheckInHistoryPage: React.FC = () => {
 
   const handleOpenPasscodeModal = (checkInId: string) => {
     const checkIn = checkIns.find(c => c.id === checkInId);
-    
+
     if (checkIn?.washType === 'instant') {
       handleStatusChange(checkInId, 'completed');
       return;
     }
-    
+
     if (!checkIn?.passcode) {
       handleStatusChange(checkInId, 'completed');
       return;
     }
-    
+
     setSelectedCheckInId(checkInId);
     setShowPasscodeModal(true);
     setPasscodeError('');
@@ -560,10 +560,10 @@ const CheckInHistoryPage: React.FC = () => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
-        setCheckIns(prev => prev.map(checkIn => 
-          checkIn.id === checkInId 
+        setCheckIns(prev => prev.map(checkIn =>
+          checkIn.id === checkInId
             ? { ...checkIn, ...result.checkIn }
             : checkIn
         ));
@@ -579,7 +579,7 @@ const CheckInHistoryPage: React.FC = () => {
   const handleSendSMS = async (checkInId: string, customerPhone: string) => {
     try {
       setSendingSMS(checkInId);
-      
+
       const response = await fetch(`/api/admin/check-ins/${checkInId}/send-sms`, {
         method: 'POST',
         headers: {
@@ -592,7 +592,7 @@ const CheckInHistoryPage: React.FC = () => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         alert('SMS sent successfully!');
       } else {
@@ -642,12 +642,12 @@ const CheckInHistoryPage: React.FC = () => {
 
 
   const calculateAverageDuration = () => {
-    const completedCheckIns = filteredCheckIns.filter(checkIn => 
+    const completedCheckIns = filteredCheckIns.filter(checkIn =>
       checkIn.status === 'completed' || checkIn.status === 'paid'
     );
     if (completedCheckIns.length === 0) return 0;
-    
-    const totalDuration = completedCheckIns.reduce((total, checkIn) => 
+
+    const totalDuration = completedCheckIns.reduce((total, checkIn) =>
       total + (checkIn.actualDuration || checkIn.estimatedDuration), 0
     );
     return Math.round(totalDuration / completedCheckIns.length);
@@ -775,7 +775,7 @@ const CheckInHistoryPage: React.FC = () => {
       </div>
 
       {/* Name Search */}
-  
+
       {/* Date Search */}
       <div className="mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -826,7 +826,7 @@ const CheckInHistoryPage: React.FC = () => {
                   startOfWeek.setDate(today.getDate() - today.getDay());
                   const endOfWeek = new Date(today);
                   endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-                  
+
                   setStartDate(startOfWeek.toISOString().split('T')[0]);
                   setEndDate(endOfWeek.toISOString().split('T')[0]);
                 }}
@@ -840,7 +840,7 @@ const CheckInHistoryPage: React.FC = () => {
                   const today = new Date();
                   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
                   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                  
+
                   setStartDate(startOfMonth.toISOString().split('T')[0]);
                   setEndDate(endOfMonth.toISOString().split('T')[0]);
                 }}
@@ -910,61 +910,55 @@ const CheckInHistoryPage: React.FC = () => {
         <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg overflow-x-auto">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'all'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'all'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             All ({filteredCheckIns.length})
           </button>
           <button
             onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'pending'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'pending'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Pending ({checkIns.filter(c => c.status === 'pending').length})
           </button>
           <button
             onClick={() => setFilter('in_progress')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'in_progress'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'in_progress'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             In Progress ({checkIns.filter(c => c.status === 'in_progress').length})
           </button>
           <button
             onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'completed'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'completed'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Completed ({checkIns.filter(c => c.status === 'completed').length})
           </button>
           <button
             onClick={() => setFilter('paid')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'paid'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'paid'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Paid ({checkIns.filter(c => c.status === 'paid').length})
           </button>
           <button
             onClick={() => setFilter('cancelled')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === 'cancelled'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'cancelled'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Cancelled ({checkIns.filter(c => c.status === 'cancelled').length})
           </button>
@@ -1002,7 +996,7 @@ const CheckInHistoryPage: React.FC = () => {
               No history found
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              {filter === 'all' 
+              {filter === 'all'
                 ? 'No completed, paid, or cancelled check-ins found.'
                 : `No ${filter} check-ins found.`
               }
@@ -1087,7 +1081,11 @@ const CheckInHistoryPage: React.FC = () => {
                         <p className="font-medium text-gray-900 dark:text-white capitalize">
                           {checkIn.washType}
                         </p>
-                      </div>
+                        {hasRole('super_admin') &&checkIn.washType === 'delayed' && (
+                          <p className="text-sm text-gray-900 dark:text-white bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded">
+                           Code:{checkIn?.passcode}
+                          </p>
+                        )} </div>
                     )}
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Check-in Time</p>
@@ -1118,7 +1116,7 @@ const CheckInHistoryPage: React.FC = () => {
                 </div>
               </div>
 
-           
+
 
               {/* Performance */}
               <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
@@ -1146,7 +1144,7 @@ const CheckInHistoryPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                   <Button
                     size="sm"
@@ -1156,7 +1154,7 @@ const CheckInHistoryPage: React.FC = () => {
                   >
                     View Details
                   </Button>
-             
+
                   {/* Active check-ins actions */}
                   {checkIn.status === 'pending' && (
                     <>
@@ -1187,16 +1185,16 @@ const CheckInHistoryPage: React.FC = () => {
                       >
                         {updatingStatus === checkIn.id ? 'Starting...' : 'Start Work'}
                       </Button>
-                      
+
                       <Button
-                      size="sm"
-                      onClick={() => {
-                        window.location.href = `/checkins/edit/${checkIn.id}`;
-                      }}
-                      className="flex-shrink-0 bg-yellow-600 hover:bg-yellow-700 text-white"
-                    >
-                      Edit
-                    </Button>
+                        size="sm"
+                        onClick={() => {
+                          window.location.href = `/checkins/edit/${checkIn.id}`;
+                        }}
+                        className="flex-shrink-0 bg-yellow-600 hover:bg-yellow-700 text-white"
+                      >
+                        Edit
+                      </Button>
 
                       <Button
                         size="sm"
@@ -1208,7 +1206,7 @@ const CheckInHistoryPage: React.FC = () => {
                       </Button>
                     </>
                   )}
-                  
+
                   {checkIn.status === 'in_progress' && (
                     <>
                       <Button
@@ -1228,8 +1226,8 @@ const CheckInHistoryPage: React.FC = () => {
                       </Button>
                     </>
                   )}
-                 
-                  
+
+
                   {/* Payment actions for completed check-ins */}
                   {checkIn.status === 'completed' && checkIn.paymentStatus === 'pending' && (
                     <Button
@@ -1241,13 +1239,13 @@ const CheckInHistoryPage: React.FC = () => {
                       {isUpdatingPayment === checkIn.id ? 'Updating...' : 'Mark as Paid'}
                     </Button>
                   )}
-                  
+
                   {checkIn.status === 'completed' && checkIn.paymentStatus === 'paid' && (
                     <span className="px-3 py-2 text-sm font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 rounded-lg">
                       ✓ Paid
                     </span>
                   )}
-                  
+
                   {/* SMS functionality for delayed wash type only */}
                   {(checkIn.status === 'pending' || checkIn.status === 'in_progress') && checkIn.washType === 'delayed' && (
                     <Button
@@ -1367,7 +1365,7 @@ const CheckInHistoryPage: React.FC = () => {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Check-in Details
                 </h3>
-                
+
               </div>
               <div className="flex items-center space-x-2">
                 {getStatusBadge(selectedCheckIn.status)}
@@ -1489,14 +1487,14 @@ const CheckInHistoryPage: React.FC = () => {
                       </p>
                     </div>
                   )}
-                                     {selectedCheckIn.paidTime && (
-                     <div>
-                       <p className="text-sm text-gray-600 dark:text-gray-400">Paid Time</p>
-                       <p className="font-medium text-gray-900 dark:text-white">
-                         {selectedCheckIn.paidTime.toLocaleString()}
-                       </p>
-                     </div>
-                   )}
+                  {selectedCheckIn.paidTime && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Paid Time</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {selectedCheckIn.paidTime.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Duration</p>
                     <p className="font-medium text-gray-900 dark:text-white">

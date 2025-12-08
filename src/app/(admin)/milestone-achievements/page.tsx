@@ -55,6 +55,15 @@ interface QualifyingCustomer {
   achievedValue: number;
 }
 
+interface Milestone {
+  id: string;
+  type: string;
+  condition: {
+    operator: string;
+    value: number;
+  };
+}
+
 const MilestoneAchievementsPage: React.FC = () => {
   const { user } = useAuth();
   const [achievements, setAchievements] = useState<CustomerMilestoneAchievement[]>([]);
@@ -143,7 +152,57 @@ const MilestoneAchievementsPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Add a timeout to prevent hanging
+      const milestoneResponse = await fetch(`/api/admin/milestones/${milestoneId}`);
+      const milestoneData = await milestoneResponse.json();
+      
+      if (!milestoneData.success || !milestoneData.milestone) {
+        setError('Failed to fetch milestone details');
+        return;
+      }
+      
+      const currentMilestone = milestoneData.milestone;
+      
+      const allMilestonesResponse = await fetch('/api/admin/milestones?isActive=true');
+      const allMilestonesData = await allMilestonesResponse.json();
+      
+      let exclusionCondition = undefined;
+      
+      if (allMilestonesData.success && allMilestonesData.milestones) {
+        const sameTypeMilestones = allMilestonesData.milestones.filter((m: Milestone) => 
+          m.type === currentMilestone.type
+        );
+        
+        sameTypeMilestones.sort((a: Milestone, b: Milestone) => a.condition.value - b.condition.value);
+        
+        const currentIndex = sameTypeMilestones.findIndex((m: Milestone) => m.id === milestoneId);
+        
+        if (currentIndex !== -1) {
+          const operator = currentMilestone.condition.operator;
+          
+          if (operator === '>' || operator === '>=') {
+            // For Greater Than, exclude the NEXT HIGHER milestone
+            // Example: Current (> 10). Next (> 20).
+            // Result: [11, 20]
+            if (currentIndex < sameTypeMilestones.length - 1) {
+              const nextMilestone = sameTypeMilestones[currentIndex + 1];
+              if (nextMilestone.condition.value > currentMilestone.condition.value) {
+                exclusionCondition = nextMilestone.condition;
+              }
+            }
+          } else if (operator === '<' || operator === '<=') {
+             // For Less Than, exclude the PREVIOUS LOWER milestone
+             // Example: Current (< 20). Previous (< 10).
+             // Result: [10, 19]
+             if (currentIndex > 0) {
+               const prevMilestone = sameTypeMilestones[currentIndex - 1];
+               if (prevMilestone.condition.value < currentMilestone.condition.value) {
+                 exclusionCondition = prevMilestone.condition;
+               }
+             }
+          }
+        }
+      }
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
@@ -153,7 +212,10 @@ const MilestoneAchievementsPage: React.FC = () => {
           'Content-Type': 'application/json',
           'X-Admin-ID': user.id,
         },
-        body: JSON.stringify({ milestoneId }),
+        body: JSON.stringify({ 
+          milestoneId,
+          exclusionCondition
+        }),
         signal: controller.signal
       });
       
@@ -180,7 +242,6 @@ const MilestoneAchievementsPage: React.FC = () => {
     }
   }, [milestoneId, user?.id]);
 
-  // Fetch bonuses to check which customers already have bonuses
   const fetchBonuses = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/bonuses?type=customer');
