@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
       payment_method: string;
       check_in_time: string;
       actual_completion_time: string | null;
+      updated_at: string;
       customer_id: string;
     }> = [];
     
@@ -114,21 +115,27 @@ export async function GET(request: NextRequest) {
           payment_method,
           check_in_time,
           actual_completion_time,
+          updated_at,
           customer_id
         `);
       
-      // For car wash only, filter by actual_completion_time; otherwise use check_in_time
+      // For car wash revenue reporting, always use updated_at (when payment was recorded)
+      // This ensures we capture payments made during the period, not just service completions
       if (viewMode === 'car-wash-only') {
+        // Use updated_at for filtering as it reflects when payment was actually recorded
+        // Also ensure we only get paid transactions
         checkInsQuery = checkInsQuery
-          .gte('actual_completion_time', startDate.toISOString())
-          .lte('actual_completion_time', endDate.toISOString())
-          .not('actual_completion_time', 'is', null)
-          .order('actual_completion_time', { ascending: false });
+          .eq('payment_status', 'paid')
+          .gte('updated_at', startDate.toISOString())
+          .lte('updated_at', endDate.toISOString())
+          .order('updated_at', { ascending: false });
       } else {
+        // For "all sales" mode, also use updated_at for car wash payments
+        // Filter by updated_at to get payments recorded in the period
         checkInsQuery = checkInsQuery
-          .gte('check_in_time', startDate.toISOString())
-          .lte('check_in_time', endDate.toISOString())
-          .order('check_in_time', { ascending: false });
+          .gte('updated_at', startDate.toISOString())
+          .lte('updated_at', endDate.toISOString())
+          .order('updated_at', { ascending: false });
       }
       
       // Filter by location (through assigned_admin_id)
@@ -233,9 +240,10 @@ export async function GET(request: NextRequest) {
     // Process car check-ins (only if not stock-sales-only)
     if (viewMode !== 'stock-sales-only') {
       checkIns?.forEach(checkIn => {
-      // For car wash only, use actual_completion_time; otherwise use check_in_time
-      const dateTime = viewMode === 'car-wash-only' && checkIn.actual_completion_time 
-        ? checkIn.actual_completion_time 
+      // For car wash revenue, always use updated_at (when payment was recorded) for accurate reporting
+      // For paid transactions, use updated_at; for pending, fall back to check_in_time
+      const dateTime = (checkIn.payment_status === 'paid' && checkIn.updated_at) 
+        ? checkIn.updated_at 
         : checkIn.check_in_time;
       const date = new Date(dateTime);
       let groupKey: string;

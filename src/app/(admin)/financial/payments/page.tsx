@@ -144,7 +144,6 @@ const FinancialPaymentsPage: React.FC = () => {
         return isInRange;
       });
       
-      console.log('Filtered payments count:', filtered.length);
       return filtered;
     }
 
@@ -385,7 +384,6 @@ const FinancialPaymentsPage: React.FC = () => {
     <div className="space-y-6">
       <PageBreadCrumb pageTitle="Payment History" />
 
-      {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Transactions</h2>
