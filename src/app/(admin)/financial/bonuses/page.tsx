@@ -94,6 +94,7 @@ const FinancialBonusesPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'customer' | 'washer'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'paid' | 'rejected'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Customer filtering states
   const [minVisits, setMinVisits] = useState<string>('');
@@ -420,6 +421,22 @@ const FinancialBonusesPage: React.FC = () => {
   const filteredBonuses = bonuses.filter(bonus => {
     if (filterType !== 'all' && bonus.type !== filterType) return false;
     if (filterStatus !== 'all' && bonus.status !== filterStatus) return false;
+    
+    // Search filtering
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesName = bonus.recipientName?.toLowerCase().includes(query);
+      const matchesEmail = bonus.recipientEmail?.toLowerCase().includes(query);
+      const matchesPhone = bonus.recipientPhone?.toLowerCase().includes(query);
+      const matchesReason = bonus.reason?.toLowerCase().includes(query);
+      const matchesMilestone = bonus.milestone?.toLowerCase().includes(query);
+      const matchesAmount = bonus.amount.toString().includes(query);
+      
+      if (!matchesName && !matchesEmail && !matchesPhone && !matchesReason && !matchesMilestone && !matchesAmount) {
+        return false;
+      }
+    }
+    
     return true;
   });
 
@@ -653,7 +670,38 @@ const FinancialBonusesPage: React.FC = () => {
       {/* Bonuses Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Bonus Records</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Bonus Records</h2>
+            <div className="w-full sm:w-auto sm:min-w-[300px]">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name, email, phone, reason, milestone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-light-500 dark:bg-gray-700 dark:text-white text-sm"
+                />
+                <svg
+                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           {filteredBonuses.length === 0 ? (

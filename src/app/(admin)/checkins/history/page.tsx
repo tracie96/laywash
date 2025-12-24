@@ -270,6 +270,70 @@ const CheckInHistoryPage: React.FC = () => {
     }
   }, []);
 
+  const handleBonusAction = async (bonusId: string, action: 'approve' | 'pay' | 'reject' | 'delete') => {
+    try {
+      if (action === 'delete') {
+        const confirmDelete = window.confirm('Are you sure you want to delete this bonus?');
+        if (!confirmDelete) return;
+
+        const response = await fetch(`/api/admin/bonuses/${bonusId}`, {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          // Refresh bonuses and update modal
+          await fetchCustomerBonuses();
+          const customerId = selectedCustomerBonuses[0]?.recipientId;
+          if (customerId) {
+            const response = await fetch('/api/admin/bonuses?type=customer');
+            const bonusData = await response.json();
+            if (bonusData.success) {
+              const updatedBonuses = bonusData.bonuses
+                .filter((b: Bonus) => b.recipientId === customerId && b.status !== 'paid');
+              setSelectedCustomerBonuses(updatedBonuses);
+            }
+          }
+        } else {
+          alert(data.error || 'Failed to delete bonus');
+        }
+      } else {
+        const response = await fetch(`/api/admin/bonuses/${bonusId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action,
+            approvedBy: user?.id
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Refresh bonuses and update modal
+          await fetchCustomerBonuses();
+          const customerId = selectedCustomerBonuses[0]?.recipientId;
+          if (customerId) {
+            const response = await fetch('/api/admin/bonuses?type=customer');
+            const bonusData = await response.json();
+            if (bonusData.success) {
+              const updatedBonuses = bonusData.bonuses
+                .filter((b: Bonus) => b.recipientId === customerId && b.status !== 'paid');
+              setSelectedCustomerBonuses(updatedBonuses);
+            }
+          }
+        } else {
+          alert(data.error || 'Failed to update bonus');
+        }
+      }
+    } catch (error) {
+      console.error('Error performing bonus action:', error);
+      alert('Failed to perform action');
+    }
+  };
+
   // Fetch service/item names when bonus modal opens
   useEffect(() => {
     if (showBonusModal && selectedCustomerBonuses.length > 0) {
@@ -1673,7 +1737,6 @@ const CheckInHistoryPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Bonus Details Modal */}
       <Modal
         isOpen={showBonusModal}
         onClose={() => setShowBonusModal(false)}
@@ -1742,6 +1805,42 @@ const CheckInHistoryPage: React.FC = () => {
                         {new Date(bonus.createdAt).toLocaleDateString()}
                       </p>
                     </div>
+                  </div>
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {bonus.status === 'pending' && (
+                      <>
+                        <Button
+                          onClick={() => handleBonusAction(bonus.id, 'approve')}
+                          className="flex-1 text-sm"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => handleBonusAction(bonus.id, 'reject')}
+                          variant="outline"
+                          className="flex-1 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {bonus.status === 'approved' && (
+                      <Button
+                        onClick={() => handleBonusAction(bonus.id, 'pay')}
+                        className="flex-1 text-sm"
+                      >
+                        Mark as Paid
+                      </Button>
+                    )}
+                    {bonus.status !== 'paid' && (
+                      <Button
+                        onClick={() => handleBonusAction(bonus.id, 'delete')}
+                        variant="outline"
+                        className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
