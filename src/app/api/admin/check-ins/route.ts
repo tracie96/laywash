@@ -91,9 +91,11 @@ function calculateEstimatedDuration(services: CheckInService[]): number {
 
 // Helper function to fetch all records with pagination
 async function fetchAllCheckIns(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   baseQuery: any,
   sortBy: string,
   sortOrder: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ data: CheckIn[] | null; error: any }> {
   const allResults: CheckIn[] = [];
   const pageSize = 1000; // Supabase max per page
