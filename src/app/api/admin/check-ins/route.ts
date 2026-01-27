@@ -89,6 +89,42 @@ function calculateEstimatedDuration(services: CheckInService[]): number {
   return services.reduce((total, service) => total + (service.duration || 0), 0);
 }
 
+// Helper function to fetch all records with pagination
+async function fetchAllCheckIns(
+  baseQuery: any,
+  sortBy: string,
+  sortOrder: string
+): Promise<{ data: CheckIn[] | null; error: any }> {
+  const allResults: CheckIn[] = [];
+  const pageSize = 1000; // Supabase max per page
+  let from = 0;
+  let hasMore = true;
+
+  // Apply ordering once to the base query
+  const orderedQuery = baseQuery.order(sortBy, { ascending: sortOrder === 'asc' });
+
+  while (hasMore) {
+    // Create a new query with range for this page
+    const query = orderedQuery.range(from, from + pageSize - 1);
+
+    const { data, error } = await query;
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (data && data.length > 0) {
+      allResults.push(...data);
+      from += pageSize;
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return { data: allResults, error: null };
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get current admin user from request header (optional for super admins)
@@ -136,8 +172,6 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || '';
     const sortBy = searchParams.get('sortBy') || 'check_in_time';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
-    const limit = parseInt(searchParams.get('limit') || '50');
-console.log('date:', date);
     let checkIns: CheckIn[] = [];
 
     if (search) {
@@ -147,7 +181,7 @@ console.log('date:', date);
       console.log(`Searching for: "${search}"`);
       
       // Use a single query with proper filtering that actually works
-      let query = supabaseAdmin
+      let baseQuery = supabaseAdmin
         .from('car_check_ins')
         .select(`
           *,
@@ -177,16 +211,14 @@ console.log('date:', date);
             phone
           )
         `)
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .limit(limit * 4); // Increase limit since we're filtering after
       
       // Filter by location (through assigned_admin_id)
       if (locationAdminIds && locationAdminIds.length > 0) {
-        query = query.in('assigned_admin_id', locationAdminIds);
+        baseQuery = baseQuery.in('assigned_admin_id', locationAdminIds);
       }
 
-      // Execute the query first
-      const { data: allResults, error: queryError } = await query;
+      // Fetch all records using pagination
+      const { data: allResults, error: queryError } = await fetchAllCheckIns(baseQuery, sortBy, sortOrder);
 
       if (queryError) {
         console.error('Error fetching check-ins:', queryError);
@@ -273,11 +305,11 @@ console.log('date:', date);
         }
       });
 
-      checkIns = filteredCheckIns.slice(0, limit);
+      checkIns = filteredCheckIns;
 
     } else {
-      // No search - use regular query
-    let query = supabaseAdmin
+      // No search - use regular query with pagination
+    let baseQuery = supabaseAdmin
       .from('car_check_ins')
       .select(`
         *,
@@ -306,18 +338,16 @@ console.log('date:', date);
           email,
           phone
         )
-      `)
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-      .limit(limit);
+      `);
     
     // Filter by location (through assigned_admin_id)
     if (locationAdminIds && locationAdminIds.length > 0) {
-      query = query.in('assigned_admin_id', locationAdminIds);
+      baseQuery = baseQuery.in('assigned_admin_id', locationAdminIds);
     }
 
     // Apply license plate filter
     if (licensePlate) {
-      query = query.eq('license_plate', licensePlate);
+      baseQuery = baseQuery.eq('license_plate', licensePlate);
     }
 
     // Apply date filter - support both single date and date range
@@ -327,31 +357,32 @@ console.log('date:', date);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
-      query = query
+      baseQuery = baseQuery
         .gte('check_in_time', targetDate.toISOString())
         .lte('check_in_time', endOfDay.toISOString());
     } else if (startDate || endDate) {
       if (startDate) {
         const start = new Date(startDate + 'T00:00:00');
-        query = query.gte('check_in_time', start.toISOString());
+        baseQuery = baseQuery.gte('check_in_time', start.toISOString());
       }
       if (endDate) {
         const end = new Date(endDate + 'T23:59:59');
-        query = query.lte('check_in_time', end.toISOString());
+        baseQuery = baseQuery.lte('check_in_time', end.toISOString());
       }
     }
 
     // Apply status filter
     if (status !== 'all') {
-      query = query.eq('status', status);
+      baseQuery = baseQuery.eq('status', status);
     }
 
     // Apply payment status filter
     if (paymentStatus !== 'all') {
-      query = query.eq('payment_status', paymentStatus);
+      baseQuery = baseQuery.eq('payment_status', paymentStatus);
     }
 
-      const { data: queryResults, error } = await query;
+    // Fetch all records using pagination
+    const { data: queryResults, error } = await fetchAllCheckIns(baseQuery, sortBy, sortOrder);
 
     if (error) {
       console.error('Error fetching check-ins:', error);
