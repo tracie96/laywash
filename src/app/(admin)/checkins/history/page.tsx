@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { Modal } from '@/components/ui/modal';
@@ -83,9 +83,22 @@ const CheckInHistoryPage: React.FC = () => {
   const [selectedCheckInId, setSelectedCheckInId] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'pos'>('cash');
 
-  // Date search state
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  // Helper function to get current date in YYYY-MM-DD format
+  const getCurrentDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // Helper function to get default start date (last 30 days)
+  const getDefaultStartDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30); // Last 30 days
+    return date.toISOString().split('T')[0];
+  };
+
+  // Date search state - default to last 30 days for better performance
+  const [startDate, setStartDate] = useState<string>(getDefaultStartDate());
+  const [endDate, setEndDate] = useState<string>(getCurrentDate());
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -110,11 +123,9 @@ const CheckInHistoryPage: React.FC = () => {
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [selectedCustomerBonuses, setSelectedCustomerBonuses] = useState<Bonus[]>([]);
 
-  // Helper function to get current date in YYYY-MM-DD format
-  const getCurrentDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
+  // Refs for optimization (request cancellation and debouncing)
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch earnings data from API
   const fetchEarnings = useCallback(async () => {
@@ -368,12 +379,27 @@ const CheckInHistoryPage: React.FC = () => {
     }
   }, [showBonusModal, selectedCustomerBonuses]);
 
-  // Load data on component mount
+  // Load data on component mount with request cancellation
   useEffect(() => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const loadData = async () => {
       setIsLoading(true);
 
       try {
+        // Fetch in parallel - all requests can be cancelled together
         await Promise.all([
           fetchCheckIns(),
           fetchWashers(),
@@ -381,28 +407,69 @@ const CheckInHistoryPage: React.FC = () => {
           fetchCustomerBonuses()
         ]);
       } catch (err) {
-        console.error('Error loading data:', err);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Error loading data:', err);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [fetchCheckIns, fetchEarnings, fetchCustomerBonuses]);
 
-  // Refetch earnings when date filters change
-  useEffect(() => {
-    fetchEarnings();
-  }, [fetchEarnings]);
+    // Cleanup: cancel requests on unmount
+    return () => {
+      abortController.abort();
+    };
+  }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
 
-  // Refetch check-ins when date filters change
+  // Refetch earnings when date filters change (debounced)
   useEffect(() => {
-    if (startDate || endDate) {
-      fetchCheckIns(searchQuery);
+    if (!user?.id) return;
+
+    // Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
-  }, [startDate, endDate, searchQuery, fetchCheckIns]);
 
-  const filteredCheckIns = checkIns.filter(checkIn => {
+    // Debounce the fetch
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchEarnings();
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [startDate, endDate, fetchEarnings, user?.id]);
+
+  // Refetch check-ins when date filters change (debounced)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Debounce the fetch
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (startDate || endDate) {
+        fetchCheckIns(searchQuery);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [startDate, endDate, searchQuery, fetchCheckIns, user?.id]);
+
+  // Memoize filtered check-ins to prevent unnecessary recalculations
+  const filteredCheckIns = useMemo(() => {
+    return checkIns.filter(checkIn => {
     // First filter by status
     let statusMatch = false;
     if (filter === 'all') {
@@ -435,7 +502,8 @@ const CheckInHistoryPage: React.FC = () => {
     }
 
     return true;
-  });
+    });
+  }, [checkIns, filter, searchQuery, startDate, endDate]);
 
   const handleMarkAsPaid = (checkInId: string) => {
     setSelectedCheckInId(checkInId);
@@ -769,7 +837,8 @@ const CheckInHistoryPage: React.FC = () => {
   };
 
 
-  const calculateAverageDuration = () => {
+  // Memoize average duration calculation
+  const calculateAverageDuration = useMemo(() => {
     const completedCheckIns = filteredCheckIns.filter(checkIn =>
       checkIn.status === 'completed' || checkIn.status === 'paid'
     );
@@ -779,9 +848,10 @@ const CheckInHistoryPage: React.FC = () => {
       total + (checkIn.actualDuration || checkIn.estimatedDuration), 0
     );
     return Math.round(totalDuration / completedCheckIns.length);
-  };
+  }, [filteredCheckIns]);
 
-  if (isLoading) {
+  // Show skeleton loading instead of blocking - better UX
+  if (isLoading && checkIns.length === 0) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
@@ -806,12 +876,14 @@ const CheckInHistoryPage: React.FC = () => {
             Manage all check-ins including active, completed, and cancelled car wash services
           </p>
         </div>
-        <Button
-          onClick={() => window.location.href = '/checkins/new'}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          New Check-in
-        </Button>
+        {!hasRole('super_admin') && (
+          <Button
+            onClick={() => window.location.href = '/checkins/new'}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            New Check-in
+          </Button>
+        )}
       </div>
 
       {/* Statistics */}
@@ -890,7 +962,7 @@ const CheckInHistoryPage: React.FC = () => {
                 Avg. Duration
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {calculateAverageDuration()} min
+                {calculateAverageDuration} min
               </p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">

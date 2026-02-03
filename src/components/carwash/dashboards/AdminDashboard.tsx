@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 interface DashboardMetrics {
@@ -134,31 +134,64 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Load data on component mount
+  // Refs for request cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load data on component mount with request cancellation
   useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const loadData = async () => {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
-      
       setLoading(true);
       setError(null);
       
       try {
+        // Fetch in parallel - both can be cancelled together
         await Promise.all([
           fetchDashboardMetrics(),
           fetchRecentCheckIns()
         ]);
       } catch (err) {
-        console.error('Error loading dashboard data:', err);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Error loading dashboard data:', err);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [user?.id, fetchDashboardMetrics, fetchRecentCheckIns]);
+
+    // Cleanup: cancel requests on unmount
+    return () => {
+      abortController.abort();
+    };
+  }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
+
+  // Memoize percentage calculations to prevent unnecessary recalculations
+  const carWashPercentage = useMemo(() => {
+    const totalDaily = metrics?.totalIncome?.daily || 0;
+    const carWashDaily = metrics?.carWashIncome?.daily || 0;
+    return totalDaily > 0 ? Math.round((carWashDaily / totalDaily) * 100) : 0;
+  }, [metrics?.totalIncome?.daily, metrics?.carWashIncome?.daily]);
+
+  const stockSalesPercentage = useMemo(() => {
+    const totalDaily = metrics?.totalIncome?.daily || 0;
+    const stockSalesDaily = metrics?.stockSalesIncome?.daily || 0;
+    return totalDaily > 0 ? Math.round((stockSalesDaily / totalDaily) * 100) : 0;
+  }, [metrics?.totalIncome?.daily, metrics?.stockSalesIncome?.daily]);
 
   // Show loading state
   if (loading) {
@@ -391,31 +424,13 @@ const AdminDashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Car Wash %</span>
               <span className="text-sm font-medium text-blue-600">
-                {(() => {
-                  const totalDaily = metrics?.totalIncome?.daily || 0;
-                  const carWashDaily = metrics?.carWashIncome?.daily || 0;
-                  console.log('Car Wash Percentage calculation:', { 
-                    totalDaily, 
-                    carWashDaily, 
-                    percentage: totalDaily > 0 ? Math.round((carWashDaily / totalDaily) * 100) : 0 
-                  });
-                  return totalDaily > 0 ? Math.round((carWashDaily / totalDaily) * 100) : 0;
-                })()}%
+                {carWashPercentage}%
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Stock Sales %</span>
               <span className="text-sm font-medium text-purple-600">
-                {(() => {
-                  const totalDaily = metrics?.totalIncome?.daily || 0;
-                  const stockSalesDaily = metrics?.stockSalesIncome?.daily || 0;
-                  console.log('Stock Sales Percentage calculation:', { 
-                    totalDaily, 
-                    stockSalesDaily, 
-                    percentage: totalDaily > 0 ? Math.round((stockSalesDaily / totalDaily) * 100) : 0 
-                  });
-                  return totalDaily > 0 ? Math.round((stockSalesDaily / totalDaily) * 100) : 0;
-                })()}%
+                {stockSalesPercentage}%
               </span>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-600 pt-2">

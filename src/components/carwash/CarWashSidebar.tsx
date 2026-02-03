@@ -37,7 +37,6 @@ const superAdminItems: NavItem[] = [
     icon: <CheckLineIcon />,
     name: "Check-ins",
     subItems: [
-      { name: "New Check-in", path: "/checkins/new", pro: false },
       { name: "Check-in History", path: "/checkins/history", pro: false }
     ],
     roles: ["super_admin"]
@@ -153,6 +152,7 @@ const adminItems: NavItem[] = [
     name: "Financial",
     subItems: [
       { name: "Payment History", path: "/payments/history", pro: false },
+      { name: "Payment History Pro", path: "/financial/payments", pro: false },
       { name: "Payment Reports", path: "/payments/reports", pro: false },
       { name: "Payment Requests", path: "/payments/requests", pro: false },
       { name: "Cash Out", path: "/financial/cash-out", pro: false },

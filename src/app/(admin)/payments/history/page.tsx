@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
 import { Modal } from '@/components/ui/modal';
@@ -41,35 +41,44 @@ interface Payment {
   passcode?: string;
 }
 
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const format = (date: Date) => date.toISOString().split('T')[0];
+  return {
+    startDate: format(startOfMonth),
+    endDate: format(endOfMonth),
+  };
+};
+
 const PaymentHistoryPage: React.FC = () => {
   const { user } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // Input value (what user types)
+  const [searchTerm, setSearchTerm] = useState(''); // Submitted search term (used for API)
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'cancelled'>('all');
+  // Temporary date inputs (what user is selecting)
+  const [tempStartDate, setTempStartDate] = useState(() => getCurrentMonthRange().startDate);
+  const [tempEndDate, setTempEndDate] = useState(() => getCurrentMonthRange().endDate);
+  // Applied date filters (used for API)
+  const [startDate, setStartDate] = useState(() => getCurrentMonthRange().startDate);
+  const [endDate, setEndDate] = useState(() => getCurrentMonthRange().endDate);
   const [error, setError] = useState<string | null>(null);
+  const [companyIncome, setCompanyIncome] = useState<number>(0);
+  const [isLoadingEarnings, setIsLoadingEarnings] = useState(false);
   
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   const fetchPayments = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Get current month date range
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-      
-      // Format dates for API
-      const startDateStr = startOfMonth.getFullYear() + '-' + 
-        String(startOfMonth.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(startOfMonth.getDate()).padStart(2, '0');
-      const endDateStr = endOfMonth.getFullYear() + '-' + 
-        String(endOfMonth.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(endOfMonth.getDate()).padStart(2, '0') + 'T23:59:59.999Z';
       
       // Build query parameters
       const params = new URLSearchParams();
@@ -78,11 +87,13 @@ const PaymentHistoryPage: React.FC = () => {
       params.append('sortBy', 'check_in_time');
       params.append('sortOrder', 'desc');
       params.append('limit', '100');
-      // Add current month date filter
-      params.append('startDate', startDateStr);
-      params.append('endDate', endDateStr);
-      
-      if (!user?.id) return;
+      // Apply the selected date range (if either value exists)
+      if (startDate) {
+        params.append('startDate', `${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        params.append('endDate', `${endDate}T23:59:59.999Z`);
+      }
       
       const response = await fetch(`/api/admin/payments?${params.toString()}`, {
         headers: {
@@ -102,16 +113,56 @@ const PaymentHistoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter, user?.id]);
+  }, [searchTerm, filter, startDate, endDate, user?.id]);
 
-  // Fetch payment data from API with debounce for search
+  // Fetch company income from earnings API
+  const fetchCompanyIncome = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoadingEarnings(true);
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+
+      const response = await fetch(`/api/admin/earnings?${params.toString()}`, {
+        headers: {
+          'X-Admin-ID': user.id,
+        },
+      });
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        setCompanyIncome(data.data.companyIncome || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching company income:', error);
+    } finally {
+      setIsLoadingEarnings(false);
+    }
+  }, [startDate, endDate, user?.id]);
+
+  const hasInitialLoad = useRef(false);
+
+  // Fetch payment data on initial load only
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    if (user?.id && !hasInitialLoad.current) {
+      hasInitialLoad.current = true;
       fetchPayments();
-    }, searchTerm ? 500 : 0); // Debounce search, but load immediately on first render
+      fetchCompanyIncome();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only run on initial load when user is available
 
-    return () => clearTimeout(timeoutId);
-  }, [fetchPayments, searchTerm]);
+  // Fetch when filter, searchTerm, or date filters change
+  // Dates only change when "Apply Date Filter" button is clicked (not while typing)
+  useEffect(() => {
+    if (user?.id && hasInitialLoad.current) {
+      fetchPayments();
+      fetchCompanyIncome();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, searchTerm, startDate, endDate]); // Only trigger when these applied filters change
 
   const handleMarkAsPaid = async (paymentId: string) => {
     try {
@@ -147,6 +198,31 @@ const PaymentHistoryPage: React.FC = () => {
   const handleDetailsModalClose = () => {
     setShowDetailsModal(false);
     setSelectedPayment(null);
+  };
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    // Only update searchTerm when Search button is clicked - this triggers the fetch
+    setSearchTerm(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchTerm(''); // Clearing searchTerm will trigger a fetch to show all results
+  };
+
+  const handleApplyDateFilter = () => {
+    // Apply the temporary dates as the actual filter dates
+    setStartDate(tempStartDate);
+    setEndDate(tempEndDate);
+  };
+
+  const handleResetDates = () => {
+    const defaultRange = getCurrentMonthRange();
+    setTempStartDate(defaultRange.startDate);
+    setTempEndDate(defaultRange.endDate);
+    setStartDate(defaultRange.startDate);
+    setEndDate(defaultRange.endDate);
   };
 
   // Since filtering is now handled server-side, we can just use all payments
@@ -275,7 +351,7 @@ const PaymentHistoryPage: React.FC = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -306,6 +382,28 @@ const PaymentHistoryPage: React.FC = () => {
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Company Income
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {isLoadingEarnings ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : (
+                  `NGN ${companyIncome.toLocaleString()}`
+                )}
+              </p>
+            </div>
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
               </svg>
             </div>
@@ -379,15 +477,97 @@ const PaymentHistoryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Date range selectors */}
+      <div className="mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+            Filter by Date Range
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2 mb-4">
+            <div>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                id="startDate"
+                value={tempStartDate}
+                onChange={(e) => setTempStartDate(e.target.value)}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                id="endDate"
+                value={tempEndDate}
+                onChange={(e) => setTempEndDate(e.target.value)}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleApplyDateFilter}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Apply Date Filter
+            </Button>
+            <Button
+              onClick={handleResetDates}
+              variant="outline"
+            >
+              Reset to This Month
+            </Button>
+          </div>
+          {(startDate || endDate) && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Showing payments from {startDate} to {endDate}
+            </p>
+          )}
+        </div>
+      </div>
       {/* Search */}
       <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Search by customer name or license plate..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-        />
+        <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row md:items-center">
+          <input
+            type="text"
+            placeholder="Search by customer name or license plate..."
+            value={searchInput}
+            onChange={(e) => {
+              // Only update the input value - this does NOT trigger any API calls
+              setSearchInput(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              // Allow Enter key to submit search
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSearchSubmit();
+              }
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          />
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Search
+            </Button>
+            {searchTerm && (
+              <Button
+                type="button"
+                onClick={handleClearSearch}
+                variant="outline"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </form>
       </div>
 
       {/* Payments List */}

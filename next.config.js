@@ -1,7 +1,7 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  /* config options here */
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Uncomment the line below for cPanel deployment (creates standalone build)
+  // output: 'standalone',
   webpack(config) {
     config.module.rules.push({
       test: /\.svg$/,
