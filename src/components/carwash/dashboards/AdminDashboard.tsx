@@ -77,7 +77,6 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  // Fetch dashboard metrics
   const fetchDashboardMetrics = useCallback(async () => {
     if (!user?.id) return;
     
@@ -111,7 +110,6 @@ const AdminDashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to load metrics');
     }
   }, [user?.id]);
-  // Fetch recent check-ins
   const fetchRecentCheckIns = useCallback(async () => {
     if (!user?.id) return;
     
@@ -134,10 +132,8 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Refs for request cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load data on component mount with request cancellation
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
@@ -174,13 +170,11 @@ const AdminDashboard: React.FC = () => {
 
     loadData();
 
-    // Cleanup: cancel requests on unmount
     return () => {
       abortController.abort();
     };
-  }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
+  }, [user?.id, fetchDashboardMetrics, fetchRecentCheckIns]); 
 
-  // Memoize percentage calculations to prevent unnecessary recalculations
   const carWashPercentage = useMemo(() => {
     const totalDaily = metrics?.totalIncome?.daily || 0;
     const carWashDaily = metrics?.carWashIncome?.daily || 0;

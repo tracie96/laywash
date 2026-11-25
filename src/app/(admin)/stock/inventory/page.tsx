@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Badge from '@/components/ui/badge/Badge';
 import Button from '@/components/ui/button/Button';
+import { useAuth } from '@/context/AuthContext';
+import StockMovements from '@/components/carwash/StockMovements';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { Modal } from '@/components/ui/modal';
 
@@ -34,6 +36,7 @@ interface CreateStockForm {
 }
 
 const StockInventoryPage: React.FC = () => {
+  const { user } = useAuth();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,7 @@ const StockInventoryPage: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [restockAmount, setRestockAmount] = useState<number>(0);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const fetchInventoy = useCallback(async () => {
     console.log('i got here')
@@ -68,7 +72,6 @@ const StockInventoryPage: React.FC = () => {
       setError(null);
       
       const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
       if (filter !== 'all') params.append('status', filter);
       params.append('sortBy', sortBy);
       params.append('sortOrder', sortOrder);
@@ -89,7 +92,7 @@ const StockInventoryPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, filter, sortBy, sortOrder]);
+  }, [filter, sortBy, sortOrder]);
 
   // Add useEffect to fetch data on mount and when dependencies change
   useEffect(() => {
@@ -131,6 +134,7 @@ const StockInventoryPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify(createForm),
       });
@@ -185,6 +189,7 @@ const StockInventoryPage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           currentStock: restockAmount
@@ -286,6 +291,12 @@ const StockInventoryPage: React.FC = () => {
           </p>
         </div>
         <div className="flex space-x-3">
+          <Button
+            onClick={() => setShowHistoryModal(true)}
+            className="bg-gray-700 hover:bg-gray-800"
+          >
+            Stock History
+          </Button>
           <Button
             onClick={() => setShowCreateModal(true)}
             className="bg-green-600 hover:bg-green-700"
@@ -600,6 +611,15 @@ const StockInventoryPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Stock additions history (loads fresh each time it opens) */}
+      <Modal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        className="w-full max-w-5xl mx-4"
+      >
+        <StockMovements />
+      </Modal>
 
       {/* Create Item Modal */}
       <Modal

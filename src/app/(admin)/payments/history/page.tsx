@@ -45,12 +45,19 @@ const getCurrentMonthRange = () => {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const format = (date: Date) => date.toISOString().split('T')[0];
+  const format = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   return {
     startDate: format(startOfMonth),
     endDate: format(endOfMonth),
   };
 };
+
+const getPaymentDisplayDate = (payment: Payment) => payment.completionTime || payment.date;
 
 const PaymentHistoryPage: React.FC = () => {
   const { user } = useAuth();
@@ -87,13 +94,9 @@ const PaymentHistoryPage: React.FC = () => {
       params.append('sortBy', 'check_in_time');
       params.append('sortOrder', 'desc');
       params.append('limit', '100');
-      // Apply the selected date range (if either value exists)
-      if (startDate) {
-        params.append('startDate', `${startDate}T00:00:00.000Z`);
-      }
-      if (endDate) {
-        params.append('endDate', `${endDate}T23:59:59.999Z`);
-      }
+      // Keep date-only values so the API can apply local-day boundaries.
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
       
       const response = await fetch(`/api/admin/payments?${params.toString()}`, {
         headers: {
@@ -211,7 +214,8 @@ const PaymentHistoryPage: React.FC = () => {
     setSearchTerm(''); // Clearing searchTerm will trigger a fetch to show all results
   };
 
-  const handleApplyDateFilter = () => {
+  const handleApplyDateFilter = (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     // Apply the temporary dates as the actual filter dates
     setStartDate(tempStartDate);
     setEndDate(tempEndDate);
@@ -225,20 +229,34 @@ const PaymentHistoryPage: React.FC = () => {
     setEndDate(defaultRange.endDate);
   };
 
-  // Since filtering is now handled server-side, we can just use all payments
-  const filteredPayments = payments;
+  const filteredPayments = payments.filter(payment => {
+    const paymentDate = new Date(getPaymentDisplayDate(payment));
+    if (Number.isNaN(paymentDate.getTime())) return false;
+
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00`);
+      if (paymentDate < start) return false;
+    }
+
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59.999`);
+      if (paymentDate > end) return false;
+    }
+
+    return true;
+  });
 
   const calculateStats = () => {
     const stats = {
-      total: payments.length,
-      pending: payments.filter(p => p.status === 'pending').length,
-      completed: payments.filter(p => p.status === 'completed').length,
-      cancelled: payments.filter(p => p.status === 'cancelled').length,
-      totalAmount: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
-      pendingAmount: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
-      cashPayments: payments.filter(p => p.paymentMethod === 'cash' && p.status === 'completed').length,
-      cardPayments: payments.filter(p => p.paymentMethod === 'card' && p.status === 'completed').length,
-      mobilePayments: payments.filter(p => p.paymentMethod === 'mobile_money' && p.status === 'completed').length
+      total: filteredPayments.length,
+      pending: filteredPayments.filter(p => p.status === 'pending').length,
+      completed: filteredPayments.filter(p => p.status === 'completed').length,
+      cancelled: filteredPayments.filter(p => p.status === 'cancelled').length,
+      totalAmount: filteredPayments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
+      pendingAmount: filteredPayments.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.totalPrice || p.amount), 0),
+      cashPayments: filteredPayments.filter(p => p.paymentMethod === 'cash' && p.status === 'completed').length,
+      cardPayments: filteredPayments.filter(p => p.paymentMethod === 'card' && p.status === 'completed').length,
+      mobilePayments: filteredPayments.filter(p => p.paymentMethod === 'mobile_money' && p.status === 'completed').length
     };
     return stats;
   };
@@ -479,7 +497,7 @@ const PaymentHistoryPage: React.FC = () => {
 
       {/* Date range selectors */}
       <div className="mb-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+        <form onSubmit={handleApplyDateFilter} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
             Filter by Date Range
           </h3>
@@ -511,7 +529,7 @@ const PaymentHistoryPage: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <Button
-              onClick={handleApplyDateFilter}
+              type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Apply Date Filter
@@ -528,7 +546,7 @@ const PaymentHistoryPage: React.FC = () => {
               Showing payments from {startDate} to {endDate}
             </p>
           )}
-        </div>
+        </form>
       </div>
       {/* Search */}
       <div className="mb-6">
@@ -616,9 +634,7 @@ const PaymentHistoryPage: React.FC = () => {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Date</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {payment.completionTime 
-                          ? new Date(payment.completionTime).toLocaleString()
-                          : new Date(payment.date).toLocaleString()}
+                        {new Date(getPaymentDisplayDate(payment)).toLocaleString()}
                       </p>
                     </div>
                   </div>

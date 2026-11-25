@@ -148,6 +148,7 @@ const StockUpdatePage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify(createForm),
       });
@@ -205,6 +206,7 @@ const StockUpdatePage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           currentStock: newStock
@@ -277,6 +279,7 @@ const StockUpdatePage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify(editForm),
       });

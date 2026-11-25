@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { SMSService } from '../../../../lib/sms';
+import { selectAll, selectByIds } from '@/lib/supabaseQuery';
+import { recordInventoryMovement } from '@/lib/inventoryMovements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,22 +23,35 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     // Build the query - fetch bonuses without joins
-    let query = supabaseAdmin
-      .from('bonuses')
-      .select('*')
-      .order(sortBy, { ascending: sortOrder === 'asc' });
+    const buildQuery = () => {
+      let query = supabaseAdmin
+        .from('bonuses')
+        .select('*')
+        .order(sortBy, { ascending: sortOrder === 'asc' })
+        .order('id');
 
-    // Apply type filter
-    if (type !== 'all') {
-      query = query.eq('type', type);
+      // Apply type filter
+      if (type !== 'all') {
+        query = query.eq('type', type);
+      }
+
+      // Apply status filter
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      return query;
+    };
+
+    // Page through all rows; a single request is capped at 1000
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let bonuses: any[] | null = null;
+    let error: { message?: string } | null = null;
+    try {
+      bonuses = await selectAll(buildQuery);
+    } catch (err) {
+      error = err as { message?: string };
     }
-
-    // Apply status filter
-    if (status !== 'all') {
-      query = query.eq('status', status);
-    }
-
-    const { data: bonuses, error } = await query;
 
     if (error) {
       console.error('Error fetching bonuses:', error);
@@ -59,67 +74,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch recipient data separately
-    const transformedBonuses = await Promise.all(
-      (bonuses || []).map(async (bonus) => {
-        let recipientName = 'Unknown';
-        let recipientEmail = '';
-        let recipientPhone = '';
+    // Fetch recipient data in batches instead of one query per bonus
+    type Recipient = { id: string; name: string; email?: string; phone?: string };
+    const customerIds = (bonuses || []).filter(b => b.type === 'customer').map(b => b.recipient_id);
+    const washerIds = (bonuses || []).filter(b => b.type !== 'customer').map(b => b.recipient_id);
 
-        try {
-          if (bonus.type === 'customer') {
-            // Fetch customer data
-            const { data: customer } = await supabaseAdmin
-              .from('customers')
-              .select('name, email, phone')
-              .eq('id', bonus.recipient_id)
-              .single();
-            
-            if (customer) {
-              recipientName = customer.name;
-              recipientEmail = customer.email || '';
-              recipientPhone = customer.phone;
-            }
-          } else {
-            // Fetch washer data
-            const { data: washer } = await supabaseAdmin
-              .from('users')
-              .select('name, email, phone')
-              .eq('id', bonus.recipient_id)
-              .eq('role', 'car_washer')
-              .single();
-            
-            if (washer) {
-              recipientName = washer.name;
-              recipientEmail = washer.email || '';
-              recipientPhone = washer.phone;
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching recipient data:', err);
-        }
+    const recipients = new Map<string, Recipient>();
+    try {
+      const [customers, washers] = await Promise.all([
+        selectByIds<Recipient>(customerIds, ids => supabaseAdmin
+          .from('customers')
+          .select('id, name, email, phone')
+          .in('id', ids)),
+        selectByIds<Recipient>(washerIds, ids => supabaseAdmin
+          .from('users')
+          .select('id, name, email, phone')
+          .in('id', ids)
+          .eq('role', 'car_washer'))
+      ]);
+      for (const r of [...customers, ...washers]) recipients.set(r.id, r);
+    } catch (err) {
+      console.error('Error fetching recipient data:', err);
+    }
 
-        return {
-          id: bonus.id,
-          type: bonus.type,
-          recipientId: bonus.recipient_id,
-          recipientName,
-          recipientEmail,
-          recipientPhone,
-          amount: bonus.amount,
-          reason: bonus.reason,
-          milestone: bonus.milestone,
-          status: bonus.status,
-          approvedBy: bonus.approved_by,
-          approvedAt: bonus.approved_at,
-          paidAt: bonus.paid_at,
-          createdAt: bonus.created_at,
-          bonusType: bonus.bonus_type,
-          serviceId: bonus.service_id,
-          itemId: bonus.item_id
-        };
-      })
-    );
+    const transformedBonuses = (bonuses || []).map(bonus => {
+      const recipient = recipients.get(bonus.recipient_id);
+
+      return {
+        id: bonus.id,
+        type: bonus.type,
+        recipientId: bonus.recipient_id,
+        recipientName: recipient?.name || 'Unknown',
+        recipientEmail: recipient?.email || '',
+        recipientPhone: recipient?.phone || '',
+        amount: bonus.amount,
+        reason: bonus.reason,
+        milestone: bonus.milestone,
+        status: bonus.status,
+        approvedBy: bonus.approved_by,
+        approvedAt: bonus.approved_at,
+        paidAt: bonus.paid_at,
+        createdAt: bonus.created_at,
+        bonusType: bonus.bonus_type,
+        serviceId: bonus.service_id,
+        itemId: bonus.item_id
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -192,10 +192,15 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
-      
-      // Log stock movement if table exists (optional, but good for tracking)
-      // We'll skip for now to avoid errors if table doesn't match exactly, 
-      // but in a real app, you'd want to record this.
+
+      await recordInventoryMovement(supabaseAdmin, {
+        inventoryItemId: itemId,
+        movementType: 'bonus',
+        previousBalance: item.current_stock,
+        newBalance: item.current_stock - 1,
+        adminId: request.headers.get('X-Admin-ID'),
+        reason: `Bonus item: ${reason}`
+      });
     }
 
     // Validate type

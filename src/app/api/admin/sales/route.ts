@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { recordInventoryMovement } from '@/lib/inventoryMovements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -150,6 +151,17 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
+
+      await recordInventoryMovement(supabaseAdmin, {
+        inventoryItemId: item.inventoryId,
+        movementType: 'sale',
+        previousBalance: inventoryItem.current_stock,
+        newBalance: newStock,
+        adminId,
+        reason: 'Sold',
+        referenceId: salesTransaction.id,
+        referenceType: 'sales_transaction'
+      });
 
       createdTransactions.push(salesTransaction);
       inventoryUpdates.push({

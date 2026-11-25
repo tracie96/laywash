@@ -11,9 +11,13 @@ interface ToolAssignment {
   quantity: number;
   returnedQuantity?: number;
   usedQuantity?: number;
+  chargedQuantity: number;
+  outstandingQuantity: number;
+  outstandingValue: number;
+  chargedValue: number;
   assignedDate: string;
   returnDate?: string;
-  status: "assigned" | "returned" | "overdue" | "partially_returned";
+  status: "assigned" | "returned" | "overdue" | "partially_returned" | "charged";
   notes: string;
 }
 
@@ -36,6 +40,7 @@ interface Worker {
   phone: string;
   status: string;
   isAvailable: boolean;
+  isActive: boolean;
 }
 
 interface AssignmentForm {
@@ -56,6 +61,11 @@ interface WasherToolWithWorker {
   quantity: number;
   returnedQuantity?: number;
   usedQuantity?: number;
+  chargedQuantity?: number;
+  outstandingQuantity?: number;
+  outstandingValue?: number;
+  chargedValue?: number;
+  isReturnDue?: boolean;
   assignedDate: string;
   returnedDate?: string;
   isReturned: boolean;
@@ -72,10 +82,15 @@ interface WasherToolWithWorker {
 
 interface GroupedAssignment {
   workerName: string;
-  assignedDate: string;
+  workerId?: string;
   assignments: ToolAssignment[];
   totalTools: number;
   totalQuantity: number;
+  outstandingValue: number;
+  dateRange: {
+    earliest: string;
+    latest: string;
+  };
 }
 
 const ToolsAssignmentsPage: React.FC = () => {
@@ -130,28 +145,27 @@ const ToolsAssignmentsPage: React.FC = () => {
             toolName: tool.toolName,
             workerName: tool.washer?.name || 'Unknown Worker',
             quantity: tool.quantity,
-            returnedQuantity: tool.returnedQuantity,
-            usedQuantity: tool.usedQuantity,
+            returnedQuantity: tool.returnedQuantity || 0,
+            usedQuantity: tool.usedQuantity !== undefined ? tool.usedQuantity : 0,
+            chargedQuantity: tool.chargedQuantity || 0,
+            outstandingQuantity: tool.outstandingQuantity ?? 0,
+            outstandingValue: tool.outstandingValue || 0,
+            chargedValue: tool.chargedValue || 0,
             assignedDate: new Date(tool.assignedDate).toISOString().split('T')[0],
             returnDate: tool.returnedDate ? new Date(tool.returnedDate).toISOString().split('T')[0] : undefined,
             status: (() => {
-              // If explicitly marked as returned in DB, it's returned
-              if (tool.isReturned) return "returned";
-              
-              // Calculate if all items are accounted for (used + returned = total)
-              const used = tool.usedQuantity || 0;
-              const returned = tool.returnedQuantity || 0;
-              const total = tool.quantity;
-              
-              // If used + returned equals total, it's fully returned
-              if (used + returned >= total) return "returned";
-              
-              // If partially returned, show partially_returned
-              if (returned > 0 && returned < total) return "partially_returned";
-              
-              // If overdue (assigned more than 24 hours ago), show overdue
-              if (new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000)) return "overdue";
-              
+              // Nothing left with the washer: everything was used on completed jobs, returned or charged
+              if (tool.isReturned || (tool.outstandingQuantity ?? 0) <= 0) {
+                return (tool.chargedQuantity || 0) > 0 ? "charged" : "returned";
+              }
+
+              // Past the expected return date (stored in returned_date) with items still out
+              if (tool.returnedDate ? tool.isReturnDue : new Date(tool.assignedDate) < new Date(Date.now() - 24 * 60 * 60 * 1000)) {
+                return "overdue";
+              }
+
+              if ((tool.returnedQuantity || 0) > 0) return "partially_returned";
+
               return "assigned";
             })(),
             notes: tool.notes || 'No notes'
@@ -172,31 +186,43 @@ const ToolsAssignmentsPage: React.FC = () => {
     }
   };
 
-  // Group assignments by worker and date
+  // Group assignments by worker name only
   const groupedAssignments: GroupedAssignment[] = assignments.reduce((groups: GroupedAssignment[], assignment) => {
-    const existingGroup = groups.find(g => g.workerName === assignment.workerName && g.assignedDate === assignment.assignedDate);
+    const existingGroup = groups.find(g => g.workerName === assignment.workerName);
     
     if (existingGroup) {
       existingGroup.assignments.push(assignment);
       existingGroup.totalTools += 1;
       existingGroup.totalQuantity += assignment.quantity;
+      existingGroup.outstandingValue += assignment.outstandingValue;
+      
+      // Update date range
+      const assignmentDate = assignment.assignedDate;
+      if (new Date(assignmentDate) < new Date(existingGroup.dateRange.earliest)) {
+        existingGroup.dateRange.earliest = assignmentDate;
+      }
+      if (new Date(assignmentDate) > new Date(existingGroup.dateRange.latest)) {
+        existingGroup.dateRange.latest = assignmentDate;
+      }
     } else {
       groups.push({
         workerName: assignment.workerName,
-        assignedDate: assignment.assignedDate,
         assignments: [assignment],
         totalTools: 1,
-        totalQuantity: assignment.quantity
+        totalQuantity: assignment.quantity,
+        outstandingValue: assignment.outstandingValue,
+        dateRange: {
+          earliest: assignment.assignedDate,
+          latest: assignment.assignedDate
+        }
       });
     }
     
     return groups;
   }, []);
 
-  // Sort groups by date (newest first) and then by worker name
+  // Sort groups by worker name
   const sortedGroups = groupedAssignments.sort((a, b) => {
-    const dateComparison = new Date(b.assignedDate).getTime() - new Date(a.assignedDate).getTime();
-    if (dateComparison !== 0) return dateComparison;
     return a.workerName.localeCompare(b.workerName);
   });
 
@@ -210,9 +236,7 @@ const ToolsAssignmentsPage: React.FC = () => {
     setExpandedGroups(newExpanded);
   };
 
-  const getGroupKey = (workerName: string, assignedDate: string) => `${workerName}-${assignedDate}`;
-
-  console.log({tools});
+  const getGroupKey = (workerName: string) => workerName;
 
   const handleReturnTool = async (assignmentId: string) => {
     setReturningToolId(assignmentId);
@@ -220,9 +244,8 @@ const ToolsAssignmentsPage: React.FC = () => {
     // Find the assignment to get the current quantity and returned quantity
     const assignment = assignments.find(a => a.id === assignmentId);
     if (assignment) {
-      const currentReturned = assignment.returnedQuantity || 0;
-      const maxCanReturn = assignment.quantity - currentReturned;
-      setMaxReturnQuantity(maxCanReturn);
+      // Only items still with the washer can come back (not used on completed jobs or already charged)
+      setMaxReturnQuantity(assignment.outstandingQuantity);
       setReturnQuantity(1); // Default to 1, but user can change
     }
     
@@ -319,8 +342,10 @@ const ToolsAssignmentsPage: React.FC = () => {
           toolName: selectedTool.name,
           toolType: 'equipment',
           quantity: assignmentForm.quantity,
+          assignedDate: assignmentForm.assignedDate,
+          expectedReturnDate: assignmentForm.expectedReturnDate || null,
           notes: assignmentForm.notes,
-          price:assignmentForm.price
+          price: assignmentForm.price
         })
       });
 
@@ -366,6 +391,8 @@ const ToolsAssignmentsPage: React.FC = () => {
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
       case "returned":
         return "bg-green-light-100 text-green-light-800 dark:bg-green-light-900/30 dark:text-green-light-300";
+      case "charged":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
       case "overdue":
         return "bg-error-100 text-error-800 dark:bg-error-900/30 dark:text-error-300";
       default:
@@ -376,6 +403,9 @@ const ToolsAssignmentsPage: React.FC = () => {
   const totalAssignments = assignments.length;
   const activeAssignments = assignments.filter(a => a.status === "assigned").length;
   const overdueAssignments = assignments.filter(a => a.status === "overdue").length;
+  const overdueValue = assignments
+    .filter(a => a.status === "overdue")
+    .reduce((sum, a) => sum + a.outstandingValue, 0);
 
   if (loading) {
     return (
@@ -406,7 +436,7 @@ const ToolsAssignmentsPage: React.FC = () => {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -448,6 +478,21 @@ const ToolsAssignmentsPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unreturned Value</p>
+              <p className="text-2xl font-bold text-error-600 dark:text-error-400">₦{overdueValue.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Deducted from washer balance at next payout</p>
+            </div>
+            <div className="p-3 bg-error-100 dark:bg-error-900/30 rounded-lg">
+              <svg className="w-6 h-6 text-error-600 dark:text-error-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Action Button */}
@@ -463,23 +508,27 @@ const ToolsAssignmentsPage: React.FC = () => {
       {/* Grouped Assignments Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tool Assignments by Washer & Date</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tool Assignments by Washer</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Washer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date Range</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tools</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Quantity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Still With Washer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {sortedGroups.map((group) => {
-                const groupKey = getGroupKey(group.workerName, group.assignedDate);
+                const groupKey = getGroupKey(group.workerName);
                 const isExpanded = expandedGroups.has(groupKey);
+                const dateRangeStr = group.dateRange.earliest === group.dateRange.latest
+                  ? new Date(group.dateRange.earliest).toLocaleDateString()
+                  : `${new Date(group.dateRange.earliest).toLocaleDateString()} - ${new Date(group.dateRange.latest).toLocaleDateString()}`;
                 
                 return (
                   <React.Fragment key={groupKey}>
@@ -489,13 +538,16 @@ const ToolsAssignmentsPage: React.FC = () => {
                         {group.workerName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(group.assignedDate).toLocaleDateString()}
+                        {dateRangeStr}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {group.totalTools} tool{group.totalTools !== 1 ? 's' : ''}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {group.totalQuantity}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${group.outstandingValue > 0 ? 'text-orange-600 dark:text-orange-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                        ₦{group.outstandingValue.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         <button
@@ -520,7 +572,7 @@ const ToolsAssignmentsPage: React.FC = () => {
                       <>
                         {/* Sub-header for individual tools */}
                         <tr className="bg-gray-25 dark:bg-gray-850/50">
-                          <td colSpan={5} className="px-6 py-2">
+                          <td colSpan={6} className="px-6 py-2">
                             <div className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                               Individual Tools
                             </div>
@@ -537,32 +589,38 @@ const ToolsAssignmentsPage: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              {new Date(assignment.assignedDate).toLocaleDateString()}
+                              {assignment.returnDate && (
+                                <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                  {assignment.status === 'returned'
+                                    ? `Returned: ${new Date(assignment.returnDate).toLocaleDateString()}`
+                                    : `Expected return: ${new Date(assignment.returnDate).toLocaleDateString()}`}
+                                </div>
+                              )}
+                            </td>
+                            <td colSpan={2} className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
                               <div>
-                                <div>Total: {assignment.quantity}</div>
-                                {assignment.usedQuantity && assignment.usedQuantity > 0 && (
-                                  <div className="text-blue-600 dark:text-blue-400">
-                                    Used: {assignment.usedQuantity}
-                                  </div>
-                                )}
-                                {assignment.returnedQuantity && assignment.returnedQuantity > 0 && (
+                                <div>Total assigned: {assignment.quantity}</div>
+                                <div className="text-blue-600 dark:text-blue-400">
+                                  Used on completed jobs: {assignment.usedQuantity || 0}
+                                </div>
+                                {(assignment.returnedQuantity || 0) > 0 && (
                                   <div className="text-green-600 dark:text-green-400">
                                     Returned: {assignment.returnedQuantity}
                                   </div>
                                 )}
-                                {(() => {
-                                  const used = assignment.usedQuantity || 0;
-                                  const returned = assignment.returnedQuantity || 0;
-                                  const remaining = assignment.quantity - used - returned;
-                                  return remaining > 0 && (
-                                    <div className="text-orange-600 dark:text-orange-400">
-                                      Remaining: {remaining}
-                                    </div>
-                                  );
-                                })()}
+                                {assignment.chargedQuantity > 0 && (
+                                  <div className="text-orange-600 dark:text-orange-400">
+                                    Charged to washer: {assignment.chargedQuantity} (₦{assignment.chargedValue.toLocaleString()})
+                                  </div>
+                                )}
+                                {assignment.outstandingQuantity > 0 && (
+                                  <div className={assignment.status === "overdue" ? "text-error-600 dark:text-error-400 font-medium" : "text-gray-700 dark:text-gray-300"}>
+                                    Still with washer: {assignment.outstandingQuantity} (₦{assignment.outstandingValue.toLocaleString()})
+                                    {assignment.status === "overdue" && " – will be deducted"}
+                                  </div>
+                                )}
                               </div>
-                            </td>
-                            <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              {assignment.returnDate ? new Date(assignment.returnDate).toLocaleDateString() : "-"}
                             </td>
                             <td className="px-6 py-3 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(assignment.status)}`}>
@@ -571,17 +629,19 @@ const ToolsAssignmentsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
                               <div className="flex space-x-2">
-                                {assignment.status !== "returned" && (
+                                {assignment.outstandingQuantity > 0 && (
                                   <button 
                                     onClick={() => handleReturnTool(assignment.id)}
                                     disabled={submitting}
                                     className="text-green-light-600 hover:text-green-light-500 dark:text-green-light-400 dark:hover:text-green-light-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    {assignment.status === "partially_returned" ? "Return More" : "Return"}
+                                    {(assignment.returnedQuantity || 0) > 0 ? "Return More" : "Return"}
                                   </button>
                                 )}
-                                {assignment.status === "returned" && (
-                                  <span className="text-gray-400 dark:text-gray-500">Fully Returned</span>
+                                {assignment.outstandingQuantity === 0 && (
+                                  <span className="text-gray-400 dark:text-gray-500">
+                                    {assignment.status === "charged" ? "Settled" : "Fully Returned"}
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -644,6 +704,7 @@ const ToolsAssignmentsPage: React.FC = () => {
               >
                 <option value="">Select a worker</option>
                 {workers
+                  .filter(worker => worker.isActive)
                   .map(worker => (
                     <option key={worker.id} value={worker.id}>
                       {worker.name} ({worker.email})

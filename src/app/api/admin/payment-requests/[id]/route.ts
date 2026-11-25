@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOutstandingCharges, markToolsCharged } from '@/lib/washerTools';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -104,6 +105,8 @@ export async function PATCH(
       approval_date?: string;
       admin_notes?: string;
       updated_at?: string;
+      material_deductions?: number;
+      tool_deductions?: number;
     } = {};
     
     if (status !== undefined) {
@@ -120,25 +123,47 @@ export async function PATCH(
 
     // If marking as paid, deduct the amount from washer's total earnings
     if (status === 'paid') {
+      if (existingRequest.status === 'paid') {
+        return NextResponse.json(
+          { success: false, error: 'Payment request is already paid' },
+          { status: 400 }
+        );
+      }
+
       const paymentAmount = existingRequest.amount;
-      const materialDeductions = existingRequest.material_deductions || 0;
-      const toolDeductions = existingRequest.tool_deductions || 0;
       const isAdvance = existingRequest.is_advance || false;
-      
-      let totalDeduction;
-      if (isAdvance) {
-        // For advance payments, only deduct the requested amount (no material/tool deductions)
-        totalDeduction = paymentAmount;
-      } else {
-        // For regular payments, deduct the full amount including deductions
-        totalDeduction = paymentAmount + materialDeductions + toolDeductions;
+
+      let totalDeduction = paymentAmount;
+      let outstanding: Awaited<ReturnType<typeof getOutstandingCharges>> | null = null;
+
+      if (!isAdvance) {
+        // Recalculate at payout so tools returned since the request aren't charged
+        outstanding = await getOutstandingCharges(supabaseAdmin, existingRequest.washer_id);
+        updateData.material_deductions = outstanding.deductions.materialDeductions;
+        updateData.tool_deductions = outstanding.deductions.toolDeductions;
+        totalDeduction += outstanding.deductions.totalDeductions;
+      }
+
+      // Deduct from the washer's current balance, not the snapshot taken at request time
+      const { data: washerProfile, error: profileError } = await supabaseAdmin
+        .from('car_washer_profiles')
+        .select('total_earnings')
+        .eq('user_id', existingRequest.washer_id)
+        .single();
+
+      if (profileError || !washerProfile) {
+        console.error('Error fetching washer profile:', profileError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch washer earnings' },
+          { status: 500 }
+        );
       }
 
       // Update washer's total earnings
       const { error: earningsError } = await supabaseAdmin
         .from('car_washer_profiles')
         .update({
-          total_earnings: existingRequest.total_earnings - totalDeduction
+          total_earnings: (washerProfile.total_earnings || 0) - totalDeduction
         })
         .eq('user_id', existingRequest.washer_id);
 
@@ -148,6 +173,11 @@ export async function PATCH(
           { success: false, error: 'Failed to update washer earnings' },
           { status: 500 }
         );
+      }
+
+      // Record the charged tools so they aren't deducted again
+      if (outstanding && outstanding.unreturnedItems.length > 0) {
+        await markToolsCharged(supabaseAdmin, outstanding.tools, outstanding.unreturnedItems);
       }
     }
 

@@ -12,6 +12,15 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
+const parseDateBoundary = (dateValue: string, boundary: 'start' | 'end') => {
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dateValue);
+  const date = isDateOnly
+    ? new Date(`${dateValue}T${boundary === 'start' ? '00:00:00' : '23:59:59.999'}`)
+    : new Date(dateValue);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -20,7 +29,9 @@ export async function GET(request: NextRequest) {
     const paymentMethod = searchParams.get('paymentMethod') || 'all';
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const limit = parseInt(searchParams.get('limit') || (startDate || endDate ? '1000' : '50'));
 
     // Build the query for sales transactions
     let query = supabaseAdmin
@@ -61,6 +72,20 @@ export async function GET(request: NextRequest) {
     // Apply payment method filter
     if (paymentMethod !== 'all') {
       query = query.eq('payment_method', paymentMethod);
+    }
+
+    if (startDate) {
+      const startDateTime = parseDateBoundary(startDate, 'start');
+      if (startDateTime) {
+        query = query.gte('created_at', startDateTime.toISOString());
+      }
+    }
+
+    if (endDate) {
+      const endDateTime = parseDateBoundary(endDate, 'end');
+      if (endDateTime) {
+        query = query.lte('created_at', endDateTime.toISOString());
+      }
     }
 
     const { data: transactions, error } = await query;

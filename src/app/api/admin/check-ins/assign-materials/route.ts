@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOutstandingQuantity, getUsedQuantities } from '@/lib/washerTools';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     const materialIds = materials.map((m: MaterialAssignment) => m.materialId);
     const { data: washerMaterials, error: materialsError } = await supabaseAdmin
       .from('washer_tools')
-      .select('id, quantity, tool_name')
+      .select('*')
       .eq('washer_id', washerId)
       .in('id', materialIds)
       .eq('is_returned', false);
@@ -64,6 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Usage on any non-cancelled check-in reserves the item, so it can't be assigned twice
+    const reservedQuantities = await getUsedQuantities(
+      supabaseAdmin,
+      washerMaterials,
+      ['pending', 'in_progress', 'completed']
+    );
+
     // Check if materials have sufficient quantity
     for (const material of materials) {
       const washerMaterial = washerMaterials.find(wm => wm.id === material.materialId);
@@ -73,9 +81,10 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (washerMaterial.quantity < material.quantityUsed) {
+      const available = getOutstandingQuantity(washerMaterial, reservedQuantities[washerMaterial.id] || 0);
+      if (available < material.quantityUsed) {
         return NextResponse.json(
-          { success: false, error: `Insufficient quantity for ${material.materialName}. Available: ${washerMaterial.quantity}, Requested: ${material.quantityUsed}` },
+          { success: false, error: `Insufficient quantity for ${material.materialName}. Available: ${available}, Requested: ${material.quantityUsed}` },
           { status: 400 }
         );
       }
@@ -107,36 +116,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update washer material quantities (reduce available quantity)
-    for (const material of materials) {
-      // First get the current quantity
-      const { data: currentMaterial, error: fetchError } = await supabaseAdmin
-        .from('washer_tools')
-        .select('quantity')
-        .eq('id', material.materialId)
-        .single();
-
-      if (fetchError || !currentMaterial) {
-        console.error('Error fetching current material quantity:', fetchError);
-        continue;
-      }
-
-      const newQuantity = currentMaterial.quantity - material.quantityUsed;
-
-      // Update with new quantity
-      const { error: updateError } = await supabaseAdmin
-        .from('washer_tools')
-        .update({ 
-          quantity: newQuantity,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', material.materialId);
-
-      if (updateError) {
-        console.error('Error updating washer material quantity:', updateError);
-        // Continue with other materials even if one fails
-      }
-    }
+    // washer_tools.quantity stays as the assigned amount; usage is derived from
+    // check_in_materials once the check-in is completed
 
     return NextResponse.json({
       success: true,

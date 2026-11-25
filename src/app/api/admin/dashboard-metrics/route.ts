@@ -439,14 +439,17 @@ export async function GET(request: NextRequest) {
     const { data: inventoryData, error: inventoryError } = await supabaseAdmin
       .from('stock_items')
       .select('id, current_stock, minimum_stock')
-      .lt('current_stock', 'minimum_stock')
       .eq('is_active', true);
 
     if (inventoryError) {
       console.error('Error fetching inventory data:', inventoryError);
     }
 
-    const lowStockItems = inventoryData?.length || 0;
+    const lowStockItems = inventoryData?.filter(item => {
+      const currentStock = Number(item.current_stock || 0);
+      const minimumStock = Number(item.minimum_stock || 0);
+      return currentStock < minimumStock;
+    }).length || 0;
 
     // 6. Fetch top performing washers (last 30 days)
     const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));

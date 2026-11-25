@@ -71,12 +71,21 @@ interface InventoryItem {
   name: string;
 }
 
+interface Milestone {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+// Check-in cards rendered per "Load more"
+const PAGE_SIZE = 50;
+
 const CheckInHistoryPage: React.FC = () => {
   const { hasRole, user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'paid' | 'cancelled'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'unpaid' | 'cancelled'>('all');
   const [isUpdatingPayment, setIsUpdatingPayment] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null); // Track which check-in is being updated
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -111,6 +120,8 @@ const CheckInHistoryPage: React.FC = () => {
 
   // Active check-ins functionality
   const [searchQuery, setSearchQuery] = useState('');
+  // Render the list in pages; drawing thousands of cards at once freezes the page
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeError, setPasscodeError] = useState<string>('');
@@ -122,6 +133,7 @@ const CheckInHistoryPage: React.FC = () => {
   const [customerBonuses, setCustomerBonuses] = useState<Map<string, Bonus[]>>(new Map());
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [selectedCustomerBonuses, setSelectedCustomerBonuses] = useState<Bonus[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
 
   // Refs for optimization (request cancellation and debouncing)
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -162,7 +174,7 @@ const CheckInHistoryPage: React.FC = () => {
   }, [startDate, endDate, user?.id]);
 
   // Fetch washers from API
-  const fetchWashers = async () => {
+  const fetchWashers = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/washers');
       const result = await response.json();
@@ -178,7 +190,7 @@ const CheckInHistoryPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching washers:', err);
     }
-  };
+  }, []);
 
   // Fetch all check-ins from API
   const fetchCheckIns = useCallback(async (search = '') => {
@@ -257,6 +269,18 @@ const CheckInHistoryPage: React.FC = () => {
   }, [startDate, endDate, user?.id]);
 
   // Fetch customer bonuses
+  const fetchMilestones = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/milestones');
+      const data = await response.json();
+      if (data.success) {
+        setMilestones(data.milestones || []);
+      }
+    } catch (error) {
+      console.error('Error fetching milestones:', error);
+    }
+  }, []);
+
   const fetchCustomerBonuses = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/bonuses?type=customer');
@@ -399,13 +423,12 @@ const CheckInHistoryPage: React.FC = () => {
       setIsLoading(true);
 
       try {
-        // Fetch in parallel - all requests can be cancelled together
-        await Promise.all([
-          fetchCheckIns(),
-          fetchWashers(),
-          fetchEarnings(),
-          fetchCustomerBonuses()
-        ]);
+        // Secondary data loads in the background; the list only waits for check-ins
+        fetchWashers();
+        fetchEarnings();
+        fetchCustomerBonuses();
+        fetchMilestones();
+        await fetchCheckIns();
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error('Error loading data:', err);
@@ -417,11 +440,10 @@ const CheckInHistoryPage: React.FC = () => {
 
     loadData();
 
-    // Cleanup: cancel requests on unmount
     return () => {
       abortController.abort();
     };
-  }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
+  }, [user?.id, fetchCheckIns, fetchWashers, fetchEarnings, fetchCustomerBonuses, fetchMilestones]); 
 
   // Refetch earnings when date filters change (debounced)
   useEffect(() => {
@@ -444,28 +466,17 @@ const CheckInHistoryPage: React.FC = () => {
     };
   }, [startDate, endDate, fetchEarnings, user?.id]);
 
-  // Refetch check-ins when date filters change (debounced)
+  // Refetch check-ins when date filters change (debounced).
+  // Search is filtered in memory, so typing doesn't re-download the list.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || (!startDate && !endDate)) return;
 
-    // Clear previous timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Debounce the fetch
-    debounceTimeoutRef.current = setTimeout(() => {
-      if (startDate || endDate) {
-        fetchCheckIns(searchQuery);
-      }
+    const timeout = setTimeout(() => {
+      fetchCheckIns();
     }, 300); // 300ms debounce
 
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, [startDate, endDate, searchQuery, fetchCheckIns, user?.id]);
+    return () => clearTimeout(timeout);
+  }, [startDate, endDate, fetchCheckIns, user?.id]);
 
   // Memoize filtered check-ins to prevent unnecessary recalculations
   const filteredCheckIns = useMemo(() => {
@@ -474,6 +485,8 @@ const CheckInHistoryPage: React.FC = () => {
     let statusMatch = false;
     if (filter === 'all') {
       statusMatch = true; // Show all statuses
+    } else if (filter === 'unpaid') {
+      statusMatch = checkIn.paymentStatus !== 'paid' && checkIn.status !== 'cancelled';
     } else {
       statusMatch = checkIn.status === filter;
     }
@@ -488,7 +501,9 @@ const CheckInHistoryPage: React.FC = () => {
       const matchesPhone = checkIn.customerPhone.toLowerCase().includes(query);
       const matchesPlate = checkIn.licensePlate.toLowerCase().includes(query);
       const matchesWasher = checkIn.assignedWasher?.toLowerCase().includes(query) || false;
-      if (!matchesName && !matchesPhone && !matchesPlate && !matchesWasher) return false;
+      const matchesCode = (checkIn.userCode || '').toLowerCase().includes(query) ||
+        (checkIn.passcode || '').toLowerCase().includes(query);
+      if (!matchesName && !matchesPhone && !matchesPlate && !matchesWasher && !matchesCode) return false;
     }
 
     // Then filter by date range if dates are selected
@@ -504,6 +519,11 @@ const CheckInHistoryPage: React.FC = () => {
     return true;
     });
   }, [checkIns, filter, searchQuery, startDate, endDate]);
+
+  // Start from the first page whenever the filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filter, searchQuery, startDate, endDate]);
 
   const handleMarkAsPaid = (checkInId: string) => {
     setSelectedCheckInId(checkInId);
@@ -1145,13 +1165,13 @@ const CheckInHistoryPage: React.FC = () => {
             Completed ({checkIns.filter(c => c.status === 'completed').length})
           </button>
           <button
-            onClick={() => setFilter('paid')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'paid'
+            onClick={() => setFilter('unpaid')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${filter === 'unpaid'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
           >
-            Paid ({checkIns.filter(c => c.status === 'paid').length})
+            Unpaid ({checkIns.filter(c => c.paymentStatus !== 'paid' && c.status !== 'cancelled').length})
           </button>
           <button
             onClick={() => setFilter('cancelled')}
@@ -1198,12 +1218,14 @@ const CheckInHistoryPage: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400">
               {filter === 'all'
                 ? 'No completed, paid, or cancelled check-ins found.'
-                : `No ${filter} check-ins found.`
+                : filter === 'unpaid'
+                  ? 'No unpaid check-ins found.'
+                  : `No ${filter.replace('_', ' ')} check-ins found.`
               }
             </p>
           </div>
         ) : (
-          filteredCheckIns.map((checkIn) => (
+          filteredCheckIns.slice(0, visibleCount).map((checkIn) => (
             <div
               key={checkIn.id}
               className={`border rounded-xl p-6 transition-colors ${getStatusColor(checkIn.status)}`}
@@ -1227,22 +1249,32 @@ const CheckInHistoryPage: React.FC = () => {
                             {checkIn.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
                           </Badge>
                         )}
-                        {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (
-                          <button
-                            onClick={() => {
-                              setSelectedCustomerBonuses(customerBonuses.get(checkIn.customerId!) || []);
-                              setShowBonusModal(true);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Badge
-                              color="info"
-                              size="sm"
+                        {checkIn.customerId && customerBonuses.has(checkIn.customerId) && (() => {
+                          const bonuses = customerBonuses.get(checkIn.customerId!) || [];
+                          // Check if any bonus has an active milestone
+                          const hasActiveMilestone = bonuses.some(bonus => {
+                            if (!bonus.milestone) return false;
+                            const milestone = milestones.find(m => m.name === bonus.milestone);
+                            return milestone?.isActive === true;
+                          });
+                          
+                          return hasActiveMilestone ? (
+                            <button
+                              onClick={() => {
+                                setSelectedCustomerBonuses(bonuses);
+                                setShowBonusModal(true);
+                              }}
+                              className="cursor-pointer"
                             >
-                              🎁 Has Bonus
-                            </Badge>
-                          </button>
-                        )}
+                              <Badge
+                                color="info"
+                                size="sm"
+                              >
+                                🎁 Has Bonus
+                              </Badge>
+                            </button>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1470,6 +1502,19 @@ const CheckInHistoryPage: React.FC = () => {
               </div>
             </div>
           ))
+        )}
+        {filteredCheckIns.length > visibleCount && (
+          <div className="flex flex-col items-center gap-2 py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {visibleCount} of {filteredCheckIns.length} check-ins
+            </p>
+            <button
+              onClick={() => setVisibleCount(count => count + PAGE_SIZE)}
+              className="px-4 py-2 bg-green-light-600 hover:bg-green-light-700 text-white rounded-lg font-medium transition-colors duration-200"
+            >
+              Load more
+            </button>
+          </div>
         )}
       </div>
 

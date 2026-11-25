@@ -72,12 +72,19 @@ interface InventoryItem {
   name: string;
 }
 
+interface Milestone {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
 const FinancialBonusesPage: React.FC = () => {
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -188,6 +195,7 @@ const FinancialBonusesPage: React.FC = () => {
     fetchWashers();
     fetchServices();
     fetchInventory();
+    fetchMilestones();
   }, [fetchBonuses]);
 
   // Filter customers and washers when filters change
@@ -245,6 +253,18 @@ const FinancialBonusesPage: React.FC = () => {
     }
   };
 
+  const fetchMilestones = async () => {
+    try {
+      const response = await fetch('/api/admin/milestones');
+      const data = await response.json();
+      if (data.success) {
+        setMilestones(data.milestones || []);
+      }
+    } catch {
+      console.error('Error fetching milestones');
+    }
+  };
+
   const handleServiceSelect = (serviceId: string) => {
     const selectedService = services.find(s => s.id === serviceId);
     if (selectedService) {
@@ -287,6 +307,7 @@ const FinancialBonusesPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           type: createForm.type,
@@ -723,6 +744,7 @@ const FinancialBonusesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reason</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Milestone Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
@@ -753,11 +775,6 @@ const FinancialBonusesPage: React.FC = () => {
                       <div className="text-sm text-gray-900 dark:text-white max-w-xs truncate">
                         {bonus.reason}
                       </div>
-                      {bonus.milestone && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Milestone: {bonus.milestone}
-                        </div>
-                      )}
                       {bonus.bonusType && (
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Type: <span className="capitalize">{bonus.bonusType}</span>
@@ -770,6 +787,27 @@ const FinancialBonusesPage: React.FC = () => {
                             return item ? ` - ${item.name}` : '';
                           })()}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {bonus.milestone ? (() => {
+                        const milestone = milestones.find(m => m.name === bonus.milestone);
+                        if (milestone) {
+                          return (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              milestone.isActive 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                            }`}>
+                              {milestone.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Unknown</span>
+                        );
+                      })() : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

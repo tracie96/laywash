@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
+import { useAuth } from '@/context/AuthContext';
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import { Modal } from '@/components/ui/modal';
 
@@ -29,6 +30,7 @@ interface InventoryItem {
 }
 
 const StockReportsPage: React.FC = () => {
+  const { user } = useAuth();
   const [reports, setReports] = useState<StockReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRestockModal, setShowRestockModal] = useState(false);
@@ -121,6 +123,7 @@ const StockReportsPage: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-ID': user?.id || '',
         },
         body: JSON.stringify({
           currentStock: restockAmount

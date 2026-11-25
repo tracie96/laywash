@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { recordInventoryMovement } from '@/lib/inventoryMovements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -90,6 +91,17 @@ export async function PATCH(
     if (updateData.supplier !== undefined) updateFields.supplier = updateData.supplier;
     if (updateData.isActive !== undefined) updateFields.is_active = updateData.isActive;
 
+    // Remember the stock before the change so it can be logged as a movement
+    let previousStock: number | null = null;
+    if (updateData.currentStock !== undefined) {
+      const { data: existingItem } = await supabaseAdmin
+        .from('inventory')
+        .select('current_stock')
+        .eq('id', id)
+        .single();
+      previousStock = existingItem?.current_stock ?? null;
+    }
+
     // Update the inventory item in the database
     const { data: updatedItem, error } = await supabaseAdmin
       .from('inventory')
@@ -104,6 +116,18 @@ export async function PATCH(
         { success: false, error: 'Failed to update inventory item' },
         { status: 500 }
       );
+    }
+
+    if (previousStock !== null && updatedItem.current_stock !== previousStock) {
+      const isIncrease = updatedItem.current_stock > previousStock;
+      await recordInventoryMovement(supabaseAdmin, {
+        inventoryItemId: updatedItem.id,
+        movementType: isIncrease ? 'stock_in' : 'stock_out',
+        previousBalance: previousStock,
+        newBalance: updatedItem.current_stock,
+        adminId: request.headers.get('X-Admin-ID'),
+        reason: updateData.reason || (isIncrease ? 'Stock added' : 'Stock removed')
+      });
     }
 
     // Transform the response to match frontend interface

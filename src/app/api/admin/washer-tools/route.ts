@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOutstandingQuantity, getUsedQuantities, isReturnDue } from '@/lib/washerTools';
+import { selectAll } from '@/lib/supabaseQuery';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -18,32 +20,44 @@ export async function GET(request: NextRequest) {
     const toolType = searchParams.get('toolType');
     const isReturned = searchParams.get('isReturned');
 
-    let query = supabaseAdmin
-      .from('washer_tools')
-      .select(`
-        *,
-        washer:users!washer_tools_washer_id_fkey (
-          id,
-          name,
-          email,
-          phone
-        )
-      `)
-      .order('assigned_date', { ascending: false });
+    const buildQuery = () => {
+      let query = supabaseAdmin
+        .from('washer_tools')
+        .select(`
+          *,
+          washer:users!washer_tools_washer_id_fkey (
+            id,
+            name,
+            email,
+            phone
+          )
+        `)
+        .order('assigned_date', { ascending: false })
+        .order('id');
 
-    if (washerId) {
-      query = query.eq('washer_id', washerId);
+      if (washerId) {
+        query = query.eq('washer_id', washerId);
+      }
+
+      if (toolType) {
+        query = query.eq('tool_type', toolType);
+      }
+
+      if (isReturned !== null) {
+        query = query.eq('is_returned', isReturned === 'true');
+      }
+
+      return query;
+    };
+
+    // Page through all rows; a single request is capped at 1000
+    let tools: Awaited<ReturnType<typeof buildQuery>>['data'] = null;
+    let error: unknown = null;
+    try {
+      tools = await selectAll(buildQuery);
+    } catch (err) {
+      error = err;
     }
-
-    if (toolType) {
-      query = query.eq('tool_type', toolType);
-    }
-
-    if (isReturned !== null) {
-      query = query.eq('is_returned', isReturned === 'true');
-    }
-
-    const { data: tools, error } = await query;
 
     if (error) {
       console.error('Error fetching washer tools:', error);
@@ -53,31 +67,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get used quantities from check_in_materials for all tools using material_id
-    const toolIds = tools?.map(tool => tool.id) || [];
-    const usedQuantities: Record<string, number> = {};
-
-    if (toolIds.length > 0) {
-      const { data: usedMaterials, error: usedError } = await supabaseAdmin
-        .from('check_in_materials')
-        .select('material_id, quantity_used, washer_id')
-        .in('material_id', toolIds);
-
-      if (!usedError && usedMaterials) {
-        // Calculate total used quantity for each tool by washer
-        usedMaterials.forEach(used => {
-          const key = `${used.material_id}_${used.washer_id}`;
-          usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
-        });
-      }
-    }
+    // Used = quantity consumed on completed check-ins
+    const usedQuantities = await getUsedQuantities(supabaseAdmin, tools || []);
 
     // Transform the data to match the frontend interface
     const transformedTools = tools?.map(tool => {
-      const usedKey = `${tool.id}_${tool.washer_id}`;
-      const usedQuantity = usedQuantities[usedKey] || 0;
+      const usedQuantity = usedQuantities[tool.id] || 0;
       const returnedQuantity = tool.returned_quantity || 0;
-      
+      const chargedQuantity = tool.charged_quantity || 0;
+      const outstandingQuantity = getOutstandingQuantity(tool, usedQuantity);
+      const unitCost = tool.amount || 0;
+
       return {
         id: tool.id,
         washerId: tool.washer_id,
@@ -86,10 +86,16 @@ export async function GET(request: NextRequest) {
         toolType: tool.tool_type,
         quantity: tool.quantity,
         returnedQuantity: returnedQuantity,
-        usedQuantity: usedQuantity, // Quantity used from check_in_materials
+        usedQuantity: usedQuantity,
+        chargedQuantity: chargedQuantity,
+        outstandingQuantity: outstandingQuantity,
+        unitCost: unitCost,
+        outstandingValue: outstandingQuantity * unitCost,
+        chargedValue: chargedQuantity * unitCost,
+        isReturnDue: isReturnDue(tool.returned_date),
         assignedDate: tool.assigned_date,
         returnedDate: tool.returned_date,
-        isReturned: tool.is_returned,
+        isReturned: tool.is_returned || outstandingQuantity === 0,
         notes: tool.notes,
         createdAt: tool.created_at,
         updatedAt: tool.updated_at
@@ -119,7 +125,9 @@ export async function POST(request: NextRequest) {
       toolType, 
       quantity, 
       notes,
-      price
+      price,
+      assignedDate,
+      expectedReturnDate
     } = await request.json();
 
     // Validate required input
@@ -193,6 +201,14 @@ export async function POST(request: NextRequest) {
       amount: finalCost,
       notes: notes || null
     };
+
+    if (assignedDate) {
+      insertData.assigned_date = assignedDate;
+    }
+
+    if (expectedReturnDate) {
+      insertData.returned_date = expectedReturnDate;
+    }
 
     // Only add tool_id if it's provided and not null
     if (toolId) {
@@ -299,28 +315,31 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Items used on completed jobs or already charged to the washer can't be returned
+    const usedQuantity = (await getUsedQuantities(supabaseAdmin, [washerTool]))[washerTool.id] || 0;
+
     // Validate returned quantity if provided
     if (returnedQuantity !== undefined) {
-      const currentReturnedQuantity = washerTool.returned_quantity || 0;
-      const maxCanReturn = washerTool.quantity - currentReturnedQuantity;
-      
       if (returnedQuantity < 0) {
         return NextResponse.json(
           { success: false, error: 'Returned quantity must be greater than or equal to 0' },
           { status: 400 }
         );
       }
-      
-      if (isCumulative && returnedQuantity > maxCanReturn) {
+
+      const outstandingQuantity = getOutstandingQuantity(washerTool, usedQuantity);
+      const otherAccounted = usedQuantity + (washerTool.charged_quantity || 0);
+
+      if (isCumulative && returnedQuantity > outstandingQuantity) {
         return NextResponse.json(
-          { success: false, error: `Cannot return more than ${maxCanReturn} items (${currentReturnedQuantity} already returned out of ${washerTool.quantity})` },
+          { success: false, error: `Cannot return more than ${outstandingQuantity} item(s) still with the washer` },
           { status: 400 }
         );
       }
-      
-      if (!isCumulative && returnedQuantity > washerTool.quantity) {
+
+      if (!isCumulative && returnedQuantity + otherAccounted > washerTool.quantity) {
         return NextResponse.json(
-          { success: false, error: `Returned quantity must be between 0 and ${washerTool.quantity}` },
+          { success: false, error: `Returned quantity must be between 0 and ${washerTool.quantity - otherAccounted}` },
           { status: 400 }
         );
       }
@@ -342,7 +361,10 @@ export async function PUT(request: NextRequest) {
       newReturnedQuantity = currentReturnedQuantity;
     }
     
-    const isFullyReturned = newReturnedQuantity >= washerTool.quantity;
+    const isFullyReturned = getOutstandingQuantity(
+      { ...washerTool, returned_quantity: newReturnedQuantity },
+      usedQuantity
+    ) === 0;
 
     // Update the washer tool status
     const updateData: {
@@ -352,7 +374,7 @@ export async function PUT(request: NextRequest) {
     } = {
       returned_quantity: newReturnedQuantity,
       is_returned: isFullyReturned,
-      returned_date: isFullyReturned ? new Date().toISOString() : null
+      returned_date: isFullyReturned ? new Date().toISOString() : washerTool.returned_date
     };
 
     const { error: updateError } = await supabaseAdmin

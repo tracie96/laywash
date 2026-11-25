@@ -98,9 +98,9 @@ const ActiveCheckInsPage: React.FC = () => {
   // Fetch active check-ins from API
   const fetchActiveCheckIns = useCallback(async (search = '') => {
     try {
+      // Only open check-ins; the server filters so we don't download history
       const searchParams = new URLSearchParams({
-        status: 'all',
-        limit: '100',
+        status: 'pending,in_progress',
         sortBy: 'check_in_time',
         sortOrder: 'desc'
       });

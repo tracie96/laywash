@@ -387,11 +387,11 @@ const PaymentRequestsPage: React.FC = () => {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Unreturned Tools Detected
+                  Tools Past Return Date
                 </h3>
                 <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                  <p>You have unreturned tools that will be deducted from your payment request.</p>
-                  <p className="mt-1">Unreturned tools: {unreturnedItems.map(item => item.toolName).join(', ')}</p>
+                  <p>These tools are past their return date and will be deducted from your payment request.</p>
+                  <p className="mt-1">Due for return: {unreturnedItems.map(item => item.toolName).join(', ')}</p>
                 </div>
               </div>
             </div>
@@ -575,7 +575,7 @@ const PaymentRequestsPage: React.FC = () => {
                 <div className="text-xs text-gray-500 mt-1">
                   Available: ₦{currentEarnings.toLocaleString()}
                 </div>
-                {hasUnreturnedTools && (
+                {calculatedDeductions.totalDeductions > 0 && (
                   <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                     After deductions: ₦{(currentEarnings - calculatedDeductions.totalDeductions).toLocaleString()}
                   </div>
@@ -623,11 +623,11 @@ const PaymentRequestsPage: React.FC = () => {
                 />
               </div>
 
-              {/* Unreturned Items Details */}
+              {/* Due Items Details */}
               {(unreturnedItems.length > 0) && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Unreturned Items (Total: ₦{calculatedDeductions.totalDeductions.toLocaleString()})
+                    Items Past Return Date (Total: ₦{calculatedDeductions.totalDeductions.toLocaleString()})
                   </h4>
                   <div className="space-y-2 max-h-32 overflow-y-auto">
                     {unreturnedItems.map((item) => (
@@ -649,13 +649,10 @@ const PaymentRequestsPage: React.FC = () => {
               <div className="flex space-x-3 pt-4">
                 <Button
                   type="submit"
-                  disabled={formSubmitting || hasUnreturnedTools}
-                  className={`flex-1 ${hasUnreturnedTools 
-                    ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
+                  disabled={formSubmitting}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {formSubmitting ? 'Creating...' : hasUnreturnedTools ? 'Return Tools First' : 'Create Request'}
+                  {formSubmitting ? 'Creating...' : 'Create Request'}
                 </Button>
                 <Button
                   type="button"

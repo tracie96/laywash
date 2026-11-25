@@ -80,6 +80,54 @@ interface PaymentRecord {
   productUnit?: string;
 }
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getPeriodDateRange = (
+  selectedPeriod: string,
+  customStartDate: string,
+  customEndDate: string
+) => {
+  if (selectedPeriod === 'custom') {
+    if (!customStartDate || !customEndDate) return null;
+    return { startDate: customStartDate, endDate: customEndDate };
+  }
+
+  const now = new Date();
+  let startDate: Date;
+  let endDate = new Date(now);
+
+  switch (selectedPeriod) {
+    case 'today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'yesterday':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      break;
+    case 'week':
+      startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+      break;
+    case 'month':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      break;
+    case 'quarter':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+      break;
+    default:
+      return null;
+  }
+
+  return {
+    startDate: formatDateInputValue(startDate),
+    endDate: formatDateInputValue(endDate)
+  };
+};
+
 // Function to fetch admin names and create a mapping
 const fetchAdminNames = async (): Promise<Record<string, string>> => {
   try {
@@ -108,6 +156,13 @@ const FinancialPaymentsPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [draftCustomStartDate, setDraftCustomStartDate] = useState('');
+  const [draftCustomEndDate, setDraftCustomEndDate] = useState('');
+
+  const dateRange = useMemo(
+    () => getPeriodDateRange(selectedPeriod, customStartDate, customEndDate),
+    [selectedPeriod, customStartDate, customEndDate]
+  );
 
   // Period options
   const periodOptions = [
@@ -125,58 +180,33 @@ const FinancialPaymentsPage: React.FC = () => {
     if (newPeriod === 'custom') {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-      setCustomStartDate(lastMonth.toISOString().split('T')[0]);
-      setCustomEndDate(today.toISOString().split('T')[0]);
+      const startDate = customStartDate || formatDateInputValue(lastMonth);
+      const endDate = customEndDate || formatDateInputValue(today);
+      setDraftCustomStartDate(startDate);
+      setDraftCustomEndDate(endDate);
+      setCustomStartDate(startDate);
+      setCustomEndDate(endDate);
     }
+  };
+
+  const handleApplyCustomDateRange = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCustomStartDate(draftCustomStartDate);
+    setCustomEndDate(draftCustomEndDate);
   };
 
   // Filter payments by date range
   const filterPaymentsByDate = useCallback((payments: PaymentRecord[]) => {
-    if (selectedPeriod === 'custom') {
-      if (!customStartDate || !customEndDate) return payments;
-      const startDate = new Date(customStartDate);
-      const endDate = new Date(customEndDate);
-      endDate.setHours(23, 59, 59, 999);
-      
-      const filtered = payments.filter(payment => {
-        const paymentDate = new Date(payment.date);
-        const isInRange = paymentDate >= startDate && paymentDate <= endDate;
-        return isInRange;
-      });
-      
-      return filtered;
-    }
+    if (!dateRange) return payments;
 
-    const now = new Date();
-    let startDate: Date;
-    let endDate = new Date(now);
-
-    switch (selectedPeriod) {
-      case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case 'yesterday':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-        break;
-      case 'week':
-        startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case 'quarter':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
-        break;
-      default:
-        return payments;
-    }
+    const startDate = new Date(`${dateRange.startDate}T00:00:00`);
+    const endDate = new Date(`${dateRange.endDate}T23:59:59.999`);
 
     return payments.filter(payment => {
       const paymentDate = new Date(payment.date);
       return paymentDate >= startDate && paymentDate <= endDate;
     });
-  }, [selectedPeriod, customStartDate, customEndDate]);
+  }, [dateRange]);
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -187,9 +217,16 @@ const FinancialPaymentsPage: React.FC = () => {
         // Fetch admin names first
         const adminNames = await fetchAdminNames();
         
+        const paymentParams = new URLSearchParams();
+        if (dateRange) {
+          paymentParams.set('startDate', dateRange.startDate);
+          paymentParams.set('endDate', dateRange.endDate);
+        }
+        const paymentQuery = paymentParams.toString();
+        
         const [carWashResponse, salesResponse] = await Promise.all([
-          fetch('/api/admin/payments'),
-          fetch('/api/admin/sales-transactions')
+          fetch(`/api/admin/payments${paymentQuery ? `?${paymentQuery}` : ''}`),
+          fetch(`/api/admin/sales-transactions${paymentQuery ? `?${paymentQuery}` : ''}`)
         ]);
         
         const carWashData = await carWashResponse.json();
@@ -308,7 +345,7 @@ const FinancialPaymentsPage: React.FC = () => {
     };
 
     fetchPayments();
-  }, []);
+  }, [dateRange]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -443,24 +480,31 @@ const FinancialPaymentsPage: React.FC = () => {
 
           {/* Custom Date Range Inputs */}
           {selectedPeriod === 'custom' && (
-            <div className="flex flex-col space-y-2">
+            <form onSubmit={handleApplyCustomDateRange} className="flex flex-col space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Custom Date Range:</label>
-              <div className="flex space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  value={draftCustomStartDate}
+                  onChange={(e) => setDraftCustomStartDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
                 <span className="text-gray-600 dark:text-gray-400 flex items-center">to</span>
                 <input
                   type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  value={draftCustomEndDate}
+                  onChange={(e) => setDraftCustomEndDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
+                <button
+                  type="submit"
+                  disabled={!draftCustomStartDate || !draftCustomEndDate}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed dark:disabled:bg-gray-600"
+                >
+                  Apply
+                </button>
               </div>
-            </div>
+            </form>
           )}
         </div>
       </div>

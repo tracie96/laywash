@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOutstandingCharges } from '@/lib/washerTools';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { washerId, requestedAmount, materialDeductions = 0, toolDeductions = 0, notes, isAdvance = false } = body;
+    const { washerId, requestedAmount, notes, isAdvance = false } = body;
 
     if (!washerId || !requestedAmount) {
       return NextResponse.json(
@@ -200,6 +201,16 @@ export async function POST(request: NextRequest) {
     }
 
     const currentEarnings = washerProfile.total_earnings || 0;
+
+    // Deductions for overdue unreturned tools are calculated here, not trusted from the client
+    let materialDeductions = 0;
+    let toolDeductions = 0;
+    if (!isAdvance) {
+      const { deductions } = await getOutstandingCharges(supabaseAdmin, washerId);
+      materialDeductions = deductions.materialDeductions;
+      toolDeductions = deductions.toolDeductions;
+    }
+
     const totalRequested = requestedAmount + materialDeductions + toolDeductions;
 
     // For advance payments, check if washer has 0 or negative earnings and amount doesn't exceed 2000

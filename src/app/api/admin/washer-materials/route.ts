@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getOutstandingQuantity, getUsedQuantities } from '@/lib/washerTools';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -52,34 +53,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get used quantities from check_in_materials for all tools using material_id
-    const toolIds = tools?.map(tool => tool.id) || [];
-    const usedQuantities: Record<string, number> = {};
+    // Used = quantity consumed on completed check-ins
+    const usedQuantities = await getUsedQuantities(supabaseAdmin, tools || []);
+    // Reserved = quantity on any non-cancelled check-in, so open jobs can't double-allocate
+    const reservedQuantities = await getUsedQuantities(
+      supabaseAdmin,
+      tools || [],
+      ['pending', 'in_progress', 'completed']
+    );
 
-    if (toolIds.length > 0) {
-      const { data: usedMaterials, error: usedError } = await supabaseAdmin
-        .from('check_in_materials')
-        .select('material_id, quantity_used, washer_id')
-        .in('material_id', toolIds);
-
-      if (!usedError && usedMaterials) {
-        // Calculate total used quantity for each tool by washer
-        usedMaterials.forEach(used => {
-          const key = `${used.material_id}_${used.washer_id}`;
-          usedQuantities[key] = (usedQuantities[key] || 0) + used.quantity_used;
-        });
-      }
-    }
-
-    console.log({tools, usedQuantities});
-    // Auto-update is_returned status for tools where used + returned = assigned
+    // Auto-update is_returned status for tools where used + returned + charged = assigned
     for (const tool of tools || []) {
-      const usedKey = `${tool.id}_${tool.washer_id}`;
-      const usedQuantity = usedQuantities[usedKey] || 0;
-      const returnedQuantity = tool.returned_quantity || 0;
-      
-      // If used + returned equals assigned quantity, mark as returned
-      if ((usedQuantity + returnedQuantity >= tool.quantity) && !tool.is_returned) {
+      const usedQuantity = usedQuantities[tool.id] || 0;
+
+      if (getOutstandingQuantity(tool, usedQuantity) === 0 && !tool.is_returned) {
         // Fire and forget the update
         void supabaseAdmin
           .from('washer_tools')
@@ -96,15 +83,11 @@ export async function GET(request: NextRequest) {
     }
 
     const transformedTools = tools?.map(tool => {
-      // Calculate used quantity from check_in_materials
-      const usedKey = `${tool.id}_${tool.washer_id}`;
-      const usedQuantity = usedQuantities[usedKey] || 0;
+      const usedQuantity = usedQuantities[tool.id] || 0;
       const returnedQuantity = tool.returned_quantity || 0;
-      
-      // Calculate available quantity: assigned - used - returned
-      // This follows the same logic as assignments: quantity - returnedQuantity
-      // When some quantity is returned, it's no longer available for use
-      const remainingQuantity = Math.max(0, tool.quantity - usedQuantity - returnedQuantity);
+
+      // Available quantity: assigned - reserved on open/completed jobs - returned - charged
+      const remainingQuantity = getOutstandingQuantity(tool, reservedQuantities[tool.id] || 0);
 
       return {
         id: tool.id,
@@ -112,9 +95,10 @@ export async function GET(request: NextRequest) {
         washer: tool.washer,
         toolName: tool.tool_name,
         toolType: tool.tool_type,
-        quantity: remainingQuantity, // Remaining quantity (assigned - used - returned)
+        quantity: remainingQuantity, // Available to allocate (assigned - reserved - returned - charged)
         assignedQuantity: tool.quantity, // Original assigned quantity
-        usedQuantity: usedQuantity, // Quantity used from check_in_materials
+        usedQuantity: usedQuantity, // Quantity used on completed check-ins
+        reservedQuantity: reservedQuantities[tool.id] || 0, // Includes pending/in-progress check-ins
         returnedQuantity: returnedQuantity, // Returned quantity
         price: tool.amount, // Changed from amount to price
         assignedDate: tool.assigned_date,
@@ -169,7 +153,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Log toolId if provided (for tracking the source tool)
-    console.log('Received data:', { washerId, toolId, toolName, toolType, quantity, price });
     
     // Determine the cost to use: provided price > service replacement cost
     let finalCost = 0;
@@ -208,8 +191,6 @@ export async function POST(request: NextRequest) {
     if (toolId) {
       insertData.tool_id = toolId;
     }
-
-    console.log('Inserting washer tool with data:', insertData);
 
     // Insert new washer tool
     const { data: tool, error } = await supabaseAdmin

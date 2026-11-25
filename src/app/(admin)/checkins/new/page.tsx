@@ -141,12 +141,46 @@ const NewCheckInPage: React.FC = () => {
     email: string;
     phone: string;
   }>>([]);
+  interface WasherToolResponse {
+    id: string;
+    washerId: string;
+    washer?: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+    };
+    toolName: string;
+    toolType: string;
+    quantity: number;
+    assignedQuantity: number;
+    usedQuantity: number;
+    returnedQuantity: number;
+    price: number;
+    assignedDate: string;
+    returnedDate?: string | null;
+    isReturned: boolean;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }
+
   const [serviceMaterials, setServiceMaterials] = useState<Record<string, Array<{
     id: string;
     toolName: string;
     materialType: string;
     quantity: number;
     unit: string;
+    assignedQuantity?: number;
+    returnedQuantity?: number;
+    usedQuantity?: number;
+    washerId?: string;
+    washer?: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+    };
   }>>>({});
 
   const vehicleTypes = [
@@ -300,7 +334,20 @@ const NewCheckInPage: React.FC = () => {
       const result = await response.json();
       
       if (result.success) {
-        setServiceMaterials(prev => ({ ...prev, [serviceId]: result.tools || [] }));
+        const tools = (result.tools || []) as WasherToolResponse[];
+        const mappedTools = tools.map((tool: WasherToolResponse) => ({
+          id: tool.id,
+          toolName: tool.toolName,
+          materialType: tool.toolType,
+          quantity: tool.quantity, 
+          unit: 'unit', 
+          assignedQuantity: tool.assignedQuantity || tool.quantity,
+          returnedQuantity: tool.returnedQuantity || 0,
+          usedQuantity: tool.usedQuantity || 0,
+          washerId: tool.washerId,
+          washer: tool.washer
+        }));
+        setServiceMaterials(prev => ({ ...prev, [serviceId]: mappedTools }));
       } else {
         console.error('Failed to fetch materials for service:', result.error);
         setServiceMaterials(prev => ({ ...prev, [serviceId]: [] }));
@@ -967,7 +1014,7 @@ const NewCheckInPage: React.FC = () => {
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                               Materials can be assigned here or handled by workers during the service
                             </p>
-                            {/* Debug info */}
+                     
                            
                             {!serviceMaterials[service.id] ? (
                               <div className="text-center py-2">
@@ -975,57 +1022,111 @@ const NewCheckInPage: React.FC = () => {
                               </div> 
                             ) : serviceMaterials[service.id].length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400">No materials available for this worker</p>
-                            ) : (
-                              <div className="grid grid-cols-1 gap-3">
-                                {serviceMaterials[service.id]
-                                  .filter((material) => material.quantity > 0)
-                                  .map((material) => {
-                                  const assignedMaterial = selectedService.materials.find(m => m.materialId === material.id);
-                                  
-                                  return (
-                                    <div
-                                      key={material.id}
-                                      className="p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
-                                    >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {material.toolName}
-                                        </h4>
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">
-                                          Available: {material.quantity} {material.unit}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <label className="text-xs text-gray-600 dark:text-gray-400">
-                                          Quantity to use:
-                                        </label>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max={material.quantity}
-                                          step="0"
-                                          className="w-16 px-2 py-1 text-xs border dark:bg-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                          placeholder="0"
-                                          value={assignedMaterial?.quantity || 0}
-                                          onChange={(e) => {
-                                            const quantity = parseFloat(e.target.value) || 0;
-                                            handleMaterialAssignment(service.id, material.id, quantity);
-                                          }}
-                                        />
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">
-                                          {material.unit}
-                                        </span>
-                                      </div>
-                                      {assignedMaterial?.quantity && assignedMaterial.quantity > 0 && (
-                                        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                                          Allocated: {assignedMaterial.quantity} {material.unit} for this check-in
+                            ) : (() => {
+                              // Group materials by toolName
+                              const groupedMaterials = serviceMaterials[service.id].reduce((acc, material) => {
+                                const key = material.toolName;
+                                if (!acc[key]) {
+                                  acc[key] = {
+                                    toolName: material.toolName,
+                                    unit: material.unit,
+                                    materials: [],
+                                    totalAssigned: 0,
+                                    totalReturned: 0,
+                                    totalUsed: 0,
+                                    available: 0,
+                                    ids: []
+                                  };
+                                }
+                                acc[key].materials.push(material);
+                                // Sum up assigned quantities (use assignedQuantity if available, otherwise fallback to quantity)
+                                const assignedQty = material.assignedQuantity || material.quantity || 0;
+                                acc[key].totalAssigned += assignedQty;
+                                acc[key].totalReturned += (material.returnedQuantity || 0);
+                                acc[key].totalUsed += (material.usedQuantity || 0);
+                                acc[key].ids.push(material.id);
+                                // quantity from the API is already assigned - used on other check-ins - returned - charged
+                                acc[key].available += material.quantity || 0;
+                                return acc;
+                              }, {} as Record<string, {
+                                toolName: string;
+                                unit: string;
+                                materials: typeof serviceMaterials[string][number][];
+                                totalAssigned: number;
+                                totalReturned: number;
+                                totalUsed: number;
+                                available: number;
+                                ids: string[];
+                              }>);
+
+                              const groupedArray = Object.values(groupedMaterials).filter(group => group.available > 0);
+
+                              return (
+                                <div className="grid grid-cols-1 gap-3">
+                                  {groupedArray.map((group) => {
+                                    // Allocate from the assignment that has the most stock left
+                                    const primaryMaterialId = [...group.materials]
+                                      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))[0].id;
+                                    const assignedMaterial = selectedService.materials.find(m => group.ids.includes(m.materialId));
+                                    
+                                    return (
+                                      <div
+                                        key={group.toolName}
+                                        className="p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {group.toolName}
+                                          </h4>
+                                          <div className="text-right">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400 block">
+                                              Available: {group.available} {group.unit}
+                                            </span>
+                                            {group.materials.length > 1 && (
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                ({group.materials.length} assignments)
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+                                        <div className="flex items-center space-x-2">
+                                          <label className="text-xs text-gray-600 dark:text-gray-400">
+                                            Quantity to use:
+                                          </label>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={group.available}
+                                            step="0"
+                                            className="w-16 px-2 py-1 text-xs border dark:bg-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            placeholder="0"
+                                            value={assignedMaterial?.quantity || 0}
+                                            onChange={(e) => {
+                                              const quantity = parseFloat(e.target.value) || 0;
+                                              // Use the first material ID for assignment
+                                              handleMaterialAssignment(service.id, primaryMaterialId, quantity);
+                                            }}
+                                          />
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                                            {group.unit}
+                                          </span>
+                                        </div>
+                                        {assignedMaterial?.quantity && assignedMaterial.quantity > 0 && (
+                                          <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                                            Allocated: {assignedMaterial.quantity} {group.unit} for this check-in
+                                          </div>
+                                        )}
+                                        {group.materials.length > 1 && (
+                                          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            Details: {group.totalAssigned} assigned, {group.totalUsed} used, {group.totalReturned} returned
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
 
